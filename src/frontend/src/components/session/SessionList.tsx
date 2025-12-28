@@ -1,0 +1,141 @@
+/**
+ * SessionList Component
+ * Displays sessions within a project
+ */
+
+import React, { useEffect, useState } from 'react';
+import { SessionItem } from './SessionItem';
+import { CreateSessionModal } from './CreateSessionModal';
+import { Button } from '@/components/common/Button';
+import { useSessions } from '@/hooks/useSessions';
+
+export interface SessionListProps {
+  projectId: string;
+}
+
+export const SessionList: React.FC<SessionListProps> = ({ projectId }) => {
+  const {
+    sessions,
+    currentSessionId,
+    loadSessions,
+    createSession,
+    deleteSession,
+    selectSession,
+  } = useSessions(projectId);
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    sessionId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  // Load sessions when project changes
+  useEffect(() => {
+    loadSessions(projectId);
+  }, [projectId, loadSessions]);
+
+  const handleSessionClick = (sessionId: string) => {
+    selectSession(sessionId);
+  };
+
+  const handleContextMenu = (sessionId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      sessionId,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (confirm('Are you sure you want to delete this session?')) {
+      try {
+        await deleteSession(sessionId);
+        setContextMenu(null);
+      } catch (err) {
+        console.error('Failed to delete session:', err);
+      }
+    }
+  };
+
+  const handleCreateSession = async (data: { title?: string }) => {
+    const session = await createSession(projectId, data);
+    selectSession(session.id);
+  };
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
+  return (
+    <div className="space-y-1">
+      {/* New Session Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsCreateModalOpen(true)}
+        className="w-full justify-start text-gray-600 dark:text-gray-400"
+      >
+        <svg
+          className="w-4 h-4 mr-2"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 4v16m8-8H4"
+          />
+        </svg>
+        New Session
+      </Button>
+
+      {/* Session Items */}
+      {sessions.length === 0 ? (
+        <div className="py-4 text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            No sessions yet
+          </p>
+        </div>
+      ) : (
+        sessions.map((session) => (
+          <SessionItem
+            key={session.id}
+            session={session}
+            isSelected={currentSessionId === session.id}
+            onClick={() => handleSessionClick(session.id)}
+            onContextMenu={(e) => handleContextMenu(session.id, e)}
+          />
+        ))
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-bg-primary shadow-lg rounded-md py-1 z-50 border border-border"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <button
+            className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+            onClick={() => handleDeleteSession(contextMenu.sessionId)}
+          >
+            Delete Session
+          </button>
+        </div>
+      )}
+
+      {/* Create Session Modal */}
+      <CreateSessionModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateSession}
+      />
+    </div>
+  );
+};

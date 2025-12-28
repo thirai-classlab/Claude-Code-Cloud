@@ -1,0 +1,250 @@
+version: '3.9'
+
+services:
+  # Frontend Service (Next.js)
+  frontend:
+    container_name: claude-frontend
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-production}
+      args:
+        - NODE_VERSION=20.11
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:8000}
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - claude-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "com.example.description=Claude Code Frontend"
+      - "com.example.service=frontend"
+
+  # Backend Service (FastAPI)
+  backend:
+    container_name: claude-backend
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-production}
+      args:
+        - PYTHON_VERSION=3.11
+        - CLAUDE_CODE_VERSION=latest
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      # Application
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+      # Claude API
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-4.5}
+      - MAX_TOKENS=${MAX_TOKENS:-4096}
+
+      # Redis
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_MAX_CONNECTIONS=${REDIS_MAX_CONNECTIONS:-50}
+
+      # MySQL
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=claude
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-claude_password}
+      - MYSQL_DATABASE=claude_code
+
+      # Session
+      - SESSION_TIMEOUT=${SESSION_TIMEOUT:-3600}
+      - MAX_SESSIONS=${MAX_SESSIONS:-100}
+
+      # Security
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+
+      # Workspace
+      - WORKSPACE_PATH=/app/workspace
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10485760}
+
+      # Rate Limiting
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-30}
+    volumes:
+      - workspace-data:/app/workspace:rw
+      - ./src/backend/app:/app/app:ro  # Development only
+    depends_on:
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    networks:
+      - claude-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.example.description=Claude Code Backend API"
+      - "com.example.service=backend"
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # MySQL Service (Database)
+  mysql:
+    container_name: claude-mysql
+    image: mysql:8.0
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_password}
+      - MYSQL_DATABASE=claude_code
+      - MYSQL_USER=claude
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-claude_password}
+    volumes:
+      - mysql-data:/var/lib/mysql:rw
+    networks:
+      - claude-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "com.example.description=MySQL Database"
+      - "com.example.service=mysql"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Redis Service (Cache & Session Store)
+  redis:
+    container_name: claude-redis
+    image: redis:7.2-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data:rw
+      - ./src/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      - claude-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "com.example.description=Redis Cache & Session Store"
+      - "com.example.service=redis"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # code-server Service (VSCode Web) - Optional
+  code-server:
+    container_name: claude-code-server
+    image: codercom/code-server:4.96.2
+    command: --auth none --bind-addr 0.0.0.0:8080
+    ports:
+      - "${CODE_SERVER_PORT:-8080}:8080"
+    environment:
+      - DOCKER_USER=coder
+      - PASSWORD=${CODE_SERVER_PASSWORD:-}
+      - HASHED_PASSWORD=${CODE_SERVER_HASHED_PASSWORD:-}
+      - SUDO_PASSWORD=${CODE_SERVER_SUDO_PASSWORD:-}
+      - PROXY_DOMAIN=${CODE_SERVER_PROXY_DOMAIN:-}
+      - DEFAULT_WORKSPACE=/home/coder/workspace
+    volumes:
+      - workspace-data:/home/coder/workspace:rw
+      - code-server-data:/home/coder/.local/share/code-server:rw
+    networks:
+      - claude-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.example.description=Claude Code - VSCode Web Editor"
+      - "com.example.service=code-server"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+# Volumes
+volumes:
+  workspace-data:
+    driver: local
+    name: claude-workspace
+    driver_opts:
+      type: none
+      o: bind
+      device: ${WORKSPACE_HOST_PATH:-./workspace}
+
+  redis-data:
+    driver: local
+    name: claude-redis-data
+
+  mysql-data:
+    driver: local
+    name: claude-mysql-data
+
+  code-server-data:
+    driver: local
+    name: claude-code-server-data
+
+# Networks
+networks:
+  claude-network:
+    name: claude-network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1

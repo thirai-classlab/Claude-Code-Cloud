@@ -1,0 +1,79 @@
+version: '3.9'
+
+# Docker-in-Docker Extension for AGENTSDK
+# Simple socket binding approach for Docker access
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dind.yml up -d
+
+services:
+  # Docker-in-Docker service for isolated container execution
+  dind:
+    container_name: claude-dind
+    image: docker:27.4-dind
+    privileged: true
+    networks:
+      - claude-network
+    environment:
+      - DOCKER_TLS_CERTDIR=  # Disable TLS for internal network
+    volumes:
+      # Persistent Docker storage
+      - dind-storage:/var/lib/docker
+      # Shared workspace
+      - workspace-data:/workspaces:rw
+    command: dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 --storage-driver=overlay2
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+  # Update code-server with Docker CLI
+  code-server:
+    user: root
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      apt-get update && apt-get install -y docker.io &&
+      chown -R coder:coder /home/coder &&
+      exec su coder -c 'dumb-init /usr/bin/code-server --bind-addr 0.0.0.0:8080 /home/coder/workspace'
+      "
+    environment:
+      - DOCKER_HOST=tcp://dind:2375
+    depends_on:
+      dind:
+        condition: service_healthy
+
+  # Update backend with Docker access
+  backend:
+    environment:
+      - DOCKER_HOST=tcp://dind:2375
+      - DIND_ENABLED=true
+      - DIND_WORKSPACE_PATH=/workspaces
+      - DOCKER_BUILDKIT=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      dind:
+        condition: service_healthy
+
+volumes:
+  dind-storage:
+    name: claude-dind-storage
+    driver: local
+
+  workspace-data:
+    external: true
+    name: claude-workspace
+
+networks:
+  claude-network:
+    external: true

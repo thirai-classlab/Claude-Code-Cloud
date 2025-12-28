@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+   "serena": {
+			"command": "uvx",
+			"args": [
+				"--from",
+				"git+https://github.com/oraios/serena",
+				"serena",
+				"start-mcp-server",
+				"--context",
+				"ide-assistant"
+			]
+		},
+		"salesforce": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@tsmztech/mcp-server-salesforce"
+      ],
+      "env": {
+        "SALESFORCE_CONNECTION_TYPE": "User_Password",
+        "SALESFORCE_USERNAME": "system+integration@classlab.co.jp",
+        "SALESFORCE_PASSWORD": "classlab1993",
+        "SALESFORCE_TOKEN": "mEIpXw0ZgDSIiRq5TH4yHxx2e",
+        "SALESFORCE_INSTANCE_URL": "https://login.salesforce.com"
+      }
+		},
+		"asana": {
+			"command": "npx",
+			"args": ["mcp-remote", "https://mcp.asana.com/sse"]
+		},
+    "slack": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "slack-mcp-server@latest",
+        "--transport",
+        "stdio"
+      ],
+      "env": {
+        "SLACK_MCP_XOXP_TOKEN": "xoxp-7303931165265-7380398304305-10158039878965-5bf0d95d946395a37fd7c1b39fbc4ef1"
+      }
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    }
+  }
+}

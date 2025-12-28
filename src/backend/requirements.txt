@@ -1,0 +1,32 @@
+# FastAPI and ASGI Server
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9
+
+# Claude Agent SDK
+anthropic>=0.39.0
+
+# Redis Client
+redis[hiredis]==5.0.1
+
+# Pydantic for validation
+pydantic==2.9.0
+pydantic-settings==2.5.0
+
+# WebSocket support
+websockets==12.0
+
+# CORS middleware
+python-jose[cryptography]==3.3.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Logging
+structlog==24.1.0
+
+# Utilities
+aiofiles==23.2.1
+
+# Scheduler for cron jobs
+apscheduler==3.10.4

@@ -1,0 +1,35 @@
+:root[data-theme='claude'] {
+  /* Primary colors */
+  --color-primary: #C17942;
+  --color-primary-light: #D89968;
+  --color-primary-dark: #A05F2E;
+
+  /* Background */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #F7F7F5;
+  --color-bg-tertiary: #EEEEEB;
+
+  /* Text */
+  --color-text-primary: #2B2520;
+  --color-text-secondary: #6B6662;
+  --color-text-tertiary: #9E9A96;
+
+  /* Border */
+  --color-border: #E0DDD9;
+  --color-border-hover: #C8C4BF;
+
+  /* Accent */
+  --color-accent-blue: #4A90E2;
+  --color-accent-green: #7CB342;
+  --color-accent-red: #E74C3C;
+  --color-accent-yellow: #F39C12;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Font */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
