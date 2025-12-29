@@ -118,3 +118,36 @@ class ProjectNotFoundError(AppException):
             message=f"Project {project_id} not found",
             status_code=404,
         )
+
+
+class NotFoundError(AppException):
+    """汎用リソース未検出エラー"""
+
+    def __init__(self, resource: str, resource_id: str):
+        super().__init__(
+            code=ErrorCode.NOT_FOUND,
+            message=f"{resource} {resource_id} not found",
+            status_code=404,
+        )
+
+
+class PermissionDeniedError(AppException):
+    """権限拒否エラー"""
+
+    def __init__(self, message: str = "Permission denied"):
+        super().__init__(
+            code=ErrorCode.PERMISSION_DENIED,
+            message=message,
+            status_code=403,
+        )
+
+
+class ValidationError(AppException):
+    """バリデーションエラー"""
+
+    def __init__(self, message: str):
+        super().__init__(
+            code=ErrorCode.VALIDATION_ERROR,
+            message=message,
+            status_code=400,
+        )

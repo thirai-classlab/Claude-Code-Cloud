@@ -5,9 +5,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
 import type { ProjectMCPServer, CreateProjectMCPServerRequest, UpdateProjectMCPServerRequest, MCPTool } from '@/types';
+import { ToggleSwitch, useSuccessMessage } from './shared';
 
 interface MCPSettingsEditorProps {
   projectId: string;
@@ -48,7 +49,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, showSuccess] = useSuccessMessage();
 
   const [isAddingServer, setIsAddingServer] = useState(false);
   const [editingServerId, setEditingServerId] = useState<string | null>(null);
@@ -71,8 +72,9 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
     try {
       const serverList = await projectConfigApi.listMCPServers(projectId);
       setServers(serverList);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load MCP servers');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load MCP servers';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -81,11 +83,6 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
   useEffect(() => {
     loadServers();
   }, [loadServers]);
-
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
 
   const parseEnvString = (envStr: string): Record<string, string> => {
     const env: Record<string, string> = {};
@@ -135,8 +132,9 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       await projectConfigApi.deleteMCPServer(projectId, server.id);
       setServers(prev => prev.filter(s => s.id !== server.id));
       showSuccess(`Server "${server.name}" deleted successfully`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete server');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete server';
+      setError(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -150,8 +148,9 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       });
       setServers(prev => prev.map(s => s.id === server.id ? updated : s));
       showSuccess(`Server "${server.name}" ${updated.enabled ? 'enabled' : 'disabled'}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update server');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update server';
+      setError(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -198,8 +197,9 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       setIsAddingServer(false);
       setEditingServerId(null);
       setServerForm(emptyServerForm);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save server configuration');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save server configuration';
+      setError(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -366,16 +366,17 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       } else {
         setError(result.error || 'Connection test failed');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to test connection';
       setTestResults(prev => ({
         ...prev,
         [server.id]: {
           loading: false,
           success: false,
-          error: err.message || 'Failed to test connection'
+          error: errorMessage
         }
       }));
-      setError(err.message || 'Failed to test connection');
+      setError(errorMessage);
     }
   };
 
@@ -424,8 +425,9 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       });
       setServers(prev => prev.map(s => s.id === server.id ? updated : s));
       showSuccess(`Tool "${toolName}" ${enabled ? 'enabled' : 'disabled'}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update tool settings');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update tool settings';
+      setError(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -676,20 +678,12 @@ SOME_VAR=value"
 
                       <div className="flex items-center gap-2 ml-4">
                         {/* Toggle Switch */}
-                        <button
-                          onClick={() => handleToggleEnabled(server)}
+                        <ToggleSwitch
+                          checked={server.enabled}
+                          onChange={() => handleToggleEnabled(server)}
                           disabled={isSaving}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
-                            server.enabled ? 'bg-primary' : 'bg-bg-tertiary'
-                          }`}
                           title={server.enabled ? 'Disable server' : 'Enable server'}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              server.enabled ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
+                        />
 
                         <button
                           onClick={() => handleEditServer(server)}

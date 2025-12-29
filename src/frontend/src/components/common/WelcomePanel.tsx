@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Button } from './Button';
+import { Button } from '@/components/atoms';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { CreateProjectModal } from '@/components/project/CreateProjectModal';

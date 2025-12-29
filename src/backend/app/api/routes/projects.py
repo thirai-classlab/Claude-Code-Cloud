@@ -7,16 +7,28 @@ Project Management API
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, Query
 
-from app.api.dependencies import get_db_session, get_project_manager, get_session_manager
+from app.api.dependencies import (
+    get_permission_service,
+    get_project_manager,
+    get_session_manager,
+    get_share_service,
+    get_usage_service,
+)
 from app.api.middleware import handle_exceptions
 from app.core.auth.users import current_active_user
 from app.core.project_manager import ProjectManager
 from app.core.security.validator import InputValidator
 from app.core.session_manager import SessionManager
 from app.models.database import UserModel
+from app.models.errors import (
+    NotFoundError,
+    PermissionDeniedError,
+    ProjectNotFoundError,
+    SessionNotFoundError,
+    ValidationError,
+)
 from app.schemas.request import CreateProjectRequest, CreateSessionRequest, UpdateProjectRequest
 from app.schemas.response import (
     CostLimitCheckResponse,
@@ -33,27 +45,6 @@ from app.services.share_service import ShareService
 from app.services.usage_service import UsageService
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-
-async def get_permission_service(
-    session: AsyncSession = Depends(get_db_session),
-) -> PermissionService:
-    """PermissionService取得"""
-    return PermissionService(session)
-
-
-async def get_share_service(
-    session: AsyncSession = Depends(get_db_session),
-) -> ShareService:
-    """ShareService取得"""
-    return ShareService(session)
-
-
-async def get_usage_service(
-    session: AsyncSession = Depends(get_db_session),
-) -> UsageService:
-    """UsageService取得"""
-    return UsageService(session)
 
 
 @router.post("", response_model=ProjectResponse, status_code=201)
@@ -203,14 +194,11 @@ async def get_project(
     project = await manager.get_project(project_id)
 
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     # 権限チェック（認証ユーザーがアクセス可能か）
     if not await permission_service.can_access_project(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to this project"
-        )
+        raise PermissionDeniedError("You don't have access to this project")
 
     return ProjectResponse(**project.model_dump())
 
@@ -239,10 +227,7 @@ async def update_project(
     """
     # 権限チェック（書き込み権限が必要）
     if not await permission_service.can_write(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have permission to update this project"
-        )
+        raise PermissionDeniedError("You don't have permission to update this project")
 
     if request.name:
         InputValidator.validate_project_name(request.name)
@@ -255,7 +240,7 @@ async def update_project(
     )
 
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     return ProjectResponse(**project.model_dump())
 
@@ -280,14 +265,11 @@ async def delete_project(
     # プロジェクト存在確認
     project = await manager.get_project(project_id)
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     # 権限チェック（オーナーのみ削除可能）
     if not await permission_service.is_owner(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="Only the project owner can delete the project"
-        )
+        raise PermissionDeniedError("Only the project owner can delete the project")
 
     await manager.delete_project(project_id)
 
@@ -324,14 +306,11 @@ async def get_project_sessions(
     # プロジェクト存在確認
     project = await project_manager.get_project(project_id)
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     # 権限チェック（アクセス権限が必要）
     if not await permission_service.can_access_project(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to this project"
-        )
+        raise PermissionDeniedError("You don't have access to this project")
 
     # プロジェクト配下のセッション取得
     sessions = await session_manager.list_sessions(
@@ -373,14 +352,11 @@ async def create_project_session(
     # プロジェクト存在確認
     project = await project_manager.get_project(project_id)
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     # 権限チェック（書き込み権限が必要）
     if not await permission_service.can_write(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have permission to create sessions in this project"
-        )
+        raise PermissionDeniedError("You don't have permission to create sessions in this project")
 
     # セッション作成（project_idを強制上書き、user_idは認証ユーザー）
     new_session = await session_manager.create_session(
@@ -419,21 +395,16 @@ async def delete_project_session(
     """
     # 権限チェック（書き込み権限が必要）
     if not await permission_service.can_write(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have permission to delete sessions in this project"
-        )
+        raise PermissionDeniedError("You don't have permission to delete sessions in this project")
 
     # セッション存在確認
     target_session = await session_manager.get_session(session_id)
     if not target_session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise SessionNotFoundError(session_id)
 
     # プロジェクト所属確認
     if target_session.project_id != project_id:
-        raise HTTPException(
-            status_code=400, detail=f"Session {session_id} does not belong to project {project_id}"
-        )
+        raise ValidationError(f"Session {session_id} does not belong to project {project_id}")
 
     # セッション削除
     await session_manager.delete_session(session_id)
@@ -472,14 +443,11 @@ async def get_project_usage(
     # プロジェクト存在確認
     project = await project_manager.get_project(project_id)
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     # 権限チェック（アクセス権限が必要）
     if not await permission_service.can_access_project(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to this project"
-        )
+        raise PermissionDeniedError("You don't have access to this project")
 
     stats = await usage_service.get_usage_stats(project_id)
     return UsageStatsResponse(**stats)
@@ -512,14 +480,11 @@ async def check_cost_limits(
     # プロジェクト存在確認
     project = await project_manager.get_project(project_id)
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     # 権限チェック（アクセス権限が必要）
     if not await permission_service.can_access_project(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to this project"
-        )
+        raise PermissionDeniedError("You don't have access to this project")
 
     result = await usage_service.check_cost_limits(project_id)
     return CostLimitCheckResponse(**result)
@@ -551,10 +516,7 @@ async def update_cost_limits(
     """
     # 権限チェック（オーナーのみ変更可能）
     if not await permission_service.is_owner(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="Only the project owner can update cost limits"
-        )
+        raise PermissionDeniedError("Only the project owner can update cost limits")
 
     project = await usage_service.update_cost_limits(
         project_id=project_id,
@@ -564,7 +526,7 @@ async def update_cost_limits(
     )
 
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     # ProjectModelからProjectResponseへ変換
     updated_project = await project_manager.get_project(project_id)
@@ -595,10 +557,7 @@ async def clear_cost_limits(
     """
     # 権限チェック（オーナーのみ変更可能）
     if not await permission_service.is_owner(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="Only the project owner can clear cost limits"
-        )
+        raise PermissionDeniedError("Only the project owner can clear cost limits")
 
     project = await usage_service.update_cost_limits(
         project_id=project_id,
@@ -606,7 +565,7 @@ async def clear_cost_limits(
     )
 
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+        raise ProjectNotFoundError(project_id)
 
     # ProjectModelからProjectResponseへ変換
     updated_project = await project_manager.get_project(project_id)

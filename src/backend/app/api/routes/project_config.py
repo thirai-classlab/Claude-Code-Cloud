@@ -7,13 +7,13 @@ MCP Server, Agent, Skill, Command のCRUD API
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends
 
-from app.api.dependencies import get_db_session
+from app.api.dependencies import get_permission_service, get_project_config_service
 from app.api.middleware import handle_exceptions
 from app.core.auth.users import current_active_user
 from app.models.database import UserModel
+from app.models.errors import NotFoundError, PermissionDeniedError
 from app.services.permission_service import PermissionService
 from app.services.project_config_service import ProjectConfigService
 from app.services.mcp_service import MCPService
@@ -38,20 +38,6 @@ from app.schemas.project_config import (
 router = APIRouter(prefix="/projects/{project_id}", tags=["project-config"])
 
 
-async def get_config_service(
-    session: AsyncSession = Depends(get_db_session),
-) -> ProjectConfigService:
-    """ProjectConfigService取得"""
-    return ProjectConfigService(session)
-
-
-async def get_permission_service(
-    session: AsyncSession = Depends(get_db_session),
-) -> PermissionService:
-    """PermissionService取得"""
-    return PermissionService(session)
-
-
 async def check_read_permission(
     project_id: str,
     current_user: UserModel,
@@ -59,10 +45,7 @@ async def check_read_permission(
 ) -> None:
     """読み取り権限チェック"""
     if not await permission_service.can_access_project(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to this project"
-        )
+        raise PermissionDeniedError("You don't have access to this project")
 
 
 async def check_write_permission(
@@ -72,10 +55,7 @@ async def check_write_permission(
 ) -> None:
     """書き込み権限チェック"""
     if not await permission_service.can_write(current_user.id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have permission to modify this project"
-        )
+        raise PermissionDeniedError("You don't have permission to modify this project")
 
 
 # ============================================
@@ -88,7 +68,7 @@ async def check_write_permission(
 async def get_project_config(
     project_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> ProjectConfigJSON:
     """
@@ -110,7 +90,7 @@ async def get_project_config(
 async def list_mcp_servers(
     project_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> List[MCPServerResponse]:
     """MCPサーバー一覧取得（認証必須）"""
@@ -125,7 +105,7 @@ async def create_mcp_server(
     project_id: str,
     request: MCPServerCreate,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> MCPServerResponse:
     """MCPサーバー作成（認証必須、書き込み権限）"""
@@ -140,14 +120,14 @@ async def get_mcp_server(
     project_id: str,
     mcp_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> MCPServerResponse:
     """MCPサーバー取得（認証必須）"""
     await check_read_permission(project_id, current_user, permission_service)
     server = await config_service.get_mcp_server(project_id, mcp_id)
     if not server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+        raise NotFoundError("MCP server", mcp_id)
     return MCPServerResponse.model_validate(server)
 
 
@@ -158,14 +138,14 @@ async def update_mcp_server(
     mcp_id: str,
     request: MCPServerUpdate,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> MCPServerResponse:
     """MCPサーバー更新（認証必須、書き込み権限）"""
     await check_write_permission(project_id, current_user, permission_service)
     server = await config_service.update_mcp_server(project_id, mcp_id, request)
     if not server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+        raise NotFoundError("MCP server", mcp_id)
     return MCPServerResponse.model_validate(server)
 
 
@@ -175,13 +155,13 @@ async def delete_mcp_server(
     project_id: str,
     mcp_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> None:
     """MCPサーバー削除（認証必須、書き込み権限）"""
     await check_write_permission(project_id, current_user, permission_service)
     if not await config_service.delete_mcp_server(project_id, mcp_id):
-        raise HTTPException(status_code=404, detail="MCP server not found")
+        raise NotFoundError("MCP server", mcp_id)
 
 
 @router.post("/mcp-servers/{mcp_id}/test", response_model=MCPTestResponse)
@@ -190,7 +170,7 @@ async def test_mcp_server(
     project_id: str,
     mcp_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> MCPTestResponse:
     """
@@ -207,7 +187,7 @@ async def test_mcp_server(
     # MCPサーバー設定を取得
     server = await config_service.get_mcp_server(project_id, mcp_id)
     if not server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+        raise NotFoundError("MCP server", mcp_id)
 
     # 接続テスト実行
     result = await MCPService.test_connection(
@@ -225,7 +205,7 @@ async def get_mcp_tools(
     project_id: str,
     mcp_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> MCPToolsResponse:
     """
@@ -241,7 +221,7 @@ async def get_mcp_tools(
     # MCPサーバー設定を取得
     server = await config_service.get_mcp_server(project_id, mcp_id)
     if not server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+        raise NotFoundError("MCP server", mcp_id)
 
     # ツール一覧取得
     result = await MCPService.get_tools(
@@ -263,7 +243,7 @@ async def get_mcp_tools(
 async def list_agents(
     project_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> List[AgentResponse]:
     """エージェント一覧取得（認証必須）"""
@@ -278,7 +258,7 @@ async def create_agent(
     project_id: str,
     request: AgentCreate,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> AgentResponse:
     """エージェント作成（認証必須、書き込み権限）"""
@@ -293,14 +273,14 @@ async def get_agent(
     project_id: str,
     agent_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> AgentResponse:
     """エージェント取得（認証必須）"""
     await check_read_permission(project_id, current_user, permission_service)
     agent = await config_service.get_agent(project_id, agent_id)
     if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
+        raise NotFoundError("Agent", agent_id)
     return AgentResponse.model_validate(agent)
 
 
@@ -311,14 +291,14 @@ async def update_agent(
     agent_id: str,
     request: AgentUpdate,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> AgentResponse:
     """エージェント更新（認証必須、書き込み権限）"""
     await check_write_permission(project_id, current_user, permission_service)
     agent = await config_service.update_agent(project_id, agent_id, request)
     if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
+        raise NotFoundError("Agent", agent_id)
     return AgentResponse.model_validate(agent)
 
 
@@ -328,13 +308,13 @@ async def delete_agent(
     project_id: str,
     agent_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> None:
     """エージェント削除（認証必須、書き込み権限）"""
     await check_write_permission(project_id, current_user, permission_service)
     if not await config_service.delete_agent(project_id, agent_id):
-        raise HTTPException(status_code=404, detail="Agent not found")
+        raise NotFoundError("Agent", agent_id)
 
 
 # ============================================
@@ -347,7 +327,7 @@ async def delete_agent(
 async def list_skills(
     project_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> List[SkillResponse]:
     """スキル一覧取得（認証必須）"""
@@ -362,7 +342,7 @@ async def create_skill(
     project_id: str,
     request: SkillCreate,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> SkillResponse:
     """スキル作成（認証必須、書き込み権限）"""
@@ -377,14 +357,14 @@ async def get_skill(
     project_id: str,
     skill_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> SkillResponse:
     """スキル取得（認証必須）"""
     await check_read_permission(project_id, current_user, permission_service)
     skill = await config_service.get_skill(project_id, skill_id)
     if not skill:
-        raise HTTPException(status_code=404, detail="Skill not found")
+        raise NotFoundError("Skill", skill_id)
     return SkillResponse.model_validate(skill)
 
 
@@ -395,14 +375,14 @@ async def update_skill(
     skill_id: str,
     request: SkillUpdate,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> SkillResponse:
     """スキル更新（認証必須、書き込み権限）"""
     await check_write_permission(project_id, current_user, permission_service)
     skill = await config_service.update_skill(project_id, skill_id, request)
     if not skill:
-        raise HTTPException(status_code=404, detail="Skill not found")
+        raise NotFoundError("Skill", skill_id)
     return SkillResponse.model_validate(skill)
 
 
@@ -412,13 +392,13 @@ async def delete_skill(
     project_id: str,
     skill_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> None:
     """スキル削除（認証必須、書き込み権限）"""
     await check_write_permission(project_id, current_user, permission_service)
     if not await config_service.delete_skill(project_id, skill_id):
-        raise HTTPException(status_code=404, detail="Skill not found")
+        raise NotFoundError("Skill", skill_id)
 
 
 # ============================================
@@ -431,7 +411,7 @@ async def delete_skill(
 async def list_commands(
     project_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> List[CommandResponse]:
     """コマンド一覧取得（認証必須）"""
@@ -446,7 +426,7 @@ async def create_command(
     project_id: str,
     request: CommandCreate,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> CommandResponse:
     """コマンド作成（認証必須、書き込み権限）"""
@@ -461,14 +441,14 @@ async def get_command(
     project_id: str,
     command_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> CommandResponse:
     """コマンド取得（認証必須）"""
     await check_read_permission(project_id, current_user, permission_service)
     command = await config_service.get_command(project_id, command_id)
     if not command:
-        raise HTTPException(status_code=404, detail="Command not found")
+        raise NotFoundError("Command", command_id)
     return CommandResponse.model_validate(command)
 
 
@@ -479,14 +459,14 @@ async def update_command(
     command_id: str,
     request: CommandUpdate,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> CommandResponse:
     """コマンド更新（認証必須、書き込み権限）"""
     await check_write_permission(project_id, current_user, permission_service)
     command = await config_service.update_command(project_id, command_id, request)
     if not command:
-        raise HTTPException(status_code=404, detail="Command not found")
+        raise NotFoundError("Command", command_id)
     return CommandResponse.model_validate(command)
 
 
@@ -496,10 +476,10 @@ async def delete_command(
     project_id: str,
     command_id: str,
     current_user: UserModel = Depends(current_active_user),
-    config_service: ProjectConfigService = Depends(get_config_service),
+    config_service: ProjectConfigService = Depends(get_project_config_service),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> None:
     """コマンド削除（認証必須、書き込み権限）"""
     await check_write_permission(project_id, current_user, permission_service)
     if not await config_service.delete_command(project_id, command_id):
-        raise HTTPException(status_code=404, detail="Command not found")
+        raise NotFoundError("Command", command_id)

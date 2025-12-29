@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { ToolExecution } from '@/types/tool';
 
 interface ToolExecutionDisplayProps {
@@ -105,8 +105,8 @@ const generateSummary = (execution: ToolExecution): string => {
   return inputSummary;
 };
 
-// SVG Icon Component
-const ToolIcon: React.FC<{ name: string; className?: string }> = ({ name, className = "w-4 h-4" }) => {
+// SVG Icon Component (memoized)
+const ToolIcon = memo<{ name: string; className?: string }>(({ name, className = "w-4 h-4" }) => {
   const iconProps = { className, fill: "none", stroke: "currentColor", strokeWidth: 1.5, viewBox: "0 0 24 24" };
 
   switch (name) {
@@ -181,9 +181,30 @@ const ToolIcon: React.FC<{ name: string; className?: string }> = ({ name, classN
         </svg>
       );
   }
+});
+
+ToolIcon.displayName = 'ToolIcon';
+
+// Custom comparison function for memo
+const areToolExecutionPropsEqual = (
+  prevProps: ToolExecutionDisplayProps,
+  nextProps: ToolExecutionDisplayProps
+): boolean => {
+  const prev = prevProps.execution;
+  const next = nextProps.execution;
+
+  // Compare essential properties
+  if (prev.id !== next.id) return false;
+  if (prev.status !== next.status) return false;
+  if (prev.name !== next.name) return false;
+  if (prev.output !== next.output) return false;
+  if (prev.error !== next.error) return false;
+  if (prev.endTime !== next.endTime) return false;
+
+  return true;
 };
 
-export const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({ execution }) => {
+const ToolExecutionDisplayComponent: React.FC<ToolExecutionDisplayProps> = ({ execution }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getStatusStyles = (status: string) => {
@@ -311,3 +332,6 @@ export const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({ exec
     </div>
   );
 };
+
+// Export memoized component
+export const ToolExecutionDisplay = memo(ToolExecutionDisplayComponent, areToolExecutionPropsEqual);

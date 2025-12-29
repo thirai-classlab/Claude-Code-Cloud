@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { projectsApi } from '@/lib/api';
 import { useProjects } from '@/hooks/useProjects';
 

@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { Modal } from '@/components/common/Modal';
 import { templatesApi } from '@/lib/api/templates';
 import type { TemplateListItem, CreateTemplateRequest, UpdateTemplateRequest } from '@/types/template';

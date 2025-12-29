@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { ChatContainer } from '@/components/chat/ChatContainer';
@@ -25,56 +25,62 @@ export const MainLayout: React.FC = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
 
+  // Memoized callback handlers for shortcuts
+  const openCommandPalette = useCallback(() => setIsCommandPaletteOpen(true), []);
+  const openShortcutsHelp = useCallback(() => setIsShortcutsHelpOpen(true), []);
+  const closeModals = useCallback(() => {
+    setIsCommandPaletteOpen(false);
+    setIsShortcutsHelpOpen(false);
+  }, []);
+
+  // Memoized keyboard shortcuts array to prevent unnecessary re-renders
+  const shortcuts = useMemo(() => [
+    {
+      key: 'k',
+      metaKey: true,
+      description: 'Open command palette',
+      action: openCommandPalette,
+    },
+    {
+      key: 'k',
+      ctrlKey: true,
+      description: 'Open command palette',
+      action: openCommandPalette,
+    },
+    {
+      key: 'b',
+      metaKey: true,
+      description: 'Toggle sidebar',
+      action: toggleSidebar,
+    },
+    {
+      key: 'b',
+      ctrlKey: true,
+      description: 'Toggle sidebar',
+      action: toggleSidebar,
+    },
+    {
+      key: '/',
+      metaKey: true,
+      description: 'Show keyboard shortcuts',
+      action: openShortcutsHelp,
+    },
+    {
+      key: '/',
+      ctrlKey: true,
+      description: 'Show keyboard shortcuts',
+      action: openShortcutsHelp,
+    },
+    {
+      key: 'Escape',
+      description: 'Close modals',
+      action: closeModals,
+      preventDefault: false,
+    },
+  ], [openCommandPalette, openShortcutsHelp, closeModals, toggleSidebar]);
+
   // Global keyboard shortcuts
-  useKeyboardShortcuts({
-    shortcuts: [
-      {
-        key: 'k',
-        metaKey: true,
-        description: 'Open command palette',
-        action: () => setIsCommandPaletteOpen(true),
-      },
-      {
-        key: 'k',
-        ctrlKey: true,
-        description: 'Open command palette',
-        action: () => setIsCommandPaletteOpen(true),
-      },
-      {
-        key: 'b',
-        metaKey: true,
-        description: 'Toggle sidebar',
-        action: toggleSidebar,
-      },
-      {
-        key: 'b',
-        ctrlKey: true,
-        description: 'Toggle sidebar',
-        action: toggleSidebar,
-      },
-      {
-        key: '/',
-        metaKey: true,
-        description: 'Show keyboard shortcuts',
-        action: () => setIsShortcutsHelpOpen(true),
-      },
-      {
-        key: '/',
-        ctrlKey: true,
-        description: 'Show keyboard shortcuts',
-        action: () => setIsShortcutsHelpOpen(true),
-      },
-      {
-        key: 'Escape',
-        description: 'Close modals',
-        action: () => {
-          setIsCommandPaletteOpen(false);
-          setIsShortcutsHelpOpen(false);
-        },
-        preventDefault: false,
-      },
-    ],
-  });
+  useKeyboardShortcuts({ shortcuts });
 
   return (
     <div className="h-screen w-screen flex flex-col bg-bg-primary overflow-hidden">

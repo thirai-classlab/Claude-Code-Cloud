@@ -5,91 +5,26 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
 import type { ProjectSkill, CreateProjectSkillRequest, UpdateProjectSkillRequest } from '@/types';
+import {
+  CATEGORY_CONFIG,
+  CATEGORY_ORDER,
+  parseMarkdownWithFrontmatter,
+  ToggleSwitch,
+  useSuccessMessage,
+  type EditorCategory,
+} from './shared';
 
 interface SkillsSettingsEditorProps {
   projectId: string;
 }
 
-// Skill category type
-type SkillCategory = 'custom' | 'exploration' | 'development' | 'quality' | 'documentation' | 'devops' | 'data';
-
-// Category display configuration
-const CATEGORY_CONFIG: Record<SkillCategory, { label: string; icon: React.ReactNode }> = {
-  custom: {
-    label: 'Custom',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-      </svg>
-    ),
-  },
-  exploration: {
-    label: 'Exploration',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-    ),
-  },
-  development: {
-    label: 'Development',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-      </svg>
-    ),
-  },
-  quality: {
-    label: 'Quality',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  documentation: {
-    label: 'Documentation',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
-  devops: {
-    label: 'DevOps',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      </svg>
-    ),
-  },
-  data: {
-    label: 'Data',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-      </svg>
-    ),
-  },
-};
-
-const CATEGORY_ORDER: SkillCategory[] = [
-  'custom',
-  'exploration',
-  'development',
-  'quality',
-  'documentation',
-  'devops',
-  'data',
-];
-
 interface SkillFormData {
   name: string;
   description: string;
-  category: SkillCategory;
+  category: EditorCategory;
   content: string;
   enabled: boolean;
 }
@@ -102,44 +37,12 @@ const emptySkillForm: SkillFormData = {
   enabled: true,
 };
 
-// Parse YAML frontmatter from markdown
-interface ParsedMarkdown {
-  meta: Record<string, unknown>;
-  content: string;
-}
-
-const parseMarkdownWithFrontmatter = (markdown: string): ParsedMarkdown | null => {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
-  const match = markdown.match(frontmatterRegex);
-  if (!match) return null;
-
-  const frontmatter = match[1];
-  const content = match[2].trim();
-
-  // Simple YAML parser
-  const meta: Record<string, unknown> = {};
-  const lines = frontmatter.split('\n');
-
-  for (const line of lines) {
-    // Key: value
-    if (line.match(/^(\w+):\s*(.+)$/)) {
-      const matches = line.match(/^(\w+):\s*(.+)$/);
-      if (matches) {
-        const [, key, value] = matches;
-        meta[key] = value === 'true' ? true : value === 'false' ? false : value;
-      }
-    }
-  }
-
-  return { meta, content };
-};
-
 export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ projectId }) => {
   const [skills, setSkills] = useState<ProjectSkill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, showSuccess] = useSuccessMessage();
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -173,11 +76,6 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
     loadSkills();
   }, [loadSkills]);
 
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
   const handleOpenCreateModal = () => {
     setEditingSkillId(null);
     setSkillForm(emptySkillForm);
@@ -190,7 +88,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
     setSkillForm({
       name: skill.name,
       description: skill.description || '',
-      category: (skill.category as SkillCategory) || 'custom',
+      category: (skill.category as EditorCategory) || 'custom',
       content: skill.content || '',
       enabled: skill.enabled,
     });
@@ -348,7 +246,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
       acc[category] = skills.filter((s) => s.category === category);
       return acc;
     },
-    {} as Record<SkillCategory, ProjectSkill[]>
+    {} as Record<EditorCategory, ProjectSkill[]>
   );
 
   // Calculate stats
@@ -490,22 +388,12 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
 
                         <div className="flex items-center gap-2">
                           {/* Toggle Switch */}
-                          <button
-                            onClick={() => handleToggleEnabled(skill)}
+                          <ToggleSwitch
+                            checked={skill.enabled}
+                            onChange={() => handleToggleEnabled(skill)}
                             disabled={isSaving}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
-                              skill.enabled ? 'bg-primary' : 'bg-bg-tertiary'
-                            }`}
-                            role="switch"
-                            aria-checked={skill.enabled}
                             title={skill.enabled ? 'Disable skill' : 'Enable skill'}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                skill.enabled ? 'translate-x-6' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
+                          />
 
                           {/* Edit button */}
                           <button
@@ -538,7 +426,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
             })}
 
             {/* Skills without category or with unknown category */}
-            {skills.filter(s => !CATEGORY_ORDER.includes(s.category as SkillCategory)).length > 0 && (
+            {skills.filter(s => !CATEGORY_ORDER.includes(s.category as EditorCategory)).length > 0 && (
               <div className="rounded-lg border border-border bg-bg-secondary overflow-hidden">
                 <div className="px-4 py-3 flex items-center gap-3 border-b border-border bg-bg-tertiary/30">
                   <div className="w-8 h-8 rounded bg-bg-tertiary flex items-center justify-center text-text-tertiary">
@@ -551,7 +439,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                   </div>
                 </div>
                 <div className="divide-y divide-border">
-                  {skills.filter(s => !CATEGORY_ORDER.includes(s.category as SkillCategory)).map((skill) => (
+                  {skills.filter(s => !CATEGORY_ORDER.includes(s.category as EditorCategory)).map((skill) => (
                     <div
                       key={skill.id}
                       className={`px-4 py-3 flex items-center justify-between transition-colors ${
@@ -577,21 +465,11 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleToggleEnabled(skill)}
+                        <ToggleSwitch
+                          checked={skill.enabled}
+                          onChange={() => handleToggleEnabled(skill)}
                           disabled={isSaving}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
-                            skill.enabled ? 'bg-primary' : 'bg-bg-tertiary'
-                          }`}
-                          role="switch"
-                          aria-checked={skill.enabled}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              skill.enabled ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
+                        />
                         <button
                           onClick={() => handleOpenEditModal(skill)}
                           className="p-2 text-text-secondary hover:text-primary hover:bg-primary/10 rounded transition-colors"
@@ -676,7 +554,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                 </label>
                 <select
                   value={skillForm.category}
-                  onChange={(e) => setSkillForm({ ...skillForm, category: e.target.value as SkillCategory })}
+                  onChange={(e) => setSkillForm({ ...skillForm, category: e.target.value as EditorCategory })}
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {CATEGORY_ORDER.map((cat) => (
@@ -705,26 +583,11 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
               </div>
 
               {/* Enabled */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSkillForm({ ...skillForm, enabled: !skillForm.enabled })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary ${
-                    skillForm.enabled ? 'bg-primary' : 'bg-bg-tertiary'
-                  }`}
-                  role="switch"
-                  aria-checked={skillForm.enabled}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      skillForm.enabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-                <label className="text-sm text-text-secondary">
-                  {skillForm.enabled ? 'Enabled' : 'Disabled'}
-                </label>
-              </div>
+              <ToggleSwitch
+                checked={skillForm.enabled}
+                onChange={(checked) => setSkillForm({ ...skillForm, enabled: checked })}
+                label={skillForm.enabled ? 'Enabled' : 'Disabled'}
+              />
             </div>
 
             <div className="p-4 border-t border-border flex justify-end gap-2">

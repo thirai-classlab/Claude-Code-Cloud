@@ -5,7 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
 import type {
   ProjectAgent,
@@ -14,75 +14,19 @@ import type {
 } from '@/types/projectConfig';
 import { AGENT_MODEL_OPTIONS, AGENT_TOOL_OPTIONS } from '@/types/agent';
 import type { AgentModel } from '@/types/agent';
+import {
+  CATEGORY_CONFIG,
+  AGENT_CATEGORY_ORDER,
+  normalizeCategory,
+  parseMarkdownWithFrontmatter,
+  ToggleSwitch,
+  useSuccessMessage,
+  type EditorCategory,
+} from './shared';
 
 interface AgentSettingsEditorProps {
   projectId: string;
 }
-
-// Category type for grouping
-type AgentCategory = 'exploration' | 'development' | 'quality' | 'documentation' | 'devops' | 'data' | 'custom';
-
-// Category display configuration
-const CATEGORY_CONFIG: Record<AgentCategory, { label: string; icon: React.ReactNode }> = {
-  exploration: {
-    label: 'Exploration & Planning',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-    ),
-  },
-  development: {
-    label: 'Development',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-      </svg>
-    ),
-  },
-  quality: {
-    label: 'Quality & Testing',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  documentation: {
-    label: 'Documentation',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
-  devops: {
-    label: 'DevOps & Infrastructure',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-      </svg>
-    ),
-  },
-  data: {
-    label: 'Data & AI',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-  },
-  custom: {
-    label: 'Custom',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-      </svg>
-    ),
-  },
-};
-
-const CATEGORY_ORDER: AgentCategory[] = ['exploration', 'development', 'quality', 'documentation', 'devops', 'data', 'custom'];
 
 // Default form state for creating/editing agents
 const getDefaultAgentForm = (): CreateProjectAgentRequest => ({
@@ -95,60 +39,14 @@ const getDefaultAgentForm = (): CreateProjectAgentRequest => ({
   enabled: true,
 });
 
-// Parse YAML frontmatter from markdown
-interface ParsedMarkdown {
-  meta: Record<string, unknown>;
-  content: string;
-}
-
-const parseMarkdownWithFrontmatter = (markdown: string): ParsedMarkdown | null => {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
-  const match = markdown.match(frontmatterRegex);
-  if (!match) return null;
-
-  const frontmatter = match[1];
-  const content = match[2].trim();
-
-  // Simple YAML parser
-  const meta: Record<string, unknown> = {};
-  const lines = frontmatter.split('\n');
-  let currentKey = '';
-
-  for (const line of lines) {
-    // Array start (e.g., "tools:")
-    if (line.match(/^(\w+):\s*$/)) {
-      currentKey = line.match(/^(\w+):/)?.[1] || '';
-      meta[currentKey] = [];
-    }
-    // Array item
-    else if (line.match(/^\s+-\s+(.+)$/)) {
-      const value = line.match(/^\s+-\s+(.+)$/)?.[1];
-      if (currentKey && Array.isArray(meta[currentKey]) && value) {
-        (meta[currentKey] as string[]).push(value);
-      }
-    }
-    // Key: value
-    else if (line.match(/^(\w+):\s*(.+)$/)) {
-      const matches = line.match(/^(\w+):\s*(.+)$/);
-      if (matches) {
-        const [, key, value] = matches;
-        meta[key] = value === 'true' ? true : value === 'false' ? false : value;
-      }
-      currentKey = '';
-    }
-  }
-
-  return { meta, content };
-};
-
 export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projectId }) => {
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<Set<AgentCategory>>(
-    new Set(CATEGORY_ORDER)
+  const [successMessage, showSuccess] = useSuccessMessage();
+  const [expandedCategories, setExpandedCategories] = useState<Set<EditorCategory>>(
+    new Set(AGENT_CATEGORY_ORDER)
   );
 
   // Create agent modal state
@@ -189,11 +87,6 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
     loadData();
   }, [loadData]);
 
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
   const handleToggleAgent = async (agent: ProjectAgent) => {
     const newEnabled = !agent.enabled;
 
@@ -218,7 +111,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
     }
   };
 
-  const toggleCategory = (category: AgentCategory) => {
+  const toggleCategory = (category: EditorCategory) => {
     const newExpanded = new Set(expandedCategories);
     if (newExpanded.has(category)) {
       newExpanded.delete(category);
@@ -378,21 +271,13 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
     setImportError(null);
   };
 
-  // Normalize category to known categories or 'custom'
-  const normalizeCategory = (category: string): AgentCategory => {
-    if (CATEGORY_ORDER.includes(category as AgentCategory)) {
-      return category as AgentCategory;
-    }
-    return 'custom';
-  };
-
   // Group agents by category
-  const agentsByCategory = CATEGORY_ORDER.reduce(
+  const agentsByCategory = AGENT_CATEGORY_ORDER.reduce(
     (acc, category) => {
-      acc[category] = agents.filter((a) => normalizeCategory(a.category) === category);
+      acc[category] = agents.filter((a) => normalizeCategory(a.category, AGENT_CATEGORY_ORDER) === category);
       return acc;
     },
-    {} as Record<AgentCategory, ProjectAgent[]>
+    {} as Record<EditorCategory, ProjectAgent[]>
   );
 
   // Calculate stats
@@ -472,7 +357,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
             </Button>
           </div>
         ) : (
-          CATEGORY_ORDER.map((category) => {
+          AGENT_CATEGORY_ORDER.map((category) => {
             const categoryAgents = agentsByCategory[category];
             if (categoryAgents.length === 0) return null;
 
@@ -570,21 +455,11 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
                           </button>
 
                           {/* Toggle Switch */}
-                          <button
-                            onClick={() => handleToggleAgent(agent)}
+                          <ToggleSwitch
+                            checked={agent.enabled}
+                            onChange={() => handleToggleAgent(agent)}
                             disabled={isSaving}
-                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
-                              agent.enabled ? 'bg-primary' : 'bg-gray-600'
-                            }`}
-                            role="switch"
-                            aria-checked={agent.enabled}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                agent.enabled ? 'translate-x-5' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
+                          />
                         </div>
                       </div>
                     ))}
@@ -646,7 +521,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
                   onChange={(e) => setNewAgentForm({ ...newAgentForm, category: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  {CATEGORY_ORDER.map((cat) => (
+                  {AGENT_CATEGORY_ORDER.map((cat) => (
                     <option key={cat} value={cat}>
                       {CATEGORY_CONFIG[cat].label}
                     </option>
@@ -710,24 +585,11 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               </div>
 
               {/* Enabled */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setNewAgentForm({ ...newAgentForm, enabled: !newAgentForm.enabled })}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary ${
-                    newAgentForm.enabled ? 'bg-primary' : 'bg-gray-600'
-                  }`}
-                  role="switch"
-                  aria-checked={newAgentForm.enabled}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      newAgentForm.enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-                <span className="text-sm text-text-secondary">Enable agent after creation</span>
-              </div>
+              <ToggleSwitch
+                checked={newAgentForm.enabled ?? true}
+                onChange={(checked) => setNewAgentForm({ ...newAgentForm, enabled: checked })}
+                label="Enable agent after creation"
+              />
             </div>
 
             <div className="p-4 border-t border-border flex justify-end gap-2">
@@ -803,7 +665,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
                   onChange={(e) => setEditAgentForm({ ...editAgentForm, category: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  {CATEGORY_ORDER.map((cat) => (
+                  {AGENT_CATEGORY_ORDER.map((cat) => (
                     <option key={cat} value={cat}>
                       {CATEGORY_CONFIG[cat].label}
                     </option>
@@ -867,24 +729,11 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               </div>
 
               {/* Enabled */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditAgentForm({ ...editAgentForm, enabled: !editAgentForm.enabled })}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary ${
-                    editAgentForm.enabled ? 'bg-primary' : 'bg-gray-600'
-                  }`}
-                  role="switch"
-                  aria-checked={editAgentForm.enabled}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      editAgentForm.enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-                <span className="text-sm text-text-secondary">Agent enabled</span>
-              </div>
+              <ToggleSwitch
+                checked={editAgentForm.enabled ?? true}
+                onChange={(checked) => setEditAgentForm({ ...editAgentForm, enabled: checked })}
+                label="Agent enabled"
+              />
             </div>
 
             <div className="p-4 border-t border-border flex justify-end gap-2">

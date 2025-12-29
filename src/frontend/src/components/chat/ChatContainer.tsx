@@ -71,12 +71,22 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
   }, [projectId, sendMessage]);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
+  // Handle scroll to detect if user has scrolled up manually
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    // Enable auto-scroll if user is near the bottom (within 100px)
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShouldAutoScroll(isNearBottom);
+  }, []);
+
+  // Auto-scroll to bottom when new content arrives (only if user hasn't scrolled up)
   useEffect(() => {
-    if (containerRef.current) {
+    if (shouldAutoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [messages, currentStreamingMessage, toolExecutions]);
+  }, [messages, currentStreamingMessage, toolExecutions, shouldAutoScroll]);
 
   return (
     <div className="flex flex-col h-full bg-bg-primary">
@@ -110,7 +120,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
       </div>
 
       {/* Messages */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-4 bg-bg-primary">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-6 py-4 bg-bg-primary"
+      >
         {/* Loading History Indicator */}
         {isLoadingHistory && (
           <div className="flex items-center justify-center py-8">

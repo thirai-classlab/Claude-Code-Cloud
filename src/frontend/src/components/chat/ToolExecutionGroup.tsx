@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { ToolExecution } from '@/types/tool';
 import { ToolExecutionDisplay } from './ToolExecutionDisplay';
 
@@ -33,8 +33,8 @@ const getToolTypeCounts = (executions: ToolExecution[]): Record<string, number> 
   return counts;
 };
 
-// Small tool icon component
-const ToolIconSmall: React.FC<{ name: string }> = ({ name }) => {
+// Small tool icon component (memoized)
+const ToolIconSmall = memo<{ name: string }>(({ name }) => {
   const iconProps = {
     className: "w-3.5 h-3.5",
     fill: "none",
@@ -97,9 +97,33 @@ const ToolIconSmall: React.FC<{ name: string }> = ({ name }) => {
         </svg>
       );
   }
+});
+
+ToolIconSmall.displayName = 'ToolIconSmall';
+
+// Custom comparison for ToolExecutionGroup
+const areToolExecutionGroupPropsEqual = (
+  prevProps: ToolExecutionGroupProps,
+  nextProps: ToolExecutionGroupProps
+): boolean => {
+  // Quick length check
+  if (prevProps.executions.length !== nextProps.executions.length) return false;
+
+  // Compare each execution
+  for (let i = 0; i < prevProps.executions.length; i++) {
+    const prev = prevProps.executions[i];
+    const next = nextProps.executions[i];
+
+    if (prev.id !== next.id) return false;
+    if (prev.status !== next.status) return false;
+    if (prev.output !== next.output) return false;
+    if (prev.error !== next.error) return false;
+  }
+
+  return true;
 };
 
-export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executions }) => {
+const ToolExecutionGroupComponent: React.FC<ToolExecutionGroupProps> = ({ executions }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (executions.length === 0) return null;
@@ -191,3 +215,6 @@ export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executio
     </div>
   );
 };
+
+// Export memoized component
+export const ToolExecutionGroup = memo(ToolExecutionGroupComponent, areToolExecutionGroupPropsEqual);

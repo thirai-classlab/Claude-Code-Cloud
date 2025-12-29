@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { Modal } from '@/components/common/Modal';
 import { CreateSessionModal } from '@/components/session/CreateSessionModal';
 import { useProjects } from '@/hooks/useProjects';

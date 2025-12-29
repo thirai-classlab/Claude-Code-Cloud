@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Modal } from '@/components/common/Modal';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { templatesApi } from '@/lib/api/templates';
 import type { TemplateListItem } from '@/types/template';
 import type { Project } from '@/types/project';

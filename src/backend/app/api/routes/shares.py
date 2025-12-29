@@ -4,10 +4,11 @@ Project Share API
 プロジェクト共有管理エンドポイント
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.api.dependencies import get_db_session
+from app.api.dependencies import get_permission_service, get_share_service
 from app.api.middleware import handle_exceptions
+from app.models.errors import NotFoundError, PermissionDeniedError, ValidationError
 from app.models.project_share import PermissionLevel
 from app.schemas.share import (
     ProjectShareListResponse,
@@ -17,24 +18,9 @@ from app.schemas.share import (
 )
 from app.services.permission_service import PermissionService
 from app.services.share_service import ShareService
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 router = APIRouter(tags=["shares"])
-
-
-async def get_permission_service(
-    session: AsyncSession = Depends(get_db_session),
-) -> PermissionService:
-    """PermissionService取得"""
-    return PermissionService(session)
-
-
-async def get_share_service(
-    session: AsyncSession = Depends(get_db_session),
-) -> ShareService:
-    """ShareService取得"""
-    return ShareService(session)
 
 
 @router.post(
@@ -67,33 +53,21 @@ async def share_project(
     """
     # 権限チェック (オーナーまたはadmin)
     if not await permission_service.can_admin(current_user_id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have permission to share this project",
-        )
+        raise PermissionDeniedError("You don't have permission to share this project")
 
     # 共有先ユーザーを検索
     target_user = await permission_service.get_user_by_email(request.email)
     if not target_user:
-        raise HTTPException(
-            status_code=404,
-            detail=f"User with email {request.email} not found",
-        )
+        raise NotFoundError("User", request.email)
 
     # 自分自身への共有は不可
     if target_user.id == current_user_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot share project with yourself",
-        )
+        raise ValidationError("Cannot share project with yourself")
 
     # 既存の共有をチェック
     existing_share = await share_service.get_share(project_id, target_user.id)
     if existing_share:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Project is already shared with {request.email}",
-        )
+        raise ValidationError(f"Project is already shared with {request.email}")
 
     # 共有を作成
     share = await share_service.create_share(

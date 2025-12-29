@@ -1,2 +1,4 @@
-// Sidebar, Message, CodeBlock, ChatInput - TODO: implement these organisms
-export * from './Header';
+// Organisms - Re-export available organism components
+export * from './Message';
+export * from './CodeBlock';
+export * from './ChatInput';

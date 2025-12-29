@@ -7,11 +7,7 @@ Claude Agent SDKを直接使用したリアルタイムチャット
 
 import json
 import os
-from pathlib import Path
-from typing import Any, Dict, List, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.schemas.project_config import ProjectConfigJSON
+from typing import Dict, List
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -24,25 +20,15 @@ from claude_agent_sdk import (
     ToolResultBlock,
     ResultMessage,
 )
-from claude_agent_sdk.types import McpStdioServerConfig, AgentDefinition
 
 from app.config import settings
-from app.core.config_loader import (
-    load_project_config,
-    generate_enhanced_system_prompt,
-    get_enabled_tools,
-)
-from app.core.project_manager import ProjectManager
+from app.core.chat_processor import ChatMessageProcessor, ConfigBundle
 from app.core.session_manager import SessionManager
 from app.schemas.websocket import WSChatMessage, WSErrorMessage
-from app.services.project_config_service import ProjectConfigService
 from app.utils.database import get_session_context
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-# デフォルトツール一覧
-DEFAULT_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
 
 
 class ConnectionManager:
@@ -190,11 +176,13 @@ async def handle_chat_message(
         # データベースセッションを使用してメッセージ履歴取得・保存
         async with get_session_context() as db_session:
             session_manager = SessionManager(db_session)
-            project_manager = ProjectManager(db_session)
 
-            # プロジェクト取得してAPIキーを確認
-            project = await project_manager.get_project(project_id)
-            if not project:
+            # ChatMessageProcessor で設定読み込み
+            processor = ChatMessageProcessor(db_session, project_id)
+            config = await processor.load_config()
+
+            # プロジェクトが見つからない場合
+            if not config:
                 error_msg = WSErrorMessage(
                     type="error",
                     error=f"Project {project_id} not found",
@@ -203,11 +191,12 @@ async def handle_chat_message(
                 await conn_manager.send_message(session_id, error_msg.model_dump())
                 return
 
-            # プロジェクトにAPIキーが設定されていない場合はエラー
-            if not project.api_key:
+            # APIキー検証
+            api_key_error = processor.validate_api_key(config)
+            if api_key_error:
                 error_msg = WSErrorMessage(
                     type="error",
-                    error="プロジェクトにAPIキーが設定されていません。設定画面でAPIキーを設定してください。",
+                    error=api_key_error,
                     code="api_key_not_configured",
                 )
                 await conn_manager.send_message(session_id, error_msg.model_dump())
@@ -224,164 +213,18 @@ async def handle_chat_message(
             # Thinking状態通知
             await conn_manager.send_message(session_id, {"type": "thinking"})
 
-            # プロジェクト設定をDBから読み込み (優先) → ファイルからフォールバック
-            config_service = ProjectConfigService(db_session)
-            db_config = await config_service.get_project_config_json(project_id)
-
-            # DBに設定がある場合はDBを使用、なければファイルベース
-            use_db_config = bool(db_config.mcp_servers or db_config.agents or db_config.skills or db_config.commands)
-
-            # MCP Servers と Agents の構築
-            mcp_servers_config: Dict[str, McpStdioServerConfig] = {}
-            agents_config: Dict[str, AgentDefinition] = {}
-
-            if use_db_config:
-                logger.info(
-                    "Project config loaded from DB",
-                    session_id=session_id,
-                    project_id=project_id,
-                    mcp_servers_count=len(db_config.mcp_servers),
-                    agents_count=len(db_config.agents),
-                    skills_count=len(db_config.skills),
-                    commands_count=len(db_config.commands),
-                )
-                # DB設定からシステムプロンプト生成
-                system_prompt = generate_db_system_prompt(workspace_path, db_config)
-                tools = get_db_enabled_tools(db_config)
-
-                # MCP Servers 構築
-                for mcp in db_config.mcp_servers:
-                    mcp_servers_config[mcp["name"]] = McpStdioServerConfig(
-                        type="stdio",
-                        command=mcp["command"],
-                        args=mcp.get("args", []),
-                        env=mcp.get("env", {}),
-                    )
-
-                # Agents 構築
-                for agent in db_config.agents:
-                    agents_config[agent["name"]] = AgentDefinition(
-                        description=agent.get("description", ""),
-                        prompt=agent.get("system_prompt", ""),
-                        tools=agent.get("tools"),
-                        model=agent.get("model", "sonnet"),
-                    )
-
-                # Skills/Commands はCRUD時にファイルシステムに同期済み
-                # Skill ツールを有効化
-                if db_config.skills and "Skill" not in tools:
-                    tools.append("Skill")
-            else:
-                # ファイルベースのフォールバック
-                project_config = load_project_config(workspace_path)
-                logger.info(
-                    "Project config loaded from files (fallback)",
-                    session_id=session_id,
-                    mcp_servers=list(project_config.mcp_servers.keys()),
-                    agents=list(project_config.agents.keys()),
-                    skills=list(project_config.skills.keys()),
-                    commands=list(project_config.commands.keys()),
-                )
-                # ファイルベースのシステムプロンプト生成
-                system_prompt = generate_enhanced_system_prompt(workspace_path, project_config)
-                tools = get_enabled_tools(project_config)
-
-                # ファイルベースのMCP Servers/Agents構築
-                for name, mcp in project_config.mcp_servers.items():
-                    mcp_servers_config[name] = McpStdioServerConfig(
-                        type="stdio",
-                        command=mcp.command,
-                        args=mcp.args or [],
-                        env=mcp.env or {},
-                    )
-
-                for name, agent in project_config.agents.items():
-                    agents_config[name] = AgentDefinition(
-                        description=agent.description or "",
-                        prompt=agent.system_prompt or "",
-                        tools=agent.tools,
-                        model=agent.model or "sonnet",
-                    )
-
-            # 応答テキストを蓄積
-            full_response_text = ""
-            usage_info = {"input_tokens": 0, "output_tokens": 0, "total_cost_usd": 0, "duration_ms": 0}
-
-            # Claude Agent SDK オプション構築
-            # プロジェクト固有のAPIキーを環境変数として渡す
-            options = ClaudeAgentOptions(
-                system_prompt=system_prompt,
-                allowed_tools=tools,
-                permission_mode="acceptEdits",
-                cwd=Path(workspace_path),
-                mcp_servers=mcp_servers_config if mcp_servers_config else {},
-                agents=agents_config if agents_config else None,
-                setting_sources=["project"],  # Skills/Commands をファイルシステムから読み込み
-                env={"ANTHROPIC_API_KEY": project.api_key},  # プロジェクト固有のAPIキー
-            )
-
-            # スキル/コマンド数の取得
-            skills_count = len(db_config.skills) if use_db_config else len(project_config.skills) if 'project_config' in locals() else 0
-            commands_count = len(db_config.commands) if use_db_config else len(project_config.commands) if 'project_config' in locals() else 0
+            # SDK オプション構築
+            options = processor.build_sdk_options(config)
 
             logger.info(
                 "Starting Claude Agent SDK session",
                 session_id=session_id,
-                tools_count=len(tools),
-                mcp_servers_count=len(mcp_servers_config),
-                agents_count=len(agents_config),
-                skills_count=skills_count,
-                commands_count=commands_count,
             )
 
-            # Claude Agent SDK でストリーミング処理
-            async with ClaudeSDKClient(options=options) as client:
-                # クエリ送信
-                await client.query(message.content)
-
-                # ストリーミングレスポンス処理
-                async for sdk_message in client.receive_response():
-                    if isinstance(sdk_message, AssistantMessage):
-                        for block in sdk_message.content:
-                            if isinstance(block, TextBlock):
-                                # テキストストリーミング
-                                full_response_text += block.text
-                                await conn_manager.send_message(
-                                    session_id,
-                                    {"type": "text", "content": block.text}
-                                )
-                            elif isinstance(block, ToolUseBlock):
-                                # ツール使用開始通知
-                                await conn_manager.send_message(
-                                    session_id,
-                                    {
-                                        "type": "tool_use_start",
-                                        "tool": block.name,
-                                        "tool_use_id": block.id,
-                                        "input": block.input,
-                                    },
-                                )
-
-                    elif isinstance(sdk_message, ToolResultBlock):
-                        # ツール結果通知
-                        await conn_manager.send_message(
-                            session_id,
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": sdk_message.tool_use_id,
-                                "success": True,
-                                "output": str(sdk_message.content),
-                            },
-                        )
-
-                    elif isinstance(sdk_message, ResultMessage):
-                        # 使用量情報
-                        usage_info = {
-                            "total_cost_usd": getattr(sdk_message, 'total_cost_usd', 0),
-                            "duration_ms": getattr(sdk_message, 'duration_ms', 0),
-                            "input_tokens": getattr(sdk_message.usage, 'input_tokens', 0) if hasattr(sdk_message, 'usage') else 0,
-                            "output_tokens": getattr(sdk_message.usage, 'output_tokens', 0) if hasattr(sdk_message, 'usage') else 0,
-                        }
+            # ストリーミング処理
+            full_response_text, usage_info = await _stream_response(
+                session_id, options, message, conn_manager
+            )
 
             # メッセージ完了
             logger.info("Message completed", session_id=session_id)
@@ -413,97 +256,92 @@ async def handle_chat_message(
         await conn_manager.send_message(session_id, error_msg.model_dump())
 
 
+async def _stream_response(
+    session_id: str,
+    options: ClaudeAgentOptions,
+    message: WSChatMessage,
+    conn_manager: ConnectionManager,
+) -> tuple[str, dict]:
+    """
+    Claude Agent SDK でストリーミングレスポンスを処理
+
+    Args:
+        session_id: セッションID
+        options: Claude Agent SDK オプション
+        message: チャットメッセージ
+        conn_manager: 接続マネージャー
+
+    Returns:
+        tuple[str, dict]: (応答テキスト, 使用量情報)
+    """
+    full_response_text = ""
+    usage_info = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_cost_usd": 0,
+        "duration_ms": 0,
+    }
+
+    async with ClaudeSDKClient(options=options) as client:
+        # クエリ送信
+        await client.query(message.content)
+
+        # ストリーミングレスポンス処理
+        async for sdk_message in client.receive_response():
+            if isinstance(sdk_message, AssistantMessage):
+                for block in sdk_message.content:
+                    if isinstance(block, TextBlock):
+                        # テキストストリーミング
+                        full_response_text += block.text
+                        await conn_manager.send_message(
+                            session_id, {"type": "text", "content": block.text}
+                        )
+                    elif isinstance(block, ToolUseBlock):
+                        # ツール使用開始通知
+                        await conn_manager.send_message(
+                            session_id,
+                            {
+                                "type": "tool_use_start",
+                                "tool": block.name,
+                                "tool_use_id": block.id,
+                                "input": block.input,
+                            },
+                        )
+
+            elif isinstance(sdk_message, ToolResultBlock):
+                # ツール結果通知
+                await conn_manager.send_message(
+                    session_id,
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": sdk_message.tool_use_id,
+                        "success": True,
+                        "output": str(sdk_message.content),
+                    },
+                )
+
+            elif isinstance(sdk_message, ResultMessage):
+                # 使用量情報
+                usage_info = {
+                    "total_cost_usd": getattr(sdk_message, "total_cost_usd", 0),
+                    "duration_ms": getattr(sdk_message, "duration_ms", 0),
+                    "input_tokens": (
+                        getattr(sdk_message.usage, "input_tokens", 0)
+                        if hasattr(sdk_message, "usage")
+                        else 0
+                    ),
+                    "output_tokens": (
+                        getattr(sdk_message.usage, "output_tokens", 0)
+                        if hasattr(sdk_message, "usage")
+                        else 0
+                    ),
+                }
+
+    return full_response_text, usage_info
+
+
 def get_default_tools() -> List[str]:
     """デフォルトツール一覧を取得（後方互換性のため維持）"""
+    from app.core.chat_processor import DEFAULT_TOOLS
+
     return DEFAULT_TOOLS.copy()
-
-
-def generate_db_system_prompt(workspace_path: str, config: "ProjectConfigJSON") -> str:
-    """
-    DB設定からシステムプロンプトを生成
-
-    Args:
-        workspace_path: ワークスペースパス
-        config: ProjectConfigJSON (DB設定)
-
-    Returns:
-        str: システムプロンプト
-    """
-    prompt_parts = [
-        f"""You are Claude Code, an AI coding assistant powered by Claude Agent SDK.
-
-Your workspace is located at: {workspace_path}
-
-## Default Tools
-You have access to the following default tools:
-- Read: Read file contents
-- Write: Create or overwrite a file
-- Edit: Edit a file by replacing text
-- Bash: Execute bash commands
-- Glob: Find files by pattern
-- Grep: Search file contents
-"""
-    ]
-
-    # Add MCP servers section
-    if config.mcp_servers:
-        mcp_section = "\n## MCP Servers\nYou have access to the following MCP servers:\n"
-        for server in config.mcp_servers:
-            mcp_section += f"- {server['name']}: MCP server (command: {server['command']})\n"
-        prompt_parts.append(mcp_section)
-
-    # Add agents section
-    if config.agents:
-        agents_section = "\n## Available Agents\nYou can delegate tasks to the following specialized agents using the Task tool:\n"
-        for agent in config.agents:
-            agents_section += f"- {agent['name']}: {agent.get('description', '')} (model: {agent.get('model', 'sonnet')})\n"
-        prompt_parts.append(agents_section)
-
-    # Add skills section
-    if config.skills:
-        skills_section = "\n## Available Skills\nYou can invoke the following skills:\n"
-        for skill in config.skills:
-            skills_section += f"- {skill['name']}: {skill.get('description', '')}\n"
-        prompt_parts.append(skills_section)
-
-    # Add commands section
-    if config.commands:
-        commands_section = "\n## Available Commands\nYou can execute the following commands:\n"
-        for cmd in config.commands:
-            commands_section += f"- /{cmd['name']}: {cmd.get('description', '')}\n"
-        prompt_parts.append(commands_section)
-
-    # Add general instructions
-    prompt_parts.append("""
-## Instructions
-- Always provide clear explanations of what you're doing.
-- When creating or modifying files, explain your changes.
-- Be helpful, safe, and accurate.
-- Use the appropriate MCP server, agent, skill, or command for the task at hand.
-- Tool execution is handled automatically by the Agent SDK.
-""")
-
-    return "\n".join(prompt_parts)
-
-
-def get_db_enabled_tools(config: "ProjectConfigJSON") -> List[str]:
-    """
-    DB設定から有効なツール一覧を取得
-
-    Args:
-        config: ProjectConfigJSON (DB設定)
-
-    Returns:
-        List[str]: ツール名リスト
-    """
-    tools = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
-
-    # Add enabled MCP servers
-    for server in config.mcp_servers:
-        tools.append(f"mcp__{server['name']}")
-
-    # Add enabled agents (as Task tool targets)
-    for agent in config.agents:
-        tools.append(f"agent__{agent['name']}")
-
-    return tools

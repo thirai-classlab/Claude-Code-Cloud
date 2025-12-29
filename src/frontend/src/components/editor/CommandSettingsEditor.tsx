@@ -5,82 +5,26 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
 import type {
   ProjectCommand,
   CreateProjectCommandRequest,
   UpdateProjectCommandRequest,
 } from '@/types/projectConfig';
+import {
+  CATEGORY_CONFIG,
+  CATEGORY_ORDER,
+  normalizeCategory,
+  parseMarkdownWithFrontmatter,
+  ToggleSwitch,
+  useSuccessMessage,
+  type EditorCategory,
+} from './shared';
 
 interface CommandSettingsEditorProps {
   projectId: string;
 }
-
-// Category type for grouping
-type CommandCategory = 'custom' | 'exploration' | 'development' | 'quality' | 'documentation' | 'devops' | 'data';
-
-// Category display configuration
-const CATEGORY_CONFIG: Record<CommandCategory, { label: string; icon: React.ReactNode }> = {
-  custom: {
-    label: 'Custom',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-      </svg>
-    ),
-  },
-  exploration: {
-    label: 'Exploration & Planning',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-    ),
-  },
-  development: {
-    label: 'Development',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-      </svg>
-    ),
-  },
-  quality: {
-    label: 'Quality & Testing',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  documentation: {
-    label: 'Documentation',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
-  devops: {
-    label: 'DevOps & Infrastructure',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-      </svg>
-    ),
-  },
-  data: {
-    label: 'Data & AI',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-  },
-};
-
-const CATEGORY_ORDER: CommandCategory[] = ['custom', 'exploration', 'development', 'quality', 'documentation', 'devops', 'data'];
 
 // Default form state for creating commands
 const getDefaultCommandForm = (): CreateProjectCommandRequest => ({
@@ -91,45 +35,13 @@ const getDefaultCommandForm = (): CreateProjectCommandRequest => ({
   enabled: true,
 });
 
-// Parse YAML frontmatter from markdown
-interface ParsedMarkdown {
-  meta: Record<string, unknown>;
-  content: string;
-}
-
-const parseMarkdownWithFrontmatter = (markdown: string): ParsedMarkdown | null => {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
-  const match = markdown.match(frontmatterRegex);
-  if (!match) return null;
-
-  const frontmatter = match[1];
-  const content = match[2].trim();
-
-  // Simple YAML parser
-  const meta: Record<string, unknown> = {};
-  const lines = frontmatter.split('\n');
-
-  for (const line of lines) {
-    // Key: value
-    if (line.match(/^(\w+):\s*(.+)$/)) {
-      const matches = line.match(/^(\w+):\s*(.+)$/);
-      if (matches) {
-        const [, key, value] = matches;
-        meta[key] = value === 'true' ? true : value === 'false' ? false : value;
-      }
-    }
-  }
-
-  return { meta, content };
-};
-
 export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ projectId }) => {
   const [commands, setCommands] = useState<ProjectCommand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<Set<CommandCategory>>(
+  const [successMessage, showSuccess] = useSuccessMessage();
+  const [expandedCategories, setExpandedCategories] = useState<Set<EditorCategory>>(
     new Set(CATEGORY_ORDER)
   );
 
@@ -171,11 +83,6 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
     loadData();
   }, [loadData]);
 
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
   const handleToggleCommand = async (command: ProjectCommand) => {
     const newEnabled = !command.enabled;
 
@@ -200,7 +107,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
     }
   };
 
-  const toggleCategory = (category: CommandCategory) => {
+  const toggleCategory = (category: EditorCategory) => {
     const newExpanded = new Set(expandedCategories);
     if (newExpanded.has(category)) {
       newExpanded.delete(category);
@@ -348,21 +255,13 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
     setImportError(null);
   };
 
-  // Normalize category to known categories or 'custom'
-  const normalizeCategory = (category: string): CommandCategory => {
-    if (CATEGORY_ORDER.includes(category as CommandCategory)) {
-      return category as CommandCategory;
-    }
-    return 'custom';
-  };
-
   // Group commands by category
   const commandsByCategory = CATEGORY_ORDER.reduce(
     (acc, category) => {
       acc[category] = commands.filter((c) => normalizeCategory(c.category) === category);
       return acc;
     },
-    {} as Record<CommandCategory, ProjectCommand[]>
+    {} as Record<EditorCategory, ProjectCommand[]>
   );
 
   // Calculate stats
@@ -537,21 +436,11 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
                           </button>
 
                           {/* Toggle Switch */}
-                          <button
-                            onClick={() => handleToggleCommand(command)}
+                          <ToggleSwitch
+                            checked={command.enabled}
+                            onChange={() => handleToggleCommand(command)}
                             disabled={isSaving}
-                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
-                              command.enabled ? 'bg-primary' : 'bg-gray-600'
-                            }`}
-                            role="switch"
-                            aria-checked={command.enabled}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                command.enabled ? 'translate-x-5' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
+                          />
                         </div>
                       </div>
                     ))}
@@ -638,24 +527,11 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               </div>
 
               {/* Enabled */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setNewCommandForm({ ...newCommandForm, enabled: !newCommandForm.enabled })}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary ${
-                    newCommandForm.enabled ? 'bg-primary' : 'bg-gray-600'
-                  }`}
-                  role="switch"
-                  aria-checked={newCommandForm.enabled}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      newCommandForm.enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-                <span className="text-sm text-text-secondary">Enable command after creation</span>
-              </div>
+              <ToggleSwitch
+                checked={newCommandForm.enabled ?? true}
+                onChange={(checked) => setNewCommandForm({ ...newCommandForm, enabled: checked })}
+                label="Enable command after creation"
+              />
             </div>
 
             <div className="p-4 border-t border-border flex justify-end gap-2">
@@ -756,24 +632,11 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               </div>
 
               {/* Enabled */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditCommandForm({ ...editCommandForm, enabled: !editCommandForm.enabled })}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary ${
-                    editCommandForm.enabled ? 'bg-primary' : 'bg-gray-600'
-                  }`}
-                  role="switch"
-                  aria-checked={editCommandForm.enabled}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      editCommandForm.enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-                <span className="text-sm text-text-secondary">Command enabled</span>
-              </div>
+              <ToggleSwitch
+                checked={editCommandForm.enabled ?? true}
+                onChange={(checked) => setEditCommandForm({ ...editCommandForm, enabled: checked })}
+                label="Command enabled"
+              />
             </div>
 
             <div className="p-4 border-t border-border flex justify-end gap-2">

@@ -6,11 +6,12 @@ Session Management API
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.api.dependencies import get_session_manager
 from app.api.middleware import handle_exceptions
 from app.core.session_manager import SessionManager
+from app.models.errors import SessionNotFoundError
 from app.models.messages import MessageRole
 from app.schemas.request import CreateSessionRequest, UpdateSessionRequest, SaveMessageRequest
 from app.schemas.response import (
@@ -100,7 +101,7 @@ async def get_session(
     target_session = await manager.get_session(session_id)
 
     if not target_session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise SessionNotFoundError(session_id)
 
     return SessionResponse(**target_session.model_dump())
 
@@ -129,7 +130,7 @@ async def update_session(
     )
 
     if not updated_session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise SessionNotFoundError(session_id)
 
     return SessionResponse(**updated_session.model_dump())
 
@@ -153,7 +154,7 @@ async def close_session(
     closed_session = await manager.close_session(session_id)
 
     if not closed_session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise SessionNotFoundError(session_id)
 
     return SessionResponse(**closed_session.model_dump())
 
@@ -174,7 +175,7 @@ async def delete_session(
     # セッション存在確認
     target_session = await manager.get_session(session_id)
     if not target_session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise SessionNotFoundError(session_id)
 
     # メッセージも削除
     await manager.delete_messages(session_id)
@@ -206,7 +207,7 @@ async def get_session_messages(
     # セッション存在確認
     target_session = await manager.get_session(session_id)
     if not target_session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise SessionNotFoundError(session_id)
 
     # メッセージ取得
     messages = await manager.get_messages(session_id, limit=limit, offset=offset)
@@ -249,7 +250,7 @@ async def save_session_message(
     # セッション存在確認
     target_session = await manager.get_session(session_id)
     if not target_session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise SessionNotFoundError(session_id)
 
     # メッセージロール変換
     role = MessageRole(request.role)
