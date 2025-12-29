@@ -210,6 +210,7 @@ class CronScheduler:
             generate_enhanced_system_prompt,
             get_enabled_tools,
         )
+        from app.core.project_manager import ProjectManager
 
         log_entry = CronExecutionLog(
             schedule_name=schedule.name,
@@ -228,6 +229,19 @@ class CronScheduler:
         )
 
         try:
+            # プロジェクトのAPIキーを取得
+            async with get_session_context() as db_session:
+                project_manager = ProjectManager(db_session)
+                project = await project_manager.get_project(schedule.project_id)
+
+                if not project:
+                    raise ValueError(f"Project {schedule.project_id} not found")
+
+                if not project.api_key:
+                    raise ValueError(f"Project {schedule.project_id} has no API key configured")
+
+                project_api_key = project.api_key
+
             # Load project configuration
             project_config = load_project_config(workspace_path)
             system_prompt = generate_enhanced_system_prompt(workspace_path, project_config)
@@ -239,11 +253,13 @@ class CronScheduler:
                 command_message += f" {json.dumps(schedule.args)}"
 
             # Execute via Claude Agent SDK
+            # プロジェクト固有のAPIキーを環境変数として渡す
             options = ClaudeAgentOptions(
                 system_prompt=system_prompt + "\n\n[CRON EXECUTION] This command is being executed by the cron scheduler.",
                 allowed_tools=tools,
                 permission_mode="acceptEdits",
                 cwd=Path(workspace_path),
+                env={"ANTHROPIC_API_KEY": project_api_key},  # プロジェクト固有のAPIキー
             )
 
             result_text = ""

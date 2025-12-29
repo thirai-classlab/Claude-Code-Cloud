@@ -8,6 +8,7 @@ export interface Project {
   updated_at: string;
   session_count: number;
   workspace_path: string;
+  api_key?: string;
 }
 
 export interface ProjectWithSessions extends Project {
@@ -22,4 +23,5 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   description?: string;
+  api_key?: string;
 }

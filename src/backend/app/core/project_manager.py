@@ -173,6 +173,7 @@ class ProjectManager:
         project_id: str,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Optional[Project]:
         """
         プロジェクト更新
@@ -181,6 +182,7 @@ class ProjectManager:
             project_id: プロジェクトID
             name: 新しいプロジェクト名 (オプション)
             description: 新しい説明 (オプション)
+            api_key: プロジェクト固有のAPIキー (オプション)
 
         Returns:
             Optional[Project]: 更新されたプロジェクト
@@ -196,6 +198,8 @@ class ProjectManager:
             project_model.name = name
         if description is not None:
             project_model.description = description
+        if api_key is not None:
+            project_model.api_key = api_key
         project_model.updated_at = datetime.now(timezone.utc)
 
         await self.session.flush()

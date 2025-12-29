@@ -15,6 +15,7 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   description?: string;
+  api_key?: string;
 }
 
 export interface ProjectsResponse {

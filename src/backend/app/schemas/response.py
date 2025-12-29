@@ -23,6 +23,7 @@ class ProjectResponse(BaseModel):
     status: ProjectStatus
     workspace_path: Optional[str]
     session_count: int
+    api_key: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

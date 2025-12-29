@@ -235,6 +235,7 @@ async def update_project(
         project_id=project_id,
         name=request.name,
         description=request.description,
+        api_key=request.api_key,
     )
 
     if not project:

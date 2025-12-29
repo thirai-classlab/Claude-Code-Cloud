@@ -79,8 +79,55 @@ New URL-based routing implemented:
 ## Blockers
 - None identified
 
+## Recent Session Updates
+
+### Project Settings & Pricing Tabs (Completed)
+Added new tabs to the right panel for project settings and pricing:
+
+**Backend Changes:**
+- `ProjectModel`: Added `api_key` column (String 500)
+- `Project` Pydantic model: Added `api_key` field
+- `UpdateProjectRequest`: Added `api_key` field
+- `ProjectResponse`: Added `api_key` field
+- `ProjectManager.update_project()`: Added api_key parameter handling
+- `projects.py` API route: Updated to pass api_key
+
+**Frontend Changes:**
+- `uiStore.ts`: Extended EditorTab type with 'settings' | 'pricing'
+- `types/project.ts`: Added api_key to Project and UpdateProjectRequest
+- `lib/api/projects.ts`: Added api_key to UpdateProjectRequest
+- `ProjectSettingsEditor.tsx`: NEW - Edit project name, description, API key
+- `PricingEditor.tsx`: NEW - Display usage stats and pricing table
+- `EditorContainer.tsx`: Added settings and pricing tabs (Settings rightmost, Pricing second from right)
+
+**Tab Order (updated):**
+VSCode → MCP → サブエージェント → コマンド → スキル → スケジュール → 料金 → 設定
+
+### Project-Specific API Key Only (Completed)
+Changed system to use ONLY project-specific API keys (not system default):
+
+**Key Changes:**
+- `handlers.py`: 
+  - Get project's api_key from DB before chat
+  - Return error if no api_key configured
+  - Pass api_key via `ClaudeAgentOptions.env={"ANTHROPIC_API_KEY": project.api_key}`
+- `cron_scheduler.py`:
+  - Get project's api_key from DB before cron execution
+  - Fail execution if no api_key configured
+  - Pass api_key via ClaudeAgentOptions.env
+
+**Error Handling:**
+- Chat: Error message "プロジェクトにAPIキーが設定されていません。設定画面でAPIキーを設定してください。"
+- Cron: Execution logged as failed with error message
+
+**Database Migration (completed):**
+```sql
+ALTER TABLE projects ADD COLUMN api_key VARCHAR(500) NULL;
+```
+
 ## Next Actions
-1. Frontend UI for managing MCP/Agent/Skill/Command
-2. Import/Export functionality for project configs
-3. Template-based project initialization
-4. UI refinements based on user feedback
+1. Run database migration for api_key column
+2. Frontend UI for managing MCP/Agent/Skill/Command
+3. Import/Export functionality for project configs
+4. Template-based project initialization
+5. UI refinements based on user feedback

@@ -43,5 +43,6 @@ class Project(BaseModel):
     status: ProjectStatus = Field(default=ProjectStatus.ACTIVE, description="プロジェクトステータス")
     workspace_path: Optional[str] = Field(default=None, description="ワークスペースパス")
     session_count: int = Field(default=0, description="セッション数")
+    api_key: Optional[str] = Field(default=None, description="プロジェクト固有のAPIキー")
     created_at: datetime = Field(default_factory=_utc_now, description="作成日時")
     updated_at: datetime = Field(default_factory=_utc_now, description="更新日時")

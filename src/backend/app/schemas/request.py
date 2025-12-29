@@ -21,6 +21,7 @@ class UpdateProjectRequest(BaseModel):
 
     name: Optional[str] = Field(default=None, min_length=1, max_length=100, description="プロジェクト名")
     description: Optional[str] = Field(default=None, max_length=500, description="プロジェクト説明")
+    api_key: Optional[str] = Field(default=None, max_length=500, description="プロジェクト固有のAPIキー")
 
 
 class CreateSessionRequest(BaseModel):

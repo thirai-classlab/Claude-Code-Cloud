@@ -71,6 +71,7 @@ class ProjectModel(Base):
     )
     workspace_path = Column(String(500), nullable=True)
     session_count = Column(Integer, default=0)
+    api_key = Column(String(500), nullable=True)  # プロジェクト固有のAPIキー（暗号化推奨）
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 

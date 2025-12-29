@@ -32,6 +32,7 @@ from app.core.config_loader import (
     generate_enhanced_system_prompt,
     get_enabled_tools,
 )
+from app.core.project_manager import ProjectManager
 from app.core.session_manager import SessionManager
 from app.schemas.websocket import WSChatMessage, WSErrorMessage
 from app.services.project_config_service import ProjectConfigService
@@ -189,6 +190,28 @@ async def handle_chat_message(
         # データベースセッションを使用してメッセージ履歴取得・保存
         async with get_session_context() as db_session:
             session_manager = SessionManager(db_session)
+            project_manager = ProjectManager(db_session)
+
+            # プロジェクト取得してAPIキーを確認
+            project = await project_manager.get_project(project_id)
+            if not project:
+                error_msg = WSErrorMessage(
+                    type="error",
+                    error=f"Project {project_id} not found",
+                    code="project_not_found",
+                )
+                await conn_manager.send_message(session_id, error_msg.model_dump())
+                return
+
+            # プロジェクトにAPIキーが設定されていない場合はエラー
+            if not project.api_key:
+                error_msg = WSErrorMessage(
+                    type="error",
+                    error="プロジェクトにAPIキーが設定されていません。設定画面でAPIキーを設定してください。",
+                    code="api_key_not_configured",
+                )
+                await conn_manager.send_message(session_id, error_msg.model_dump())
+                return
 
             # メッセージ履歴取得
             message_history = await session_manager.get_message_history(session_id)
@@ -285,6 +308,7 @@ async def handle_chat_message(
             usage_info = {"input_tokens": 0, "output_tokens": 0, "total_cost_usd": 0, "duration_ms": 0}
 
             # Claude Agent SDK オプション構築
+            # プロジェクト固有のAPIキーを環境変数として渡す
             options = ClaudeAgentOptions(
                 system_prompt=system_prompt,
                 allowed_tools=tools,
@@ -293,6 +317,7 @@ async def handle_chat_message(
                 mcp_servers=mcp_servers_config if mcp_servers_config else {},
                 agents=agents_config if agents_config else None,
                 setting_sources=["project"],  # Skills/Commands をファイルシステムから読み込み
+                env={"ANTHROPIC_API_KEY": project.api_key},  # プロジェクト固有のAPIキー
             )
 
             # スキル/コマンド数の取得
