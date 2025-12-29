@@ -626,26 +626,39 @@ graph TB
 
 ## 関連ドキュメント
 
-### システム設計
+詳細なドキュメント一覧は [README.md のドキュメントセクション](README.md#ドキュメント) を参照してください。
+
+### システム設計（主要）
 
 | ドキュメント | パス | 説明 |
 |-------------|------|------|
-| アーキテクチャ設計書 | doc/architecture-design.md | システム全体設計 |
-| バックエンド設計 | doc/backend-design.md | API設計 |
-| フロントエンド設計 | doc/frontend-design.md | UI設計 |
+| アーキテクチャ設計書 | doc/architecture-design.md | システム全体設計、技術スタック |
+| バックエンド設計書 | doc/backend-design.md | FastAPI、API設計、WebSocket |
+| フロントエンド設計書 | doc/frontend-design.md | React/Next.js、状態管理 |
 | データベース設計書 | doc/database-design.md | ER図、テーブル定義、インデックス |
-| Docker設計書 | doc/docker-design.md | コンテナ構成 |
-| DinD詳細設計書 | doc/dind-design.md | DinDアーキテクチャ・セキュリティ |
-| DinDセットアップ | doc/dind-setup-guide.md | DinD環境構築 |
-| DinD Executor使用ガイド | doc/dind-executor-usage.md | DinDでのコード実行 |
-| ユーザーガイド | doc/user-guide.md | 利用方法 |
+| Docker設計書 | doc/docker-design.md | コンテナ構成、ネットワーク |
+| 認証設計書 | doc/authentication-design.md | 認証・認可、JWT |
 
-### フロントエンドデザイン（リニューアル）
+### Docker-in-Docker (DinD)
+
+| ドキュメント | パス | 説明 |
+|-------------|------|------|
+| DinD詳細設計書 | doc/dind-design.md | DinDアーキテクチャ・セキュリティ |
+| DinDセットアップガイド | doc/dind-setup-guide.md | DinD環境構築手順 |
+| DinD Executor使用ガイド | doc/dind-executor-usage.md | コード実行環境の使い方 |
+
+### UI/UX設計
 
 | ドキュメント | パス | 説明 |
 |-------------|------|------|
 | デザインシステム設計書 | doc/frontend-design-system.md | カラー、タイポグラフィ、スペーシング |
 | コンポーネント設計書 | doc/frontend-component-design.md | Atomic Design、コンポーネント仕様 |
-| Tailwind CSS設定設計書 | doc/tailwind-config-design.md | Tailwind設定、CSS変数 |
-| デザインパターン比較 | doc_draft/design-patterns/README.md | 10種類のパターン比較 |
-| 採用パターンHTML | doc_draft/design-patterns/pattern-09-v2-no-icons.html | 採用デザインのプロトタイプ |
+| Tailwind CSS設定設計書 | doc/tailwind-config-design.md | Tailwind設定、CSS変数、テーマ |
+| 画面設計書 | doc/screen-design.md | 画面レイアウト、コンポーネント配置 |
+
+### ガイド
+
+| ドキュメント | パス | 説明 |
+|-------------|------|------|
+| ユーザーガイド | doc/user-guide.md | エンドユーザー向け操作説明 |
+| デプロイガイド | doc/deployment-guide.md | 本番環境へのデプロイ手順 |

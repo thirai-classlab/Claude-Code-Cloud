@@ -136,6 +136,27 @@ class MessageHistoryResponse(BaseModel):
     messages: List[ChatMessageResponse]
     total: int
     session_id: str
+    limit: Optional[int] = None
+    offset: int = 0
+    has_more: bool = False
+
+
+class PaginatedMessageHistoryResponse(BaseModel):
+    """ペジネーション付きメッセージ履歴レスポンス"""
+
+    messages: List[ChatMessageResponse]
+    session_id: str
+    pagination: "PaginationInfo"
+
+
+class PaginationInfo(BaseModel):
+    """ペジネーション情報"""
+
+    total: int = Field(description="総件数")
+    limit: int = Field(description="取得件数上限")
+    offset: int = Field(description="オフセット")
+    has_more: bool = Field(description="次のページがあるか")
+    next_offset: Optional[int] = Field(None, description="次のページのオフセット")
 
 
 class UsageStatsResponse(BaseModel):

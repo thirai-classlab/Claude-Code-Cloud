@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/atoms';
+
+// ドラフト保存のデバウンス時間（ms）
+const DRAFT_SAVE_DEBOUNCE = 500;
 
 export interface ChatInputProps {
   value?: string;
@@ -11,6 +14,9 @@ export interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  // ドラフト機能
+  initialDraft?: string;
+  onDraftChange?: (value: string) => void;
 }
 
 export function ChatInput({
@@ -20,17 +26,57 @@ export function ChatInput({
   disabled = false,
   placeholder = 'Type a message...',
   className,
+  initialDraft = '',
+  onDraftChange,
 }: ChatInputProps) {
-  const [internalValue, setInternalValue] = useState('');
+  const [internalValue, setInternalValue] = useState(initialDraft);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const draftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitializedRef = useRef(false);
 
   const value = controlledValue !== undefined ? controlledValue : internalValue;
+
+  // 初期ドラフトの復元
+  useEffect(() => {
+    if (!isInitializedRef.current && initialDraft && controlledValue === undefined) {
+      setInternalValue(initialDraft);
+      isInitializedRef.current = true;
+    }
+  }, [initialDraft, controlledValue]);
+
+  // ドラフト保存（デバウンス付き）
+  const saveDraft = useCallback(
+    (newValue: string) => {
+      if (draftTimeoutRef.current) {
+        clearTimeout(draftTimeoutRef.current);
+      }
+      draftTimeoutRef.current = setTimeout(() => {
+        onDraftChange?.(newValue);
+      }, DRAFT_SAVE_DEBOUNCE);
+    },
+    [onDraftChange]
+  );
+
+  // クリーンアップ
+  useEffect(() => {
+    return () => {
+      if (draftTimeoutRef.current) {
+        clearTimeout(draftTimeoutRef.current);
+      }
+      // コンポーネントアンマウント時に即座にドラフトを保存
+      if (value.trim()) {
+        onDraftChange?.(value);
+      }
+    };
+  }, [value, onDraftChange]);
 
   const handleChange = (newValue: string) => {
     if (controlledValue === undefined) {
       setInternalValue(newValue);
     }
     onChange?.(newValue);
+    // ドラフト保存
+    saveDraft(newValue);
   };
 
   const handleSubmit = () => {
@@ -39,6 +85,11 @@ export function ChatInput({
       if (controlledValue === undefined) {
         setInternalValue('');
       }
+      // ドラフトをクリア
+      if (draftTimeoutRef.current) {
+        clearTimeout(draftTimeoutRef.current);
+      }
+      onDraftChange?.('');
     }
   };
 

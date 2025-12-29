@@ -4,6 +4,7 @@ Session Management API
 セッション管理エンドポイント
 """
 
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -19,6 +20,8 @@ from app.schemas.response import (
     SessionResponse,
     ChatMessageResponse,
     MessageHistoryResponse,
+    PaginatedMessageHistoryResponse,
+    PaginationInfo,
 )
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -188,29 +191,58 @@ async def delete_session(
 @handle_exceptions
 async def get_session_messages(
     session_id: str,
-    limit: Optional[int] = Query(default=None, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
+    limit: Optional[int] = Query(default=50, ge=1, le=200, description="最大取得件数"),
+    offset: int = Query(default=0, ge=0, description="オフセット"),
+    role: Optional[str] = Query(default=None, description="メッセージロールでフィルタ (user/assistant/system)"),
+    start_date: Optional[datetime] = Query(default=None, description="開始日時でフィルタ (ISO 8601形式)"),
+    end_date: Optional[datetime] = Query(default=None, description="終了日時でフィルタ (ISO 8601形式)"),
+    search: Optional[str] = Query(default=None, max_length=100, description="メッセージ内容で検索"),
     manager: SessionManager = Depends(get_session_manager),
 ) -> MessageHistoryResponse:
     """
     セッションのメッセージ履歴取得
 
+    ペジネーション、フィルタリング、検索機能付き
+
     Args:
         session_id: セッションID
-        limit: 最大取得件数
+        limit: 最大取得件数 (デフォルト50、最大200)
         offset: オフセット
+        role: メッセージロールでフィルタ
+        start_date: 開始日時でフィルタ
+        end_date: 終了日時でフィルタ
+        search: メッセージ内容で検索
         manager: セッションマネージャー (DI)
 
     Returns:
-        MessageHistoryResponse: メッセージ履歴
+        MessageHistoryResponse: メッセージ履歴（ペジネーション情報付き）
     """
     # セッション存在確認
     target_session = await manager.get_session(session_id)
     if not target_session:
         raise SessionNotFoundError(session_id)
 
-    # メッセージ取得
-    messages = await manager.get_messages(session_id, limit=limit, offset=offset)
+    # ロールのバリデーション
+    role_filter = None
+    if role:
+        try:
+            role_filter = MessageRole(role)
+        except ValueError:
+            pass  # 無効なロールは無視
+
+    # メッセージ取得と総件数カウント
+    messages, total = await manager.get_messages_with_count(
+        session_id,
+        limit=limit,
+        offset=offset,
+        role=role_filter,
+        start_date=start_date,
+        end_date=end_date,
+        search=search,
+    )
+
+    # 次のページがあるかどうか
+    has_more = (offset + len(messages)) < total
 
     return MessageHistoryResponse(
         session_id=session_id,
@@ -218,14 +250,96 @@ async def get_session_messages(
             ChatMessageResponse(
                 id=msg.id,
                 session_id=msg.session_id,
-                role=msg.role.value,
+                role=msg.role.value if hasattr(msg.role, 'value') else str(msg.role),
                 content=msg.content,
                 tokens=msg.tokens,
                 created_at=msg.created_at,
             )
             for msg in messages
         ],
-        total=len(messages),
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=has_more,
+    )
+
+
+@router.get("/{session_id}/messages/paginated", response_model=PaginatedMessageHistoryResponse)
+@handle_exceptions
+async def get_session_messages_paginated(
+    session_id: str,
+    limit: int = Query(default=50, ge=1, le=200, description="最大取得件数"),
+    offset: int = Query(default=0, ge=0, description="オフセット"),
+    role: Optional[str] = Query(default=None, description="メッセージロールでフィルタ (user/assistant/system)"),
+    start_date: Optional[datetime] = Query(default=None, description="開始日時でフィルタ (ISO 8601形式)"),
+    end_date: Optional[datetime] = Query(default=None, description="終了日時でフィルタ (ISO 8601形式)"),
+    search: Optional[str] = Query(default=None, max_length=100, description="メッセージ内容で検索"),
+    manager: SessionManager = Depends(get_session_manager),
+) -> PaginatedMessageHistoryResponse:
+    """
+    セッションのメッセージ履歴取得（詳細ペジネーション情報付き）
+
+    Args:
+        session_id: セッションID
+        limit: 最大取得件数
+        offset: オフセット
+        role: メッセージロールでフィルタ
+        start_date: 開始日時でフィルタ
+        end_date: 終了日時でフィルタ
+        search: メッセージ内容で検索
+        manager: セッションマネージャー (DI)
+
+    Returns:
+        PaginatedMessageHistoryResponse: メッセージ履歴（詳細ペジネーション情報付き）
+    """
+    # セッション存在確認
+    target_session = await manager.get_session(session_id)
+    if not target_session:
+        raise SessionNotFoundError(session_id)
+
+    # ロールのバリデーション
+    role_filter = None
+    if role:
+        try:
+            role_filter = MessageRole(role)
+        except ValueError:
+            pass
+
+    # メッセージ取得と総件数カウント
+    messages, total = await manager.get_messages_with_count(
+        session_id,
+        limit=limit,
+        offset=offset,
+        role=role_filter,
+        start_date=start_date,
+        end_date=end_date,
+        search=search,
+    )
+
+    # 次のページがあるかどうか
+    has_more = (offset + len(messages)) < total
+    next_offset = offset + limit if has_more else None
+
+    return PaginatedMessageHistoryResponse(
+        session_id=session_id,
+        messages=[
+            ChatMessageResponse(
+                id=msg.id,
+                session_id=msg.session_id,
+                role=msg.role.value if hasattr(msg.role, 'value') else str(msg.role),
+                content=msg.content,
+                tokens=msg.tokens,
+                created_at=msg.created_at,
+            )
+            for msg in messages
+        ],
+        pagination=PaginationInfo(
+            total=total,
+            limit=limit,
+            offset=offset,
+            has_more=has_more,
+            next_offset=next_offset,
+        ),
     )
 
 

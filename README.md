@@ -8,13 +8,18 @@ Claude Agent SDK (Python) を使用したWebベースのコーディングアシ
 
 ### 主な機能
 
-- Claudeとのリアルタイムストリーミングチャット
-- ファイル操作（Read/Write/Edit）
-- Bashコマンド実行
-- VSCode Web（code-server）統合
-- プロジェクト・セッション管理
-- メッセージ履歴保存
-- ツール実行の可視化
+| 機能 | 説明 |
+|------|------|
+| リアルタイムストリーミングチャット | Claudeとのリアルタイム会話、中断・再開対応 |
+| ファイル操作 | Read/Write/Edit ツール統合 |
+| Bashコマンド実行 | コンテナ内でのコマンド実行 |
+| VSCode Web統合 | code-server によるブラウザベースエディタ |
+| プロジェクト・セッション管理 | マルチプロジェクト、セッション履歴保存 |
+| シンタックスハイライト | prism-react-renderer によるコードブロック表示 |
+| セッション永続化 | ローカルストレージキャッシュ、ドラフト保存 |
+| MCP サーバー統合 | Model Context Protocol サーバー連携 |
+| カスタムエージェント | プロジェクト固有のエージェント設定 |
+| WebSocket 接続管理 | ping/pong、状態追跡、自動再接続 |
 
 # エージェントの動作
 こちらからの全て指示は『/sc:pm』を適応し最適なサブエージェントと連携して作業を行う
@@ -138,32 +143,27 @@ make shell-frontend
 
 ## サービス構成
 
-### Frontend (Next.js)
-- React 18 + Next.js 14
-- TypeScript
-- Monaco Editor (VSCode同等のエディタ)
-- TailwindCSS
-- WebSocket接続でリアルタイム通信
+### 技術スタック
 
-### Backend (FastAPI)
-- Python 3.11
-- FastAPI + Uvicorn
-- Claude Agent SDK統合
-- WebSocketサポート
-- Redis セッション管理
+| レイヤー | 技術 |
+|----------|------|
+| Frontend | React 18, Next.js 14, TypeScript, TailwindCSS, Zustand, prism-react-renderer |
+| Backend | Python 3.11, FastAPI, Claude Agent SDK, Uvicorn, SQLAlchemy 2.x, Pydantic 2.x |
+| Database | MySQL 8.0 (永続化) |
+| Cache | Redis (セッション・キャッシュ) |
+| Infrastructure | Docker 24+, Docker Compose 2.x, Docker-in-Docker |
+| IDE | code-server (VSCode Web) |
 
-### Redis
-- セッション・キャッシュストア
-- 永続化設定済み (AOF + RDB)
+### サービス詳細
 
-### code-server (オプション)
-- ブラウザベースのVSCode
-- 共有ワークスペース
-
-### Docker-in-Docker (DinD) (オプション)
-- 分離されたコード実行環境
-- Backend (Agent SDK) とcode-serverで共有
-- 安全なコンテナ実行
+| サービス | 説明 |
+|----------|------|
+| Frontend (Next.js) | React 18 + Next.js 14、TypeScript、TailwindCSS、WebSocket通信 |
+| Backend (FastAPI) | Python 3.11、Claude Agent SDK統合、WebSocket/REST API |
+| MySQL | メッセージ履歴、プロジェクト設定、ユーザー情報の永続化 |
+| Redis | セッション管理、キャッシュストア（AOF + RDB永続化） |
+| code-server | ブラウザベースのVSCode、共有ワークスペース |
+| Docker-in-Docker | 分離されたコード実行環境、安全なコンテナ実行 |
 
 ## 環境変数
 
@@ -271,58 +271,76 @@ MIT License
 
 本プロジェクトには包括的な技術ドキュメントが用意されています。
 
-### 📐 設計書
+---
 
-| ドキュメント | 説明 | 状態 |
+### 目次
+
+1. [システム設計](#システム設計)
+2. [UI/UX設計](#uiux設計)
+3. [Docker-in-Docker (DinD)](#docker-in-docker-dind)
+4. [ガイド](#ガイド)
+5. [その他](#その他)
+6. [外部リソース](#外部リソース)
+
+---
+
+### システム設計
+
+| ドキュメント | 説明 | パス |
 |-------------|------|------|
-| [アーキテクチャ設計書](doc/architecture-design.md) | システム全体の設計、技術スタック、コンポーネント構成 | ✅ 完了 |
-| [バックエンド設計書](doc/backend-design.md) | FastAPI、API設計、WebSocket、エラーハンドリング | ✅ 完了 |
-| [フロントエンド設計書](doc/frontend-design.md) | React/Next.js、コンポーネント設計、状態管理 | ✅ 完了 |
-| [データベース設計書](doc/database-design.md) | ER図、テーブル定義、インデックス、マイグレーション | ✅ 完了 |
-| [Docker設計書](doc/docker-design.md) | コンテナ構成、ネットワーク、ボリューム | ✅ 完了 |
+| アーキテクチャ設計書 | システム全体の設計、技術スタック、コンポーネント構成 | [doc/architecture-design.md](doc/architecture-design.md) |
+| バックエンド設計書 | FastAPI、API設計、WebSocket、エラーハンドリング | [doc/backend-design.md](doc/backend-design.md) |
+| フロントエンド設計書 | React/Next.js、コンポーネント設計、状態管理 | [doc/frontend-design.md](doc/frontend-design.md) |
+| データベース設計書 | ER図、テーブル定義、インデックス、マイグレーション | [doc/database-design.md](doc/database-design.md) |
+| Docker設計書 | コンテナ構成、ネットワーク、ボリューム | [doc/docker-design.md](doc/docker-design.md) |
+| 認証設計書 | 認証・認可の設計、JWT、権限管理 | [doc/authentication-design.md](doc/authentication-design.md) |
+| 概要設計書 | プロジェクト概要、機能一覧 | [doc/overview-design.md](doc/overview-design.md) |
 
-### 🎨 UI/UX設計
+### UI/UX設計
 
-| ドキュメント | 説明 | 状態 |
+| ドキュメント | 説明 | パス |
 |-------------|------|------|
-| [画面設計書](doc/screen-design.md) | 画面レイアウト、コンポーネント配置 | ✅ 完了 |
-| [デザインシステム](doc/frontend-design-system.md) | カラー、タイポグラフィ、スペーシング | ✅ 完了 |
-| [コンポーネント設計書](doc/frontend-component-design.md) | Atomic Design、コンポーネント仕様 | ✅ 完了 |
-| [Tailwind CSS設定](doc/tailwind-config-design.md) | Tailwind設定、CSS変数 | ✅ 完了 |
+| 画面設計書 | 画面レイアウト、コンポーネント配置 | [doc/screen-design.md](doc/screen-design.md) |
+| デザインシステム | カラー、タイポグラフィ、スペーシング | [doc/frontend-design-system.md](doc/frontend-design-system.md) |
+| コンポーネント設計書 | Atomic Design、コンポーネント仕様 | [doc/frontend-component-design.md](doc/frontend-component-design.md) |
+| Tailwind CSS設定 | Tailwind設定、CSS変数、テーマ | [doc/tailwind-config-design.md](doc/tailwind-config-design.md) |
 
-### 🐳 Docker-in-Docker (DinD)
+### Docker-in-Docker (DinD)
 
-| ドキュメント | 説明 | 状態 |
+| ドキュメント | 説明 | パス |
 |-------------|------|------|
-| [DinD詳細設計書](doc/dind-design.md) | DinDアーキテクチャ・セキュリティ設計 | ✅ 完了 |
-| [DinD セットアップガイド](doc/dind-setup-guide.md) | DinD環境構築手順 | ✅ 完了 |
-| [DinD Executor使用ガイド](doc/dind-executor-usage.md) | コード実行環境の使い方 | ✅ 完了 |
-| [DinD 実装概要](doc/dind-implementation-summary.md) | DinD実装詳細、変更履歴 | ✅ 完了 |
-| [DinD 変更概要](doc/dind-changes-summary.md) | DinD関連の変更内容 | ✅ 完了 |
+| DinD詳細設計書 | DinDアーキテクチャ・セキュリティ設計 | [doc/dind-design.md](doc/dind-design.md) |
+| DinDセットアップガイド | DinD環境構築手順 | [doc/dind-setup-guide.md](doc/dind-setup-guide.md) |
+| DinD Executor使用ガイド | コード実行環境の使い方 | [doc/dind-executor-usage.md](doc/dind-executor-usage.md) |
+| DinD実装概要 | DinD実装詳細、変更履歴 | [doc/dind-implementation-summary.md](doc/dind-implementation-summary.md) |
+| DinD変更概要 | DinD関連の変更内容 | [doc/dind-changes-summary.md](doc/dind-changes-summary.md) |
 
-### 📖 ガイド
+### ガイド
 
-| ドキュメント | 説明 | 状態 |
+| ドキュメント | 説明 | パス |
 |-------------|------|------|
-| [ユーザーガイド](doc/user-guide.md) | エンドユーザー向け操作説明 | ✅ 完了 |
-| [デプロイガイド](doc/deployment-guide.md) | 本番環境へのデプロイ手順 | ✅ 完了 |
-| [認証設計書](doc/authentication-design.md) | 認証・認可の設計 | ✅ 完了 |
+| ユーザーガイド | エンドユーザー向け操作説明 | [doc/user-guide.md](doc/user-guide.md) |
+| デプロイガイド | 本番環境へのデプロイ手順 | [doc/deployment-guide.md](doc/deployment-guide.md) |
+| ユーザー操作 | ユーザー操作一覧 | [doc/user-operations.md](doc/user-operations.md) |
 
-### 📝 その他
+### その他
 
-| ドキュメント | 説明 | 状態 |
+| ドキュメント | 説明 | パス |
 |-------------|------|------|
-| [概要設計書](doc/overview-design.md) | プロジェクト概要 | ✅ 完了 |
-| [Claude Agent SDK調査](doc/claude-agent-sdk-research.md) | SDK調査結果 | ✅ 完了 |
-| [WebSocket統合](doc/frontend-websocket-integration.md) | WebSocket実装詳細 | ✅ 完了 |
-| [ユーザー操作](doc/user-operations.md) | ユーザー操作一覧 | ✅ 完了 |
-| [開発ロードマップ](doc/development-roadmap.md) | 開発計画 | ✅ 完了 |
-| [実装進捗](doc/implementation-progress.md) | 実装状況 | ✅ 完了 |
-| [Phase2実装概要](doc/phase2-implementation-summary.md) | Phase2の実装内容 | ✅ 完了 |
-| [リファクタリング計画](doc/refactoring-2025-01.md) | 2025年1月のリファクタリング | 📋 計画中 |
-| [次のタスク](doc/next-tasks.md) | 次に実装するタスク | 🔄 更新中 |
+| Claude Agent SDK調査 | SDK調査結果 | [doc/claude-agent-sdk-research.md](doc/claude-agent-sdk-research.md) |
+| WebSocket統合 | WebSocket実装詳細 | [doc/frontend-websocket-integration.md](doc/frontend-websocket-integration.md) |
+| 開発ロードマップ | 開発計画 | [doc/development-roadmap.md](doc/development-roadmap.md) |
+| 実装進捗 | 実装状況 | [doc/implementation-progress.md](doc/implementation-progress.md) |
+| Phase2実装概要 | Phase2の実装内容 | [doc/phase2-implementation-summary.md](doc/phase2-implementation-summary.md) |
+| リファクタリング計画 | 2025年1月のリファクタリング | [doc/refactoring-2025-01.md](doc/refactoring-2025-01.md) |
+| 次のタスク | 次に実装するタスク | [doc/next-tasks.md](doc/next-tasks.md) |
 
 ### 外部リソース
-- [Claude Agent SDK](https://github.com/anthropics/anthropic-sdk-python)
-- [FastAPI ドキュメント](https://fastapi.tiangolo.com/)
-- [Next.js ドキュメント](https://nextjs.org/docs)
+
+| リソース | URL |
+|----------|-----|
+| Claude Agent SDK | https://github.com/anthropics/anthropic-sdk-python |
+| FastAPI ドキュメント | https://fastapi.tiangolo.com/ |
+| Next.js ドキュメント | https://nextjs.org/docs |
+| SQLAlchemy ドキュメント | https://docs.sqlalchemy.org/ |
+| Zustand ドキュメント | https://zustand-demo.pmnd.rs/ |
