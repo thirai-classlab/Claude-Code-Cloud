@@ -1,11 +1,12 @@
 # Web版Claude Code バックエンド詳細設計書
 
 **作成日:** 2025-12-20
-**最終更新:** 2025-12-21
-**バージョン:** 1.1
+**最終更新:** 2025-12-29
+**バージョン:** 1.3
 **ステータス:** ✅ 完了（100%）
 **対象:** FastAPI + Claude Agent SDK (Python) バックエンド実装
 **実行環境:** Docker Container
+**関連ドキュメント:** [データベース設計書](database-design.md), [アーキテクチャ設計書](architecture-design.md)
 
 ---
 
@@ -30,73 +31,78 @@
 backend/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py                      # FastAPI アプリケーションエントリポイント
-│   ├── config.py                    # 環境設定管理
+│   ├── main.py                           # FastAPI アプリケーションエントリポイント
+│   ├── config.py                         # 環境設定管理
 │   │
-│   ├── api/                         # API層
+│   ├── api/                              # API層
 │   │   ├── __init__.py
-│   │   ├── dependencies.py          # 共通依存性注入
-│   │   ├── middleware.py            # カスタムミドルウェア
+│   │   ├── dependencies.py               # 共通依存性注入
+│   │   ├── middleware.py                 # カスタムミドルウェア
 │   │   │
-│   │   ├── routes/                  # REST API エンドポイント
+│   │   ├── routes/                       # REST API エンドポイント
 │   │   │   ├── __init__.py
-│   │   │   ├── projects.py          # プロジェクト管理API
-│   │   │   ├── sessions.py          # セッション管理API (プロジェクト配下)
-│   │   │   ├── files.py             # ファイル操作API
-│   │   │   ├── health.py            # ヘルスチェックAPI
-│   │   │   ├── config.py            # クライアント設定API
-│   │   │   └── code_server.py       # code-server連携API
+│   │   │   ├── auth.py                   # 認証API
+│   │   │   ├── projects.py               # プロジェクト管理API
+│   │   │   ├── sessions.py               # セッション管理API
+│   │   │   ├── files.py                  # ファイル操作API
+│   │   │   ├── templates.py              # テンプレート管理API
+│   │   │   ├── shares.py                 # プロジェクト共有API
+│   │   │   ├── project_config.py         # MCP/Agent/Skill/Command設定API
+│   │   │   ├── health.py                 # ヘルスチェックAPI
+│   │   │   └── code_server.py            # code-server連携API
 │   │   │
-│   │   └── websocket/               # WebSocket層
+│   │   └── websocket/                    # WebSocket層
 │   │       ├── __init__.py
-│   │       ├── handlers.py          # WebSocketハンドラー
-│   │       ├── connection_manager.py # 接続管理
-│   │       └── message_handler.py   # メッセージ処理
+│   │       ├── handlers.py               # WebSocketハンドラー
+│   │       ├── connection_manager.py     # 接続管理
+│   │       └── message_handler.py        # メッセージ処理
 │   │
-│   ├── core/                        # コアビジネスロジック
+│   ├── core/                             # コアビジネスロジック
 │   │   ├── __init__.py
-│   │   ├── claude_client.py         # Claude Agent SDK ラッパー
-│   │   ├── project_manager.py       # プロジェクト管理
-│   │   ├── session_manager.py       # セッション管理 (プロジェクト配下)
-│   │   ├── tools/                   # カスタムツール
-│   │   │   ├── __init__.py
-│   │   │   ├── base.py              # ツール基底クラス
-│   │   │   ├── file_tools.py        # ファイル操作ツール
-│   │   │   └── custom_tools.py      # カスタムMCPツール
-│   │   └── security/                # セキュリティ層
+│   │   ├── claude_client.py              # Claude Agent SDK ラッパー
+│   │   ├── project_manager.py            # プロジェクト管理
+│   │   ├── session_manager.py            # セッション管理
+│   │   └── security/                     # セキュリティ層
 │   │       ├── __init__.py
-│   │       ├── sandbox.py           # サンドボックス制御
-│   │       ├── validator.py         # 入力検証
-│   │       └── auth.py              # 認証・認可
+│   │       ├── sandbox.py                # サンドボックス制御
+│   │       ├── validator.py              # 入力検証
+│   │       └── auth.py                   # 認証・認可
 │   │
-│   ├── models/                      # データモデル
+│   ├── models/                           # SQLAlchemy データモデル
 │   │   ├── __init__.py
-│   │   ├── projects.py              # プロジェクトモデル
-│   │   ├── messages.py              # メッセージモデル
-│   │   ├── sessions.py              # セッションモデル (project_id参照)
-│   │   ├── files.py                 # ファイルモデル
-│   │   └── errors.py                # エラーモデル
+│   │   ├── database.py                   # 全モデル定義（12テーブル）
+│   │   ├── user.py                       # ユーザーモデル
+│   │   ├── projects.py                   # プロジェクトモデル
+│   │   ├── sessions.py                   # セッションモデル
+│   │   ├── messages.py                   # メッセージモデル
+│   │   ├── project_share.py              # プロジェクト共有モデル
+│   │   └── errors.py                     # エラーモデル
 │   │
-│   ├── services/                    # ビジネスロジック層
+│   ├── services/                         # ビジネスロジック層
 │   │   ├── __init__.py
-│   │   ├── project_service.py       # プロジェクトサービス
-│   │   ├── chat_service.py          # チャットサービス
-│   │   ├── file_service.py          # ファイルサービス
-│   │   └── session_service.py       # セッションサービス
+│   │   ├── project_service.py            # プロジェクトサービス
+│   │   ├── chat_service.py               # チャットサービス
+│   │   ├── file_service.py               # ファイルサービス
+│   │   ├── session_service.py            # セッションサービス
+│   │   ├── template_service.py           # テンプレートサービス
+│   │   └── project_config_service.py     # 設定管理サービス
 │   │
-│   ├── utils/                       # ユーティリティ
+│   ├── utils/                            # ユーティリティ
 │   │   ├── __init__.py
-│   │   ├── logger.py                # ロギング設定
-│   │   ├── redis_client.py          # Redis接続ヘルパー
-│   │   └── helpers.py               # 汎用ヘルパー関数
+│   │   └── logger.py                     # ロギング設定
 │   │
-│   └── schemas/                     # Pydantic スキーマ
+│   └── schemas/                          # Pydantic スキーマ
 │       ├── __init__.py
-│       ├── request.py               # リクエストスキーマ
-│       ├── response.py              # レスポンススキーマ
-│       └── websocket.py             # WebSocketメッセージスキーマ
+│       ├── request.py                    # リクエストスキーマ
+│       ├── response.py                   # レスポンススキーマ
+│       ├── project_config.py             # 設定スキーマ
+│       ├── template.py                   # テンプレートスキーマ
+│       └── websocket.py                  # WebSocketメッセージスキーマ
 │
-├── tests/                           # テストコード
+├── migrations/                           # Alembicマイグレーション
+│   └── versions/                         # マイグレーションファイル
+│
+├── tests/                                # テストコード
 │   ├── __init__.py
 │   ├── conftest.py                  # pytest設定
 │   ├── unit/                        # ユニットテスト
@@ -124,24 +130,15 @@ backend/
 
 ### 1.2 主要ファイルの役割
 
-```mermaid
-flowchart TD
-    subgraph 最高["重要度: 最高"]
-        MAIN["main.py"] --> MAIN_D["FastAPIアプリ起動、ルート登録、ミドルウェア設定"]
-        CLAUDE["core/claude_client.py"] --> CLAUDE_D["Claude Agent SDK統合、ストリーミング管理"]
-        SESSION["core/session_manager.py"] --> SESSION_D["セッションライフサイクル管理"]
-        WS["api/websocket/handlers.py"] --> WS_D["WebSocket接続・メッセージ処理"]
-    end
-
-    subgraph 高["重要度: 高"]
-        SANDBOX["core/security/sandbox.py"] --> SANDBOX_D["サンドボックス環境制御"]
-        CHAT["services/chat_service.py"] --> CHAT_D["チャットビジネスロジック"]
-    end
-
-    subgraph 中["重要度: 中"]
-        CONFIG["config.py"] --> CONFIG_D["環境設定一元管理"]
-    end
-```
+| ファイル | 役割 | 重要度 |
+|---------|------|:------:|
+| `main.py` | FastAPIアプリ起動、ルート登録、ミドルウェア設定 | 最高 |
+| `core/claude_client.py` | Claude Agent SDK統合、ストリーミング管理 | 最高 |
+| `core/session_manager.py` | セッションライフサイクル管理 | 最高 |
+| `api/websocket/handlers.py` | WebSocket接続・メッセージ処理 | 最高 |
+| `core/security/sandbox.py` | サンドボックス環境制御 | 高 |
+| `services/chat_service.py` | チャットビジネスロジック | 高 |
+| `config.py` | 環境設定一元管理 | 中 |
 
 ---
 
@@ -2863,26 +2860,21 @@ docker-compose logs -f backend
 
 ## 変更履歴
 
-```mermaid
-flowchart LR
-    subgraph 変更履歴
-        V10["v1.0<br/>2025-12-20<br/>初版作成"]
-        V11["v1.1<br/>2025-12-21<br/>ドキュメント完成度100%達成"]
-    end
-    V10 --> V11
-```
+| バージョン | 日付 | 変更内容 |
+|-----------|------|----------|
+| v1.0 | 2025-12-20 | 初版作成 |
+| v1.1 | 2025-12-21 | ドキュメント完成度100%達成 |
+| v1.2 | 2025-12-29 | ディレクトリ構造更新、テンプレート/共有機能追加 |
+| v1.3 | 2025-12-29 | テーブル形式に統一（主要ファイル、変更履歴） |
 
 ---
 
 **ドキュメント管理情報**
 
-```mermaid
-classDiagram
-    class ドキュメント情報 {
-        設計書バージョン: 1.1
-        最終更新: 2025-12-21
-        作成者: Claude Code
-        レビューステータス: ✅ 完了
-        完成度: 100%
-    }
-```
+| 項目 | 値 |
+|------|-----|
+| 設計書バージョン | 1.3 |
+| 最終更新 | 2025-12-29 |
+| 作成者 | Claude Code |
+| レビューステータス | ✅ 完了 |
+| 完成度 | 100% |

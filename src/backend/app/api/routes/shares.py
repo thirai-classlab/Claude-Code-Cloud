@@ -120,10 +120,7 @@ async def list_project_shares(
     """
     # アクセス権チェック
     if not await permission_service.can_access_project(current_user_id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to this project",
-        )
+        raise PermissionDeniedError("You don't have access to this project")
 
     shares = await share_service.list_project_shares(project_id)
 
@@ -164,10 +161,7 @@ async def update_project_share(
     """
     # 権限チェック (オーナーまたはadmin)
     if not await permission_service.can_admin(current_user_id, project_id):
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have permission to modify shares for this project",
-        )
+        raise PermissionDeniedError("You don't have permission to modify shares for this project")
 
     # 共有を更新
     share = await share_service.update_share(
@@ -177,10 +171,7 @@ async def update_project_share(
     )
 
     if not share:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Share not found for user {user_id}",
-        )
+        raise NotFoundError("Share", user_id)
 
     # ユーザー情報を取得
     target_user = await permission_service.get_user_by_id(user_id)
@@ -229,16 +220,10 @@ async def delete_project_share(
     has_admin = await permission_service.can_admin(current_user_id, project_id)
 
     if not is_self and not has_admin:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have permission to remove this share",
-        )
+        raise PermissionDeniedError("You don't have permission to remove this share")
 
     # 共有を削除
     deleted = await share_service.delete_share(project_id, user_id)
 
     if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Share not found for user {user_id}",
-        )
+        raise NotFoundError("Share", user_id)
