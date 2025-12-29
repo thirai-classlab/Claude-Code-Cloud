@@ -1,8 +1,8 @@
 # Web版Claude Code データベース設計書
 
 **作成日:** 2025-12-29
-**最終更新:** 2025-12-29
-**バージョン:** 1.1
+**最終更新:** 2025-12-30
+**バージョン:** 1.2
 **ステータス:** ✅ 完了
 **対象:** MySQL 8.0 データベース設計
 **関連ファイル:** `src/backend/app/models/database.py`
@@ -177,6 +177,7 @@ erDiagram
         enum status "active|idle|processing|closed"
         string user_id
         string model "DEFAULT claude-opus-4-5"
+        string sdk_session_id "Claude SDK session ID"
         int message_count "DEFAULT 0"
         int total_tokens "DEFAULT 0"
         float total_cost_usd "DEFAULT 0"
@@ -311,6 +312,7 @@ erDiagram
         string project_id FK
         string name
         enum status
+        string sdk_session_id
         int message_count
         int total_tokens
         float total_cost_usd
@@ -550,6 +552,7 @@ CREATE TABLE sessions (
     status ENUM('active', 'idle', 'processing', 'closed') NOT NULL DEFAULT 'active',
     user_id VARCHAR(36),
     model VARCHAR(50) NOT NULL DEFAULT 'claude-opus-4-5',
+    sdk_session_id VARCHAR(100),
     message_count INTEGER DEFAULT 0,
     total_tokens INTEGER DEFAULT 0,
     total_cost_usd FLOAT DEFAULT 0.0,
@@ -561,6 +564,7 @@ CREATE TABLE sessions (
     INDEX ix_sessions_project_status (project_id, status),
     INDEX ix_sessions_last_activity (last_activity_at),
     INDEX ix_sessions_user_id (user_id),
+    INDEX ix_sessions_sdk_session_id (sdk_session_id),
 
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -574,6 +578,7 @@ CREATE TABLE sessions (
 | status | ENUM | NO | 'active' | ステータス |
 | user_id | VARCHAR(36) | YES | NULL | 操作ユーザーID |
 | model | VARCHAR(50) | NO | 'claude-opus-4-5' | 使用モデル |
+| sdk_session_id | VARCHAR(100) | YES | NULL | Claude SDKセッションID（セッション再開用） |
 | message_count | INTEGER | YES | 0 | メッセージ数 |
 | total_tokens | INTEGER | YES | 0 | 合計トークン数 |
 | total_cost_usd | FLOAT | YES | 0.0 | 合計コスト（USD） |
@@ -1044,7 +1049,44 @@ sequenceDiagram
     Handler-->>WS: result
 ```
 
-### 5.3 プロジェクト設定読み込みフロー
+### 5.3 セッション再開フロー
+
+Claude Agent SDKのセッション再開機能を使用して、ブラウザ更新後も会話履歴を維持します。
+
+```mermaid
+sequenceDiagram
+    participant Client as クライアント
+    participant WS as WebSocket Handler
+    participant DB as MySQL
+    participant SDK as Claude Agent SDK
+
+    Note over Client,SDK: 初回接続時
+    Client->>WS: WebSocket接続 + メッセージ送信
+    WS->>DB: SELECT sdk_session_id FROM sessions WHERE id = ?
+    DB-->>WS: NULL (新規セッション)
+    WS->>SDK: ClaudeAgentOptions(resume=None)
+    SDK-->>WS: 応答 + session_id
+    WS->>DB: UPDATE sessions SET sdk_session_id = ?
+
+    Note over Client,SDK: 再接続時（ブラウザ更新後）
+    Client->>WS: WebSocket接続 + メッセージ送信
+    WS->>DB: SELECT sdk_session_id FROM sessions WHERE id = ?
+    DB-->>WS: "sdk_session_xxx" (既存セッションID)
+    WS->>SDK: ClaudeAgentOptions(resume="sdk_session_xxx")
+    Note over SDK: 前回の会話コンテキストを復元
+    SDK-->>WS: 応答（履歴を考慮）
+```
+
+**セッションID管理:**
+
+| 操作 | 説明 |
+|------|------|
+| 初回接続 | SDK session_id が NULL、新規セッション作成 |
+| メッセージ送信後 | SDK から返された session_id を DB に保存 |
+| 再接続時 | DB から sdk_session_id を取得し、SDK の resume パラメータに渡す |
+| セッション終了 | sdk_session_id は保持（将来の再開に備える） |
+
+### 5.4 プロジェクト設定読み込みフロー
 
 ```mermaid
 sequenceDiagram
@@ -1067,7 +1109,7 @@ sequenceDiagram
     SDK-->>Handler: Agent ready
 ```
 
-### 5.4 テンプレート適用フロー
+### 5.5 テンプレート適用フロー
 
 ```mermaid
 sequenceDiagram
@@ -1146,6 +1188,7 @@ flowchart LR
 | sessions | ix_sessions_project_id | project_id | INDEX | プロジェクト別一覧 |
 | sessions | ix_sessions_project_status | project_id, status | COMPOSITE | ステータス別一覧 |
 | sessions | ix_sessions_last_activity | last_activity_at | INDEX | アクティビティ順 |
+| sessions | ix_sessions_sdk_session_id | sdk_session_id | INDEX | SDK セッションID検索 |
 | messages | PRIMARY | id | PK | 主キー |
 | messages | ix_messages_session_id | session_id | INDEX | セッション別一覧 |
 | messages | ix_messages_session_created | session_id, created_at | COMPOSITE | 時系列取得 |
@@ -1579,6 +1622,7 @@ flowchart TD
 |-----------|------|----------|
 | v1.0 | 2025-12-29 | 初版作成 |
 | v1.1 | 2025-12-29 | テーブル形式に統一（変更履歴、管理情報） |
+| v1.2 | 2025-12-30 | sessions テーブルに sdk_session_id カラムを追加（セッション再開機能対応） |
 
 ---
 
@@ -1586,8 +1630,8 @@ flowchart TD
 
 | 項目 | 値 |
 |------|-----|
-| 設計書バージョン | 1.1 |
-| 最終更新 | 2025-12-29 |
+| 設計書バージョン | 1.2 |
+| 最終更新 | 2025-12-30 |
 | 作成者 | Claude Code |
 | レビューステータス | ✅ 完了 |
 | 完成度 | 100% |

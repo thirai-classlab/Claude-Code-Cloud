@@ -40,6 +40,7 @@ class Session(BaseModel):
     status: SessionStatus = Field(default=SessionStatus.ACTIVE, description="セッションステータス")
     user_id: Optional[str] = Field(default=None, description="ユーザーID (オプション)")
     model: str = Field(default="claude-opus-4-5", description="使用Claudeモデル")
+    sdk_session_id: Optional[str] = Field(default=None, description="Claude SDKセッションID（resume用）")
     message_count: int = Field(default=0, description="メッセージ数")
     total_tokens: int = Field(default=0, description="累計トークン数")
     total_cost_usd: float = Field(default=0.0, description="累計コスト (USD)")

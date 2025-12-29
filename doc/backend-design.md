@@ -1,8 +1,8 @@
 # Web版Claude Code バックエンド詳細設計書
 
 **作成日:** 2025-12-20
-**最終更新:** 2025-12-29
-**バージョン:** 1.3
+**最終更新:** 2025-12-30
+**バージョン:** 1.4
 **ステータス:** ✅ 完了（100%）
 **対象:** FastAPI + Claude Agent SDK (Python) バックエンド実装
 **実行環境:** Docker Container
@@ -784,9 +784,85 @@ class SessionManager:
 3. **自動クリーンアップ:** バックグラウンドタスクでの期限切れセッション削除
 4. **リソース制限:** 最大セッション数の制御
 
+#### SDK セッション再開機能 (v1.2追加)
+
+ブラウザ更新後も会話コンテキストを維持するため、Claude Agent SDKの`resume`パラメータを使用します。
+
+```python
+# SDK セッションID管理メソッド
+async def update_sdk_session_id(
+    self, session_id: str, sdk_session_id: str
+) -> Optional[Session]:
+    """
+    SDKセッションIDを更新（セッション再開用）
+
+    Args:
+        session_id: アプリケーションセッションID
+        sdk_session_id: Claude Agent SDKから返されるセッションID
+
+    Returns:
+        Session: 更新されたセッション
+    """
+    stmt = select(SessionModel).where(SessionModel.id == session_id)
+    result = await self.session.execute(stmt)
+    session_model = result.scalar_one_or_none()
+    if not session_model:
+        return None
+    session_model.sdk_session_id = sdk_session_id
+    session_model.updated_at = datetime.now(timezone.utc)
+    await self.session.flush()
+    return self._model_to_pydantic(session_model)
+
+async def get_sdk_session_id(self, session_id: str) -> Optional[str]:
+    """
+    SDKセッションIDを取得
+
+    Args:
+        session_id: アプリケーションセッションID
+
+    Returns:
+        Optional[str]: SDKセッションID（存在しない場合はNone）
+    """
+    stmt = select(SessionModel.sdk_session_id).where(SessionModel.id == session_id)
+    result = await self.session.execute(stmt)
+    return result.scalar_one_or_none()
+```
+
+**セッション再開フロー:**
+
+```mermaid
+sequenceDiagram
+    participant Client as クライアント
+    participant WS as WebSocket Handler
+    participant SM as SessionManager
+    participant DB as MySQL
+    participant SDK as Claude Agent SDK
+
+    Note over Client,SDK: 初回接続時
+    Client->>WS: メッセージ送信
+    WS->>SM: get_sdk_session_id(session_id)
+    SM->>DB: SELECT sdk_session_id
+    DB-->>SM: NULL
+    SM-->>WS: None
+    WS->>SDK: ClaudeAgentOptions(resume=None)
+    SDK-->>WS: 応答 + ResultMessage.session_id
+    WS->>SM: update_sdk_session_id(session_id, sdk_session_id)
+    SM->>DB: UPDATE sessions SET sdk_session_id = ?
+
+    Note over Client,SDK: 再接続時
+    Client->>WS: メッセージ送信
+    WS->>SM: get_sdk_session_id(session_id)
+    SM->>DB: SELECT sdk_session_id
+    DB-->>SM: "sdk_xxx"
+    SM-->>WS: "sdk_xxx"
+    WS->>SDK: ClaudeAgentOptions(resume="sdk_xxx")
+    Note over SDK: 会話コンテキスト復元
+    SDK-->>WS: 応答（履歴を考慮）
+```
+
 ---
 
-### 2.3 WebSocketHandler (api/websocket/handlers.py)
+### 2.4 WebSocketHandler (api/websocket/handlers.py)
 
 **責務:** WebSocket接続管理、メッセージルーティング、エラーハンドリング。
 

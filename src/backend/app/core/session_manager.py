@@ -234,6 +234,47 @@ class SessionManager:
         await self.session.flush()
         return self._model_to_pydantic(session_model)
 
+    async def update_sdk_session_id(
+        self, session_id: str, sdk_session_id: str
+    ) -> Optional[Session]:
+        """
+        SDKセッションIDを更新（セッション再開用）
+
+        Args:
+            session_id: セッションID
+            sdk_session_id: Claude SDKのセッションID
+
+        Returns:
+            Optional[Session]: 更新されたセッション
+        """
+        stmt = select(SessionModel).where(SessionModel.id == session_id)
+        result = await self.session.execute(stmt)
+        session_model = result.scalar_one_or_none()
+
+        if not session_model:
+            return None
+
+        session_model.sdk_session_id = sdk_session_id
+        session_model.updated_at = datetime.now(timezone.utc)
+
+        await self.session.flush()
+        logger.info("SDK session ID updated", session_id=session_id, sdk_session_id=sdk_session_id)
+        return self._model_to_pydantic(session_model)
+
+    async def get_sdk_session_id(self, session_id: str) -> Optional[str]:
+        """
+        SDKセッションIDを取得
+
+        Args:
+            session_id: セッションID
+
+        Returns:
+            Optional[str]: SDKセッションID（存在しない場合はNone）
+        """
+        stmt = select(SessionModel.sdk_session_id).where(SessionModel.id == session_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def close_session(self, session_id: str) -> Optional[Session]:
         """
         セッションをクローズ

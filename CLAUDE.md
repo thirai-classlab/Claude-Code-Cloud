@@ -8,13 +8,17 @@ Web版Claude Codeプロジェクト - Claude Agent SDK (Python) を使用したW
 
 ### 主な機能
 
-- Claudeとのリアルタイムストリーミングチャット
-- ファイル操作（Read/Write/Edit）
-- Bashコマンド実行
-- VSCode Web（code-server）統合
-- プロジェクト・セッション管理
-- メッセージ履歴保存
-- Docker-in-Docker (DinD) によるコード実行環境
+| 機能 | 説明 |
+|------|------|
+| リアルタイムストリーミングチャット | Claudeとのリアルタイム会話、中断・再開対応 |
+| セッション再開（Resume） | ブラウザ更新後も会話コンテキストを維持（SDK session_id使用） |
+| ファイル操作 | Read/Write/Edit ツール統合 |
+| Bashコマンド実行 | コンテナ内でのコマンド実行 |
+| VSCode Web統合 | code-server によるブラウザベースエディタ |
+| プロジェクト・セッション管理 | マルチプロジェクト、セッション履歴保存 |
+| MCP サーバー統合 | Model Context Protocol サーバー連携 |
+| カスタムエージェント | プロジェクト固有のエージェント設定 |
+| Docker-in-Docker | 分離されたコード実行環境、安全なコンテナ実行 |
 
 ---
 

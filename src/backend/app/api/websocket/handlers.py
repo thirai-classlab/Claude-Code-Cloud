@@ -91,6 +91,10 @@ class ConnectionManager:
         self.session_states: Dict[str, SessionState] = {}
         self._ping_tasks: Dict[str, asyncio.Task] = {}
         self._message_id_counter: int = 0
+        # SDKクライアント管理（セッション継続性のため）
+        self._sdk_clients: Dict[str, ClaudeSDKClient] = {}
+        self._sdk_client_options: Dict[str, ClaudeAgentOptions] = {}
+        self._sdk_client_locks: Dict[str, asyncio.Lock] = {}
 
     def _generate_message_id(self) -> str:
         """メッセージIDを生成"""
@@ -138,6 +142,65 @@ class ConnectionManager:
                     break
 
         self._ping_tasks[session_id] = asyncio.create_task(ping_loop())
+
+    async def get_or_create_sdk_client(
+        self, session_id: str, options: ClaudeAgentOptions
+    ) -> ClaudeSDKClient:
+        """
+        SDKクライアントを取得または作成（セッション継続性のため）
+
+        Args:
+            session_id: セッションID
+            options: Claude Agent SDK オプション
+
+        Returns:
+            ClaudeSDKClient: SDKクライアント
+        """
+        # ロックを取得または作成
+        if session_id not in self._sdk_client_locks:
+            self._sdk_client_locks[session_id] = asyncio.Lock()
+
+        async with self._sdk_client_locks[session_id]:
+            # 既存のクライアントがあれば返す
+            if session_id in self._sdk_clients:
+                logger.debug("Reusing existing SDK client", session_id=session_id)
+                return self._sdk_clients[session_id]
+
+            # 新しいクライアントを作成
+            logger.info("Creating new SDK client", session_id=session_id)
+            client = ClaudeSDKClient(options=options)
+            await client.__aenter__()  # コンテキストマネージャーを開始
+            self._sdk_clients[session_id] = client
+            self._sdk_client_options[session_id] = options
+            return client
+
+    async def close_sdk_client(self, session_id: str) -> None:
+        """
+        SDKクライアントをクローズ
+
+        Args:
+            session_id: セッションID
+        """
+        if session_id in self._sdk_client_locks:
+            async with self._sdk_client_locks[session_id]:
+                if session_id in self._sdk_clients:
+                    try:
+                        client = self._sdk_clients[session_id]
+                        await client.__aexit__(None, None, None)
+                        logger.info("SDK client closed", session_id=session_id)
+                    except Exception as e:
+                        logger.warning("Error closing SDK client", session_id=session_id, error=str(e))
+                    finally:
+                        del self._sdk_clients[session_id]
+                        if session_id in self._sdk_client_options:
+                            del self._sdk_client_options[session_id]
+
+            # ロックも削除
+            del self._sdk_client_locks[session_id]
+
+    def has_sdk_client(self, session_id: str) -> bool:
+        """SDKクライアントが存在するか確認"""
+        return session_id in self._sdk_clients
 
     def disconnect(self, session_id: str) -> None:
         """WebSocket接続を切断"""
@@ -454,6 +517,9 @@ async def _handle_disconnect(session_id: str) -> None:
             except Exception as e:
                 logger.warning("Failed to save partial response on disconnect", session_id=session_id, error=str(e))
 
+    # SDKクライアントをクローズ（セッション継続性管理）
+    await connection_manager.close_sdk_client(session_id)
+
     connection_manager.disconnect(session_id)
 
 
@@ -522,18 +588,31 @@ async def handle_chat_message(
                 "timestamp": time.time(),
             })
 
-            # SDK オプション構築
-            options = processor.build_sdk_options(config)
+            # SDKセッションIDを取得（セッション再開用）
+            sdk_session_id = await session_manager.get_sdk_session_id(session_id)
+
+            # SDK オプション構築（既存のSDKセッションIDがあれば再開）
+            options = processor.build_sdk_options(config, resume_session_id=sdk_session_id)
 
             logger.info(
                 "Starting Claude Agent SDK session",
                 session_id=session_id,
+                resume_sdk_session=sdk_session_id,
             )
 
             # ストリーミング処理
-            full_response_text, usage_info, was_interrupted = await _stream_response(
+            full_response_text, usage_info, was_interrupted, new_sdk_session_id = await _stream_response(
                 session_id, options, message, conn_manager
             )
+
+            # SDKセッションIDをDBに保存（初回または変更があった場合）
+            if new_sdk_session_id and new_sdk_session_id != sdk_session_id:
+                await session_manager.update_sdk_session_id(session_id, new_sdk_session_id)
+                logger.info(
+                    "SDK session ID saved",
+                    session_id=session_id,
+                    sdk_session_id=new_sdk_session_id,
+                )
 
             # メッセージ完了
             logger.info("Message completed", session_id=session_id, interrupted=was_interrupted)
@@ -590,9 +669,11 @@ async def _stream_response(
     options: ClaudeAgentOptions,
     message: WSChatMessage,
     conn_manager: ConnectionManager,
-) -> tuple[str, dict, bool]:
+) -> tuple[str, dict, bool, Optional[str]]:
     """
     Claude Agent SDK でストリーミングレスポンスを処理
+
+    セッション継続性のため、同じセッションでは同じSDKクライアントを再利用します。
 
     Args:
         session_id: セッションID
@@ -601,7 +682,7 @@ async def _stream_response(
         conn_manager: 接続マネージャー
 
     Returns:
-        tuple[str, dict, bool]: (応答テキスト, 使用量情報, 中断されたか)
+        tuple[str, dict, bool, Optional[str]]: (応答テキスト, 使用量情報, 中断されたか, SDKセッションID)
     """
     full_response_text = ""
     usage_info = {
@@ -611,83 +692,90 @@ async def _stream_response(
         "duration_ms": 0,
     }
     was_interrupted = False
+    sdk_session_id: Optional[str] = None
     start_time = time.time()
 
     try:
-        async with ClaudeSDKClient(options=options) as client:
-            # クエリ送信
-            await client.query(message.content)
+        # セッション継続性のため、既存クライアントを再利用または新規作成
+        client = await conn_manager.get_or_create_sdk_client(session_id, options)
 
-            # ストリーミングレスポンス処理
-            async for sdk_message in client.receive_response():
-                # 接続が切れていないか確認
-                if session_id not in conn_manager.active_connections:
-                    logger.warning("Connection lost during streaming", session_id=session_id)
-                    was_interrupted = True
-                    break
+        # クエリ送信
+        await client.query(message.content)
 
-                # 処理中フラグが解除されていたら中断（interrupt リクエスト）
-                if not conn_manager.is_processing(session_id):
-                    logger.info("Streaming interrupted by request", session_id=session_id)
-                    was_interrupted = True
-                    break
+        # ストリーミングレスポンス処理
+        async for sdk_message in client.receive_response():
+            # 接続が切れていないか確認
+            if session_id not in conn_manager.active_connections:
+                logger.warning("Connection lost during streaming", session_id=session_id)
+                was_interrupted = True
+                break
 
-                if isinstance(sdk_message, AssistantMessage):
-                    for block in sdk_message.content:
-                        if isinstance(block, TextBlock):
-                            # テキストストリーミング
-                            full_response_text += block.text
-                            # 部分レスポンスを更新（中断時の保存用）
-                            conn_manager.update_partial_response(session_id, block.text)
-                            await conn_manager.send_message(
-                                session_id, {
-                                    "type": "text",
-                                    "content": block.text,
-                                    "timestamp": time.time(),
-                                }
-                            )
-                        elif isinstance(block, ToolUseBlock):
-                            # ツール使用開始通知
-                            await conn_manager.send_message(
-                                session_id,
-                                {
-                                    "type": "tool_use_start",
-                                    "tool": block.name,
-                                    "tool_use_id": block.id,
-                                    "input": block.input,
-                                    "timestamp": time.time(),
-                                },
-                            )
+            # 処理中フラグが解除されていたら中断（interrupt リクエスト）
+            if not conn_manager.is_processing(session_id):
+                logger.info("Streaming interrupted by request", session_id=session_id)
+                was_interrupted = True
+                break
 
-                elif isinstance(sdk_message, ToolResultBlock):
-                    # ツール結果通知
-                    await conn_manager.send_message(
-                        session_id,
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": sdk_message.tool_use_id,
-                            "success": True,
-                            "output": str(sdk_message.content),
-                            "timestamp": time.time(),
-                        },
-                    )
+            if isinstance(sdk_message, AssistantMessage):
+                for block in sdk_message.content:
+                    if isinstance(block, TextBlock):
+                        # テキストストリーミング
+                        full_response_text += block.text
+                        # 部分レスポンスを更新（中断時の保存用）
+                        conn_manager.update_partial_response(session_id, block.text)
+                        await conn_manager.send_message(
+                            session_id, {
+                                "type": "text",
+                                "content": block.text,
+                                "timestamp": time.time(),
+                            }
+                        )
+                    elif isinstance(block, ToolUseBlock):
+                        # ツール使用開始通知
+                        await conn_manager.send_message(
+                            session_id,
+                            {
+                                "type": "tool_use_start",
+                                "tool": block.name,
+                                "tool_use_id": block.id,
+                                "input": block.input,
+                                "timestamp": time.time(),
+                            },
+                        )
 
-                elif isinstance(sdk_message, ResultMessage):
-                    # 使用量情報
-                    usage_info = {
-                        "total_cost_usd": getattr(sdk_message, "total_cost_usd", 0),
-                        "duration_ms": getattr(sdk_message, "duration_ms", 0),
-                        "input_tokens": (
-                            getattr(sdk_message.usage, "input_tokens", 0)
-                            if hasattr(sdk_message, "usage")
-                            else 0
-                        ),
-                        "output_tokens": (
-                            getattr(sdk_message.usage, "output_tokens", 0)
-                            if hasattr(sdk_message, "usage")
-                            else 0
-                        ),
-                    }
+            elif isinstance(sdk_message, ToolResultBlock):
+                # ツール結果通知
+                await conn_manager.send_message(
+                    session_id,
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": sdk_message.tool_use_id,
+                        "success": True,
+                        "output": str(sdk_message.content),
+                        "timestamp": time.time(),
+                    },
+                )
+
+            elif isinstance(sdk_message, ResultMessage):
+                # 使用量情報
+                usage_info = {
+                    "total_cost_usd": getattr(sdk_message, "total_cost_usd", 0),
+                    "duration_ms": getattr(sdk_message, "duration_ms", 0),
+                    "input_tokens": (
+                        getattr(sdk_message.usage, "input_tokens", 0)
+                        if hasattr(sdk_message, "usage")
+                        else 0
+                    ),
+                    "output_tokens": (
+                        getattr(sdk_message.usage, "output_tokens", 0)
+                        if hasattr(sdk_message, "usage")
+                        else 0
+                    ),
+                }
+                # SDKセッションIDを取得（セッション再開用）
+                sdk_session_id = getattr(sdk_message, "session_id", None)
+                if sdk_session_id:
+                    logger.debug("Got SDK session ID from ResultMessage", sdk_session_id=sdk_session_id)
 
     except asyncio.CancelledError:
         logger.info("Stream cancelled", session_id=session_id)
@@ -701,7 +789,7 @@ async def _stream_response(
     if usage_info["duration_ms"] == 0:
         usage_info["duration_ms"] = int((time.time() - start_time) * 1000)
 
-    return full_response_text, usage_info, was_interrupted
+    return full_response_text, usage_info, was_interrupted, sdk_session_id
 
 
 def get_default_tools() -> List[str]:

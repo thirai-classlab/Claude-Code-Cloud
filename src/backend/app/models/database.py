@@ -136,6 +136,7 @@ class SessionModel(Base):
     )
     user_id = Column(String(36), nullable=True, index=True)
     model = Column(String(50), default="claude-opus-4-5", nullable=False)
+    sdk_session_id = Column(String(100), nullable=True, index=True)  # Claude SDK セッションID（resume用）
     message_count = Column(Integer, default=0)
     total_tokens = Column(Integer, default=0)
     total_cost_usd = Column(Float, default=0.0)
