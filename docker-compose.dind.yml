@@ -44,7 +44,7 @@ services:
       -c "
       apt-get update && apt-get install -y docker.io &&
       chown -R coder:coder /home/coder &&
-      exec su coder -c 'dumb-init /usr/bin/code-server --bind-addr 0.0.0.0:8080 /home/coder/workspace'
+      exec su coder -c 'dumb-init /usr/bin/code-server --auth none --bind-addr 0.0.0.0:8080 /home/coder/workspace'
       "
     environment:
       - DOCKER_HOST=tcp://dind:2375
@@ -60,8 +60,6 @@ services:
       - DIND_WORKSPACE_PATH=/workspaces
       - DOCKER_BUILDKIT=1
     depends_on:
-      redis:
-        condition: service_healthy
       dind:
         condition: service_healthy
 

@@ -83,7 +83,7 @@ export const MainLayout: React.FC = () => {
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Sidebar - Hidden on mobile, toggleable on tablet+ */}
         {isSidebarOpen && (
-          <aside className="w-64 lg:w-72 border-r border-border bg-bg-secondary flex-shrink-0 hidden md:flex md:flex-col overflow-hidden">
+          <aside className="w-sidebar border-r border-border-subtle bg-bg-secondary flex-shrink-0 hidden md:flex md:flex-col overflow-hidden">
             <Sidebar />
           </aside>
         )}
@@ -91,12 +91,12 @@ export const MainLayout: React.FC = () => {
         {/* Mobile sidebar overlay */}
         {isSidebarOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            className="fixed inset-0 z-40 bg-bg-primary/80 backdrop-blur-sm md:hidden"
             onClick={toggleSidebar}
             aria-hidden="true"
           >
             <aside
-              className="w-64 h-full border-r border-border bg-bg-secondary flex flex-col overflow-hidden"
+              className="w-sidebar h-full border-r border-border-subtle bg-bg-secondary flex flex-col overflow-hidden animate-slide-in"
               onClick={(e) => e.stopPropagation()}
             >
               <Sidebar />
@@ -106,11 +106,11 @@ export const MainLayout: React.FC = () => {
 
         {/* Chat Panel - Responsive width */}
         <div
-          className="border-r border-border bg-white flex-shrink-0 w-full md:w-auto flex flex-col overflow-hidden"
+          className="border-r border-border-subtle bg-bg-primary flex-shrink-0 w-full md:w-auto flex flex-col overflow-hidden"
           style={{
             width: isMdOrLarger ? `${chatWidth}px` : '100%',
             minWidth: isMdOrLarger ? '320px' : '100%',
-            maxWidth: isMdOrLarger ? '800px' : '100%',
+            maxWidth: isMdOrLarger ? 'var(--chat-max-width, 860px)' : '100%',
           }}
         >
           {/* プロジェクトとセッション両方が選択された場合のみチャット表示 */}

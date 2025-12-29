@@ -65,7 +65,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         <div>
           <label
             htmlFor="project-name"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            className="block text-sm font-medium text-text-secondary mb-1"
           >
             Project Name *
           </label>
@@ -75,7 +75,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="My Awesome Project"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
             autoFocus
             disabled={isSubmitting}
           />
@@ -85,7 +85,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         <div>
           <label
             htmlFor="project-description"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            className="block text-sm font-medium text-text-secondary mb-1"
           >
             Description (Optional)
           </label>
@@ -95,15 +95,15 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Describe your project..."
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none"
             disabled={isSubmitting}
           />
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="p-3 bg-status-error/10 border border-status-error/30 rounded-md">
+            <p className="text-sm text-status-error">{error}</p>
           </div>
         )}
 

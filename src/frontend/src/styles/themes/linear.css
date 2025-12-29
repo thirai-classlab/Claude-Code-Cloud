@@ -1,0 +1,59 @@
+/* Linear Style Theme - Pattern 09 v2 (No Icons) */
+/* A modern, cool, and minimal dark theme inspired by Linear */
+
+:root,
+[data-theme='linear'],
+[data-theme='dark'] {
+  /* Background Colors */
+  --bg-primary: #09090b;
+  --bg-secondary: #0f0f11;
+  --bg-tertiary: #18181b;
+  --bg-hover: #1f1f23;
+
+  /* Text Colors */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #52525b;
+
+  /* Accent Colors */
+  --accent: #5e5ce6;
+  --accent-hover: #6e6ce8;
+  --accent-muted: rgba(94, 92, 230, 0.15);
+
+  /* Border Colors */
+  --border: #27272a;
+  --border-subtle: #1c1c1e;
+
+  /* Syntax Highlighting */
+  --syntax-keyword: #ff7b72;
+  --syntax-function: #d2a8ff;
+  --syntax-string: #a5d6ff;
+  --syntax-comment: #8b949e;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Shadows (minimal for this theme) */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  /* Layout Sizes */
+  --sidebar-width: 220px;
+  --header-height: 48px;
+  --chat-max-width: 860px;
+
+  /* Legacy variable mapping for backwards compatibility */
+  --color-primary: var(--accent);
+  --color-primary-light: var(--accent-hover);
+  --color-primary-dark: #4e4cd6;
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border: var(--border);
+  --color-border-hover: var(--bg-hover);
+}

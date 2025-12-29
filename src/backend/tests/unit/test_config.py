@@ -7,10 +7,8 @@ from app.config import Settings
 
 def test_settings_default_values():
     """Test that settings have default values"""
-    settings = Settings(anthropic_api_key="test-key", redis_url="redis://localhost:6379")
+    settings = Settings(anthropic_api_key="test-key")
 
-    assert settings.redis_url == "redis://localhost:6379"
-    assert settings.redis_db == 0
     assert settings.max_projects == 50
     assert settings.max_sessions_per_project == 20
     assert settings.session_timeout == 3600

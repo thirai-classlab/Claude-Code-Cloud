@@ -5,14 +5,13 @@ MySQL/SQLAlchemy接続管理
 """
 
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool
 
 from app.config import settings
 from app.models.database import Base
@@ -33,7 +32,7 @@ def get_database_url() -> str:
         str: MySQL接続URL
     """
     return (
-        f"mysql+asyncmy://{settings.mysql_user}:{settings.mysql_password}"
+        f"mysql+aiomysql://{settings.mysql_user}:{settings.mysql_password}"
         f"@{settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}"
         f"?charset=utf8mb4"
     )

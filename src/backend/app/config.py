@@ -26,25 +26,12 @@ class Settings(BaseSettings):
     # Claude API Configuration
     anthropic_api_key: str = Field(..., description="Anthropic API Key")
 
-    # Redis Configuration (for caching)
-    redis_url: str = Field(default="redis://localhost:6379", description="Redis URL")
-    redis_password: Optional[str] = Field(default=None, description="Redis password")
-    redis_db: int = Field(default=0, description="Redis database number")
-
     # MySQL Configuration
     mysql_host: str = Field(default="localhost", description="MySQL host")
     mysql_port: int = Field(default=3306, description="MySQL port")
     mysql_user: str = Field(default="claude", description="MySQL user")
     mysql_password: str = Field(default="claude_password", description="MySQL password")
     mysql_database: str = Field(default="claude_code", description="MySQL database name")
-
-    @field_validator("redis_password", mode="before")
-    @classmethod
-    def empty_str_to_none(cls, v: Optional[str]) -> Optional[str]:
-        """空文字列をNoneに変換"""
-        if v is None or v == "":
-            return None
-        return v
 
     @field_validator("mysql_password", mode="before")
     @classmethod

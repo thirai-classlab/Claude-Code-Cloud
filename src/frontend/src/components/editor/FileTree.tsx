@@ -42,7 +42,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
     return (
       <div className="h-full flex items-center justify-center bg-bg-secondary">
         <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent"></div>
           <span className="text-xs text-text-secondary">Loading files...</span>
         </div>
       </div>
@@ -57,7 +57,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
           <p className="text-xs text-text-secondary max-w-xs">{error}</p>
           <button
             onClick={handleRefresh}
-            className="px-3 py-1 text-xs bg-primary text-white rounded hover:bg-primary-dark"
+            className="px-3 py-1 text-xs bg-accent text-white rounded hover:bg-accent-hover"
           >
             Retry
           </button>
@@ -87,7 +87,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="p-1.5 hover:bg-bg-tertiary rounded disabled:opacity-50"
+            className="p-1.5 text-text-secondary hover:bg-bg-hover hover:text-text-primary rounded disabled:opacity-50 transition-colors"
             title="Refresh"
           >
             <RefreshIcon className={loading ? 'animate-spin' : ''} />

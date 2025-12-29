@@ -5,7 +5,7 @@ Session Manager
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import select, delete, func
@@ -43,31 +43,11 @@ class SessionManager:
 
     def _model_to_pydantic(self, model: SessionModel) -> Session:
         """SQLAlchemyモデルをPydanticモデルに変換"""
-        return Session(
-            id=model.id,
-            project_id=model.project_id,
-            name=model.name,
-            status=SessionStatus(model.status),
-            user_id=model.user_id,
-            model=model.model,
-            message_count=model.message_count,
-            total_tokens=model.total_tokens,
-            total_cost_usd=model.total_cost_usd,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            last_activity_at=model.last_activity_at,
-        )
+        return Session.model_validate(model)
 
     def _message_model_to_pydantic(self, model: MessageModel) -> ChatMessage:
         """MessageモデルをPydanticモデルに変換"""
-        return ChatMessage(
-            id=model.id,
-            session_id=model.session_id,
-            role=MessageRole(model.role),
-            content=model.content,
-            tokens=model.tokens,
-            created_at=model.created_at.isoformat(),
-        )
+        return ChatMessage.model_validate(model)
 
     async def create_session(
         self,
@@ -100,7 +80,7 @@ class SessionManager:
 
         # セッション生成
         session_id = generate_id()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         session_model = SessionModel(
             id=session_id,
@@ -197,7 +177,7 @@ class SessionManager:
             session_model.name = name
         if status:
             session_model.status = status.value
-        session_model.updated_at = datetime.utcnow()
+        session_model.updated_at = datetime.now(timezone.utc)
 
         await self.session.flush()
         logger.info("Session updated", session_id=session_id)
@@ -215,7 +195,7 @@ class SessionManager:
         session_model = result.scalar_one_or_none()
 
         if session_model:
-            session_model.last_activity_at = datetime.utcnow()
+            session_model.last_activity_at = datetime.now(timezone.utc)
             await self.session.flush()
 
     async def update_usage(
@@ -242,8 +222,8 @@ class SessionManager:
         session_model.message_count += 1
         session_model.total_tokens += tokens
         session_model.total_cost_usd += cost_usd
-        session_model.updated_at = datetime.utcnow()
-        session_model.last_activity_at = datetime.utcnow()
+        session_model.updated_at = datetime.now(timezone.utc)
+        session_model.last_activity_at = datetime.now(timezone.utc)
 
         await self.session.flush()
         return self._model_to_pydantic(session_model)
@@ -297,7 +277,7 @@ class SessionManager:
             ChatMessage: 保存されたメッセージ
         """
         message_id = generate_id()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         message_model = MessageModel(
             id=message_id,

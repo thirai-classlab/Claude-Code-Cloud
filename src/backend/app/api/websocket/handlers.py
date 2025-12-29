@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from fastapi import WebSocket, WebSocketDisconnect
-from redis.asyncio import Redis
 
 from claude_agent_sdk import (
     ClaudeAgentOptions,
@@ -80,7 +79,7 @@ connection_manager = ConnectionManager()
 
 
 async def handle_chat_websocket(
-    websocket: WebSocket, session_id: str, redis: Redis
+    websocket: WebSocket, session_id: str
 ) -> None:
     """
     チャットWebSocketハンドラー
@@ -88,7 +87,6 @@ async def handle_chat_websocket(
     Args:
         websocket: WebSocketインスタンス
         session_id: セッションID
-        redis: Redisクライアント (キャッシュ用途)
     """
     import asyncio
 

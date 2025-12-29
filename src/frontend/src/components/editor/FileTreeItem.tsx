@@ -74,8 +74,8 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   return (
     <div>
       <div
-        className={`flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-bg-tertiary transition-colors ${
-          isSelected ? 'bg-primary/10 text-primary' : 'text-text-primary'
+        className={`flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-bg-hover transition-colors ${
+          isSelected ? 'bg-accent-muted text-accent' : 'text-text-primary'
         }`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={handleSelect}
@@ -83,7 +83,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
         {isDirectory && (
           <button
             onClick={handleToggle}
-            className="flex items-center justify-center w-4 h-4 hover:bg-bg-secondary rounded"
+            className="flex items-center justify-center w-4 h-4 hover:bg-bg-tertiary rounded text-text-secondary"
           >
             <ChevronIcon isExpanded={isExpanded} />
           </button>

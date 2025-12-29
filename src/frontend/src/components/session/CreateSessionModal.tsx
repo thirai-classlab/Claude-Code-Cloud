@@ -56,7 +56,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
         <div>
           <label
             htmlFor="session-title"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            className="block text-sm font-medium text-text-secondary mb-1"
           >
             Session Title (Optional)
           </label>
@@ -66,19 +66,19 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Untitled Session"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
             autoFocus
             disabled={isSubmitting}
           />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-xs text-text-tertiary">
             Leave blank to auto-generate a title
           </p>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="p-3 bg-status-error/10 border border-status-error/30 rounded-md">
+            <p className="text-sm text-status-error">{error}</p>
           </div>
         )}
 

@@ -68,7 +68,6 @@ class HealthCheckResponse(BaseModel):
     status: str = Field(default="ok", description="サービスステータス")
     version: str = Field(default="1.0.0", description="バージョン")
     timestamp: str = Field(..., description="タイムスタンプ")
-    redis_connected: bool = Field(..., description="Redis接続状態")
 
 
 class ConfigResponse(BaseModel):

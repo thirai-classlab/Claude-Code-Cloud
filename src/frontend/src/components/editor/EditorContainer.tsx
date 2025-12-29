@@ -36,12 +36,12 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center border-b bg-bg-secondary">
+      <div className="flex items-center border-b border-border bg-bg-secondary">
         <button
           onClick={() => setActiveTab('vscode')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'vscode'
-              ? 'border-primary text-primary'
+              ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -54,7 +54,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onClick={() => setActiveTab('mcp')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'mcp'
-              ? 'border-primary text-primary'
+              ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -68,7 +68,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onClick={() => setActiveTab('agents')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'agents'
-              ? 'border-primary text-primary'
+              ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -81,7 +81,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onClick={() => setActiveTab('commands')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'commands'
-              ? 'border-primary text-primary'
+              ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -94,7 +94,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onClick={() => setActiveTab('skills')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'skills'
-              ? 'border-primary text-primary'
+              ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -107,7 +107,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           onClick={() => setActiveTab('cron')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'cron'
-              ? 'border-primary text-primary'
+              ? 'border-accent text-accent'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >

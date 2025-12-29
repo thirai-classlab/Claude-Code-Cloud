@@ -71,17 +71,17 @@ export const ToolUseCard: React.FC<ToolUseCardProps> = ({ toolUse }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800/50">
+    <div className="border border-border rounded-lg p-3 bg-bg-secondary">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between text-left"
       >
-        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+        <div className="flex items-center gap-2 text-text-secondary">
           <ToolIcon name={toolUse.name} className="w-5 h-5 opacity-70" />
-          <span className="font-semibold text-sm">{toolUse.name}</span>
+          <span className="font-semibold text-sm text-text-primary">{toolUse.name}</span>
         </div>
         <svg
-          className={`w-4 h-4 transition-transform text-gray-500 dark:text-gray-400 ${isExpanded ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 transition-transform text-text-tertiary ${isExpanded ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -96,8 +96,8 @@ export const ToolUseCard: React.FC<ToolUseCardProps> = ({ toolUse }) => {
       </button>
 
       {isExpanded && (
-        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-          <pre className="text-xs overflow-x-auto bg-gray-900 dark:bg-gray-950 text-gray-100 p-3 rounded-md font-mono">
+        <div className="mt-2 pt-2 border-t border-border-subtle">
+          <pre className="text-xs overflow-x-auto bg-bg-tertiary text-text-secondary p-3 rounded-md font-mono">
             {JSON.stringify(toolUse.input, null, 2)}
           </pre>
         </div>

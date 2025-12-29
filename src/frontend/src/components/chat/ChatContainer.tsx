@@ -35,17 +35,17 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
   }, [messages, currentStreamingMessage, toolExecutions]);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
+    <div className="flex flex-col h-full bg-bg-primary">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">チャット</h2>
+      <div className="flex items-center justify-between px-6 h-header border-b border-border">
+        <h2 className="text-lg font-semibold text-text-primary">Chat</h2>
         <div className="flex items-center gap-3">
           {isStreaming && (
             <button
               onClick={interrupt}
-              className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+              className="btn px-3 py-1 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-all duration-fast"
             >
-              停止
+              Stop
             </button>
           )}
           <div className="flex items-center gap-2">
@@ -58,24 +58,24 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
                   : 'bg-red-500'
               }`}
             />
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {connectionStatus === 'connected' ? '接続中' : connectionStatus === 'connecting' ? '接続待ち' : '切断'}
+            <span className="text-sm text-text-tertiary">
+              {connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting' : 'Disconnected'}
             </span>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-4 bg-bg-primary">
         {/* Loading History Indicator */}
         {isLoadingHistory && (
           <div className="flex items-center justify-center py-8">
-            <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-3 text-text-tertiary">
               <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span>チャット履歴を読み込み中...</span>
+              <span>Loading chat history...</span>
             </div>
           </div>
         )}
@@ -84,13 +84,13 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
 
         {/* Streaming Message */}
         {currentStreamingMessage && (
-          <div className="flex justify-start mb-4">
-            <div className="max-w-[80%] rounded-lg px-4 py-3 shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+          <div className="message">
+            <div className="max-w-[80%] rounded-lg px-4 py-3 bg-bg-secondary text-text-primary border border-border">
+              <div className="flex items-center gap-2.5 mb-2">
+                <div className="w-7 h-7 rounded-md bg-accent text-white flex items-center justify-center text-xs font-semibold">
                   C
                 </div>
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Claude</span>
+                <span className="text-base font-semibold text-text-primary">Claude</span>
               </div>
               <StreamingText text={currentStreamingMessage} />
             </div>
@@ -109,7 +109,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div className="border-t border-border bg-bg-primary">
         <MessageInput
           onSend={sendMessage}
           disabled={isStreaming || connectionStatus !== 'connected'}

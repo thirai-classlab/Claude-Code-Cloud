@@ -18,7 +18,6 @@ from app.core.cron_scheduler import get_cron_scheduler, shutdown_cron_scheduler
 from app.models.errors import AppException, ErrorResponse
 from app.utils.database import init_database, close_database, get_session_context
 from app.utils.logger import get_logger, setup_logging
-from app.utils.redis_client import close_redis, get_redis
 
 # ロギング設定
 setup_logging(log_level=settings.log_level, debug=settings.debug)
@@ -43,15 +42,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.error("Failed to connect to database", error=str(e))
         raise
 
-    # Redis接続確認 (キャッシュ用途)
-    try:
-        redis = await get_redis()
-        await redis.ping()
-        logger.info("Redis connection established")
-    except Exception as e:
-        logger.error("Failed to connect to Redis", error=str(e))
-        raise
-
     # ワークスペースディレクトリ作成
     import os
 
@@ -60,7 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Cronスケジューラー起動
     try:
-        scheduler = await get_cron_scheduler(redis)
+        scheduler = await get_cron_scheduler()
         logger.info("Cron scheduler initialized")
     except Exception as e:
         logger.error("Failed to initialize cron scheduler", error=str(e))
@@ -77,10 +67,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # データベース接続クローズ
     await close_database()
     logger.info("Database connection closed")
-
-    # Redis接続クローズ
-    await close_redis()
-    logger.info("Redis connection closed")
 
 
 # FastAPI アプリケーション初期化
@@ -147,8 +133,7 @@ async def websocket_chat_endpoint(websocket: WebSocket, session_id: str) -> None
         websocket: WebSocketインスタンス
         session_id: セッションID
     """
-    redis = await get_redis()
-    await handle_chat_websocket(websocket, session_id, redis)
+    await handle_chat_websocket(websocket, session_id)
 
 
 # ルートエンドポイント

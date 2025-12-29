@@ -1,6 +1,6 @@
 /**
  * Button Component
- * Reusable button with multiple variants and sizes
+ * Reusable button with multiple variants and sizes using Linear theme tokens
  */
 
 import React from 'react';
@@ -17,12 +17,12 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const buttonStyles = {
-  base: 'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+  base: 'inline-flex items-center justify-center font-medium rounded-md transition-all duration-fast focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed',
 
   variants: {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600',
-    ghost: 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+    primary: 'bg-accent text-white hover:bg-accent-hover',
+    secondary: 'bg-bg-tertiary text-text-primary border border-border hover:bg-bg-hover',
+    ghost: 'text-text-secondary hover:bg-bg-hover hover:text-text-primary',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
   },
 

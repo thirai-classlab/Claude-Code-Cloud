@@ -94,7 +94,7 @@ export const WelcomePanel: React.FC = () => {
 
           {projectsLoading && projects.length === 0 ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
             </div>
           ) : projects.length === 0 ? (
             <div className="text-center py-8 bg-bg-secondary rounded-lg border border-border">
@@ -112,13 +112,13 @@ export const WelcomePanel: React.FC = () => {
                   onClick={() => selectProject(project.id)}
                   className={`p-4 rounded-lg border text-left transition-all ${
                     currentProjectId === project.id
-                      ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
-                      : 'border-border bg-bg-secondary hover:border-primary/50 hover:bg-bg-tertiary'
+                      ? 'border-accent bg-accent-muted ring-2 ring-accent/30'
+                      : 'border-border bg-bg-secondary hover:border-accent/50 hover:bg-bg-tertiary'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      currentProjectId === project.id ? 'bg-primary text-white' : 'bg-bg-tertiary text-text-secondary'
+                      currentProjectId === project.id ? 'bg-accent text-white' : 'bg-bg-tertiary text-text-secondary'
                     }`}>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -131,7 +131,7 @@ export const WelcomePanel: React.FC = () => {
                       </p>
                     </div>
                     {currentProjectId === project.id && (
-                      <svg className="w-5 h-5 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-5 h-5 text-accent flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                     )}
@@ -168,7 +168,7 @@ export const WelcomePanel: React.FC = () => {
 
             {sessionsLoading && sessions.length === 0 ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
               </div>
             ) : sessions.length === 0 ? (
               <div className="text-center py-8 bg-bg-secondary rounded-lg border border-border">
@@ -184,10 +184,10 @@ export const WelcomePanel: React.FC = () => {
                   <button
                     key={session.id}
                     onClick={() => handleSessionClick(session.id)}
-                    className="w-full p-4 rounded-lg border border-border bg-bg-secondary hover:border-primary/50 hover:bg-bg-tertiary text-left transition-all group"
+                    className="w-full p-4 rounded-lg border border-border bg-bg-secondary hover:border-accent/50 hover:bg-bg-tertiary text-left transition-all group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-bg-tertiary flex items-center justify-center text-text-secondary group-hover:bg-primary group-hover:text-white transition-colors">
+                      <div className="w-10 h-10 rounded-lg bg-bg-tertiary flex items-center justify-center text-text-secondary group-hover:bg-accent group-hover:text-white transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
@@ -200,7 +200,7 @@ export const WelcomePanel: React.FC = () => {
                           Created {new Date(session.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <svg className="w-5 h-5 text-text-tertiary group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-text-tertiary group-hover:text-accent transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>

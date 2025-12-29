@@ -68,7 +68,7 @@
 #### ユーティリティ (app/utils/)
 - `app/utils/__init__.py`
 - `app/utils/logger.py` - ロギング設定
-- `app/utils/redis_client.py` - Redis接続
+- `app/utils/database.py` - データベース接続
 - `app/utils/helpers.py` - 汎用ヘルパー
 
 ### tests/ (テストコード)
@@ -91,7 +91,7 @@
 - ✅ ストリーミングレスポンス
 - ✅ プロジェクト管理
 - ✅ セッション管理
-- ✅ Redis永続化
+- ✅ MySQL永続化
 
 ### 3. セキュリティ
 - ✅ サンドボックス環境

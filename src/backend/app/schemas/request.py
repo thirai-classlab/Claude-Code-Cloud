@@ -27,6 +27,7 @@ class UpdateProjectRequest(BaseModel):
 class CreateSessionRequest(BaseModel):
     """セッション作成リクエスト"""
 
+    project_id: str = Field(..., description="所属プロジェクトID")
     name: Optional[str] = Field(default=None, max_length=100, description="セッション名")
     user_id: Optional[str] = Field(default=None, description="ユーザーID")
     model: Optional[str] = Field(default=None, description="使用Claudeモデル")

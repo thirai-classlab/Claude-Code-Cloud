@@ -58,7 +58,7 @@ FROM base as dependencies
 COPY pyproject.toml poetry.lock* ./
 
 # Install dependencies (production only)
-RUN poetry install --no-root --no-dev --no-interaction --no-ansi
+RUN poetry lock --no-update && poetry install --no-root --only main --no-interaction --no-ansi
 
 # ============================================
 # Development Stage: Full development setup

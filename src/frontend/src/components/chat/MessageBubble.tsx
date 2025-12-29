@@ -17,20 +17,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isUser = message.role === 'user';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div className={`message ${isUser ? 'flex justify-end' : ''}`}>
       <div
-        className={`max-w-[80%] rounded-lg px-4 py-3 shadow-sm ${
+        className={`max-w-[80%] rounded-lg px-4 py-3 ${
           isUser
-            ? 'bg-blue-600 text-white'
-            : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700'
+            ? 'bg-accent text-white'
+            : 'bg-bg-secondary text-text-primary border border-border'
         }`}
       >
         {!isUser && (
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+          <div className="flex items-center gap-2.5 mb-2">
+            <div className="w-7 h-7 rounded-md bg-accent text-white flex items-center justify-center text-xs font-semibold">
               C
             </div>
-            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Claude</span>
+            <span className="text-base font-semibold text-text-primary">Claude</span>
           </div>
         )}
 
@@ -45,7 +45,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ))}
         </div>
 
-        <div className={`text-xs mt-2 ${isUser ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
+        <div className={`text-sm mt-2 ${isUser ? 'text-white/70' : 'text-text-tertiary'}`}>
           {new Date(message.timestamp).toLocaleTimeString()}
         </div>
       </div>
@@ -62,7 +62,7 @@ const ContentBlockRenderer: React.FC<{
     return isStreaming ? (
       <StreamingText text={block.text} />
     ) : (
-      <div className="whitespace-pre-wrap">{block.text}</div>
+      <div className="whitespace-pre-wrap text-md leading-relaxed">{block.text}</div>
     );
   }
 
@@ -73,7 +73,7 @@ const ContentBlockRenderer: React.FC<{
   if (block.type === 'thinking') {
     return (
       <div className={`italic text-sm opacity-70 border-l-2 pl-3 ${
-        isUser ? 'border-blue-300' : 'border-gray-400 dark:border-gray-500'
+        isUser ? 'border-white/50' : 'border-border'
       }`}>
         {block.content}
       </div>

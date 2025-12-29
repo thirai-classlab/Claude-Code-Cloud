@@ -1,11 +1,13 @@
 /**
  * ProjectCard Component
- * Displays a project card with sessions count and metadata
+ * Displays a project card with Linear Style (Pattern 09 v2 - No Icons) design
+ * Uses dot indicators instead of folder icons
  */
 
 import React from 'react';
 import { Project } from '@/types/project';
-import { clsx } from 'clsx';
+import { cn } from '@/lib/utils';
+import { Indicator } from '@/components/atoms';
 
 export interface ProjectCardProps {
   project: Project;
@@ -24,76 +26,51 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   onToggle,
   onContextMenu,
 }) => {
-  const formattedDate = new Date(project.created_at).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-
   return (
     <div
-      className={clsx(
-        'group flex items-center px-3 py-2 rounded-md cursor-pointer transition-colors',
-        isSelected
-          ? 'bg-blue-100 dark:bg-blue-900'
-          : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+      className={cn(
+        'nav-item group',
+        isSelected && 'active'
       )}
       onClick={onClick}
       onContextMenu={onContextMenu}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          onClick();
+        }
+      }}
     >
-      {/* Expand/Collapse Icon */}
+      {/* Expand/Collapse Indicator */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onToggle();
         }}
-        className="mr-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+        className={cn(
+          'w-4 h-4 flex items-center justify-center',
+          'text-text-tertiary hover:text-text-secondary',
+          'transition-transform duration-100',
+          isExpanded && 'rotate-90'
+        )}
+        aria-label={isExpanded ? 'Collapse project' : 'Expand project'}
+        aria-expanded={isExpanded}
       >
-        <svg
-          className={clsx('w-4 h-4 transition-transform', isExpanded && 'rotate-90')}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5l7 7-7 7"
-          />
-        </svg>
+        <span className="text-xs">{'>'}</span>
       </button>
 
-      {/* Folder Icon */}
-      <div className="mr-3 text-gray-400">
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-          />
-        </svg>
-      </div>
+      {/* Dot Indicator */}
+      <Indicator active={isSelected} />
 
       {/* Project Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-            {project.name}
-          </h3>
-          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
-            {formattedDate}
-          </span>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {project.session_count} session{project.session_count !== 1 ? 's' : ''}
-        </p>
+      <div className="flex-1 min-w-0 flex items-baseline justify-between gap-2">
+        <span className="truncate text-base">
+          {project.name}
+        </span>
+        <span className="text-xs text-text-tertiary bg-bg-tertiary px-1.5 py-0.5 rounded flex-shrink-0">
+          {project.session_count}
+        </span>
       </div>
     </div>
   );

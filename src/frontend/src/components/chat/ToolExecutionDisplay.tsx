@@ -7,7 +7,7 @@ interface ToolExecutionDisplayProps {
   execution: ToolExecution;
 }
 
-// ツール実行のサマリーを生成
+// Generate summary for tool execution
 const generateSummary = (execution: ToolExecution): string => {
   const { name, input, output, status, error } = execution;
 
@@ -19,19 +19,19 @@ const generateSummary = (execution: ToolExecution): string => {
       case 'read_file': {
         const filePath = input.file_path || input.path || '';
         const fileName = filePath.split('/').pop() || filePath;
-        return `${fileName} を読み込み中`;
+        return `Reading ${fileName}`;
       }
       case 'Write':
       case 'write_file': {
         const filePath = input.file_path || input.path || '';
         const fileName = filePath.split('/').pop() || filePath;
-        return `${fileName} に書き込み中`;
+        return `Writing to ${fileName}`;
       }
       case 'Edit':
       case 'edit_file': {
         const filePath = input.file_path || input.path || '';
         const fileName = filePath.split('/').pop() || filePath;
-        return `${fileName} を編集中`;
+        return `Editing ${fileName}`;
       }
       case 'Bash':
       case 'execute_bash': {
@@ -41,23 +41,23 @@ const generateSummary = (execution: ToolExecution): string => {
       }
       case 'Glob': {
         const pattern = input.pattern || '';
-        return `ファイル検索: ${pattern}`;
+        return `File search: ${pattern}`;
       }
       case 'Grep': {
         const pattern = input.pattern || '';
-        return `検索: ${pattern}`;
+        return `Search: ${pattern}`;
       }
       case 'Task': {
-        const description = input.description || input.prompt?.substring(0, 40) || 'タスク実行中';
+        const description = input.description || input.prompt?.substring(0, 40) || 'Executing task';
         return description;
       }
       case 'WebSearch': {
         const query = input.query || '';
-        return `Web検索: ${query}`;
+        return `Web search: ${query}`;
       }
       case 'WebFetch': {
         const url = input.url || '';
-        return `取得中: ${url}`;
+        return `Fetching: ${url}`;
       }
       default:
         return JSON.stringify(input).substring(0, 50);
@@ -100,12 +100,12 @@ const generateSummary = (execution: ToolExecution): string => {
   const outputSummary = status === 'success' || status === 'error' ? getOutputSummary() : '';
 
   if (outputSummary) {
-    return `${inputSummary} → ${outputSummary}`;
+    return `${inputSummary} -> ${outputSummary}`;
   }
   return inputSummary;
 };
 
-// SVGアイコンコンポーネント
+// SVG Icon Component
 const ToolIcon: React.FC<{ name: string; className?: string }> = ({ name, className = "w-4 h-4" }) => {
   const iconProps = { className, fill: "none", stroke: "currentColor", strokeWidth: 1.5, viewBox: "0 0 24 24" };
 
@@ -189,15 +189,15 @@ export const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({ exec
   const getStatusStyles = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/30 text-amber-700 dark:text-amber-300';
+        return 'bg-amber-500/10 border-amber-500/30 text-amber-400';
       case 'executing':
-        return 'bg-blue-500/10 dark:bg-blue-500/20 border-blue-500/30 text-blue-700 dark:text-blue-300';
+        return 'bg-accent-muted border-accent/30 text-accent';
       case 'success':
-        return 'bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/30 text-emerald-700 dark:text-emerald-300';
+        return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
       case 'error':
-        return 'bg-red-500/10 dark:bg-red-500/20 border-red-500/30 text-red-700 dark:text-red-300';
+        return 'bg-red-500/10 border-red-500/30 text-red-400';
       default:
-        return 'bg-gray-500/10 dark:bg-gray-500/20 border-gray-500/30 text-gray-700 dark:text-gray-300';
+        return 'bg-bg-secondary border-border text-text-secondary';
     }
   };
 
@@ -248,7 +248,7 @@ export const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({ exec
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        className="w-full flex items-center justify-between text-left px-3 py-2 hover:bg-bg-hover/50 transition-colors"
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <ToolIcon name={execution.name} className="w-4 h-4 flex-shrink-0 opacity-70" />
@@ -278,11 +278,11 @@ export const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({ exec
 
       {/* Expanded Details */}
       {isExpanded && (
-        <div className="border-t border-current/10 p-3 space-y-3 bg-white/50 dark:bg-black/20">
+        <div className="border-t border-current/10 p-3 space-y-3 bg-bg-secondary/50">
           {/* Input */}
           <div>
-            <div className="text-[10px] font-medium mb-1.5 opacity-50 uppercase tracking-wider">Input</div>
-            <pre className="text-xs overflow-x-auto bg-gray-900 dark:bg-gray-950 text-gray-100 p-3 rounded-md font-mono leading-relaxed">
+            <div className="text-[10px] font-medium mb-1.5 text-text-tertiary uppercase tracking-wider">Input</div>
+            <pre className="text-xs overflow-x-auto bg-bg-tertiary text-text-secondary p-3 rounded-md font-mono leading-relaxed">
               {JSON.stringify(execution.input, null, 2)}
             </pre>
           </div>
@@ -290,8 +290,8 @@ export const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({ exec
           {/* Output */}
           {execution.output && (
             <div>
-              <div className="text-[10px] font-medium mb-1.5 opacity-50 uppercase tracking-wider">Output</div>
-              <pre className="text-xs overflow-x-auto bg-gray-900 dark:bg-gray-950 text-gray-100 p-3 rounded-md font-mono max-h-80 overflow-y-auto leading-relaxed">
+              <div className="text-[10px] font-medium mb-1.5 text-text-tertiary uppercase tracking-wider">Output</div>
+              <pre className="text-xs overflow-x-auto bg-bg-tertiary text-text-secondary p-3 rounded-md font-mono max-h-80 overflow-y-auto leading-relaxed">
                 {execution.output}
               </pre>
             </div>
@@ -300,8 +300,8 @@ export const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({ exec
           {/* Error */}
           {execution.error && (
             <div>
-              <div className="text-[10px] font-medium mb-1.5 text-red-500 uppercase tracking-wider">Error</div>
-              <pre className="text-xs overflow-x-auto bg-red-950 text-red-100 p-3 rounded-md font-mono leading-relaxed">
+              <div className="text-[10px] font-medium mb-1.5 text-red-400 uppercase tracking-wider">Error</div>
+              <pre className="text-xs overflow-x-auto bg-red-950/50 text-red-300 p-3 rounded-md font-mono leading-relaxed">
                 {execution.error}
               </pre>
             </div>

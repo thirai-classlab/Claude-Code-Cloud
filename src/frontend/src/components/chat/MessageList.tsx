@@ -12,9 +12,9 @@ export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
   if (messages.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-text-tertiary">
-        <div className="text-center max-w-md">
-          <h3 className="text-lg font-semibold mb-2">Start a conversation</h3>
-          <p className="text-sm">
+        <div className="text-center max-w-md px-4">
+          <h3 className="text-lg font-semibold text-text-primary mb-2">Start a conversation</h3>
+          <p className="text-sm text-text-secondary">
             Ask Claude to help you write code, review files, or debug issues.
           </p>
         </div>
@@ -23,7 +23,7 @@ export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-chat mx-auto">
       {messages.map((message) => (
         <MessageBubble key={message.id} message={message} />
       ))}

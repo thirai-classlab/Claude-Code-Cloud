@@ -128,6 +128,26 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       keywords: ['theme', 'claude', 'appearance'],
     },
     {
+      id: 'theme-linear',
+      label: 'Set Linear Theme',
+      description: 'Switch to Linear theme (minimal dark)',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+          />
+        </svg>
+      ),
+      action: () => {
+        setTheme('linear');
+        onClose();
+      },
+      keywords: ['theme', 'linear', 'minimal', 'dark', 'appearance'],
+    },
+    {
       id: 'clear-chat',
       label: 'Clear Chat History',
       description: 'Delete all messages in current session',

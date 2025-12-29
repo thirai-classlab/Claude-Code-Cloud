@@ -8,7 +8,7 @@ interface ToolExecutionGroupProps {
   executions: ToolExecution[];
 }
 
-// グループのサマリーを生成
+// Generate group summary
 const generateGroupSummary = (executions: ToolExecution[]): string => {
   const completed = executions.filter(e => e.status === 'success').length;
   const running = executions.filter(e => e.status === 'executing').length;
@@ -16,15 +16,15 @@ const generateGroupSummary = (executions: ToolExecution[]): string => {
   const errors = executions.filter(e => e.status === 'error').length;
 
   const parts: string[] = [];
-  if (running > 0) parts.push(`${running}件 実行中`);
-  if (pending > 0) parts.push(`${pending}件 待機中`);
-  if (completed > 0) parts.push(`${completed}件 完了`);
-  if (errors > 0) parts.push(`${errors}件 失敗`);
+  if (running > 0) parts.push(`${running} running`);
+  if (pending > 0) parts.push(`${pending} pending`);
+  if (completed > 0) parts.push(`${completed} completed`);
+  if (errors > 0) parts.push(`${errors} failed`);
 
-  return parts.join('、');
+  return parts.join(', ');
 };
 
-// ツール種類別にカウント
+// Count tool types
 const getToolTypeCounts = (executions: ToolExecution[]): Record<string, number> => {
   const counts: Record<string, number> = {};
   for (const exec of executions) {
@@ -33,7 +33,7 @@ const getToolTypeCounts = (executions: ToolExecution[]): Record<string, number> 
   return counts;
 };
 
-// ツールアイコンコンポーネント（小さいバージョン）
+// Small tool icon component
 const ToolIconSmall: React.FC<{ name: string }> = ({ name }) => {
   const iconProps = {
     className: "w-3.5 h-3.5",
@@ -104,7 +104,7 @@ export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executio
 
   if (executions.length === 0) return null;
 
-  // 1つだけの場合は直接表示
+  // If only one execution, show it directly
   if (executions.length === 1) {
     return <ToolExecutionDisplay execution={executions[0]} />;
   }
@@ -114,18 +114,18 @@ export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executio
   const hasRunning = executions.some(e => e.status === 'executing' || e.status === 'pending');
   const hasErrors = executions.some(e => e.status === 'error');
 
-  // 最新の実行中または最後の実行を取得
+  // Get latest running or last execution
   const latestExecution = executions.find(e => e.status === 'executing') || executions[executions.length - 1];
 
-  // ステータスに応じたスタイル
+  // Status-based styles
   const getGroupStyles = () => {
     if (hasErrors) {
-      return 'border-red-500/30 bg-red-500/10 dark:bg-red-500/20 text-red-700 dark:text-red-300';
+      return 'border-red-500/30 bg-red-500/10 text-red-400';
     }
     if (hasRunning) {
-      return 'border-blue-500/30 bg-blue-500/10 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300';
+      return 'border-accent/30 bg-accent-muted text-accent';
     }
-    return 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300';
+    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
   };
 
   return (
@@ -133,7 +133,7 @@ export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executio
       {/* Group Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between text-left p-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        className="w-full flex items-center justify-between text-left p-3 hover:bg-bg-hover/50 transition-colors"
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="flex items-center gap-1 flex-shrink-0 opacity-70">
@@ -147,7 +147,7 @@ export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executio
             )}
           </div>
           <span className="font-medium text-sm">
-            {executions.length}件のツール実行
+            {executions.length} tool executions
           </span>
           <span className="text-xs opacity-60">
             ({summary})
@@ -155,9 +155,9 @@ export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executio
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {hasRunning && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs bg-blue-500/20 dark:bg-blue-500/30">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs bg-accent/20">
               <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-              処理中
+              Processing
             </span>
           )}
           <svg
@@ -175,14 +175,14 @@ export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executio
       {/* Latest Execution Preview (when collapsed) */}
       {!isExpanded && latestExecution && (
         <div className="px-3 pb-2 border-t border-current/10">
-          <div className="text-[10px] opacity-50 mb-1 uppercase tracking-wider">最新</div>
+          <div className="text-[10px] text-text-tertiary mb-1 uppercase tracking-wider">Latest</div>
           <ToolExecutionDisplay execution={latestExecution} />
         </div>
       )}
 
       {/* All Executions (when expanded) */}
       {isExpanded && (
-        <div className="border-t border-current/10 p-3 space-y-2 bg-white/50 dark:bg-black/20">
+        <div className="border-t border-current/10 p-3 space-y-2 bg-bg-secondary/50">
           {executions.map((execution) => (
             <ToolExecutionDisplay key={execution.id || execution.tool_use_id} execution={execution} />
           ))}

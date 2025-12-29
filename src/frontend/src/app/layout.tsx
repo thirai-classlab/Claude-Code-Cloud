@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja" suppressHydrationWarning data-theme="claude">
+    <html lang="ja" suppressHydrationWarning data-theme="linear">
       <body className="overflow-hidden">
         <Providers>{children}</Providers>
       </body>

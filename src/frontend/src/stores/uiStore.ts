@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-type Theme = 'light' | 'dark' | 'claude';
+type Theme = 'light' | 'dark' | 'claude' | 'linear';
 
 interface UIState {
   theme: Theme;
@@ -20,7 +20,7 @@ interface UIState {
 export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
-      theme: 'claude',
+      theme: 'linear',
       isSidebarOpen: true,
       isFileTreeOpen: true,
       chatWidth: 600,

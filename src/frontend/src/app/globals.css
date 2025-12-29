@@ -5,45 +5,144 @@
 @import '../styles/themes/light.css';
 @import '../styles/themes/dark.css';
 @import '../styles/themes/claude.css';
+@import '../styles/themes/linear.css';
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+@layer base {
+  * {
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+  }
+
+  html,
+  body {
+    max-width: 100vw;
+    overflow-x: hidden;
+    font-family: var(--font-sans);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+  }
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-  font-family: var(--font-sans);
-  background-color: var(--color-bg-primary);
-  color: var(--color-text-primary);
-}
+@layer components {
+  /* Button variants */
+  .btn {
+    @apply px-3 py-1.5 rounded-md text-base font-medium transition-all duration-fast;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
+  .btn-default {
+    @apply bg-transparent text-text-tertiary hover:bg-bg-hover hover:text-text-secondary;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-white hover:bg-accent-hover;
+  }
+
+  .btn-ghost {
+    @apply border border-border bg-bg-tertiary text-text-primary hover:bg-bg-hover;
+  }
+
+  /* Navigation */
+  .nav-item {
+    @apply flex items-center gap-2.5 px-2.5 py-2 rounded-md text-text-secondary text-base cursor-pointer transition-all duration-fast;
+  }
+
+  .nav-item:hover {
+    @apply bg-bg-hover text-text-primary;
+  }
+
+  .nav-item.active {
+    @apply bg-bg-hover text-text-primary;
+  }
+
+  .nav-indicator {
+    @apply w-1.5 h-1.5 rounded-full bg-text-tertiary;
+  }
+
+  .nav-item.active .nav-indicator {
+    @apply bg-accent;
+  }
+
+  /* Message */
+  .message {
+    @apply mb-5 p-4 rounded-lg transition-colors duration-fast;
+  }
+
+  .message:hover {
+    @apply bg-bg-secondary;
+  }
+
+  /* Code block */
+  .code-block {
+    @apply bg-bg-secondary border border-border-subtle rounded-lg my-3 overflow-hidden;
+  }
+
+  .code-header {
+    @apply flex justify-between items-center px-3 py-2 bg-bg-tertiary border-b border-border-subtle;
+  }
+
+  .code-content {
+    @apply p-3.5 font-mono text-sm leading-normal overflow-x-auto text-text-secondary;
+  }
+
+  /* Input */
+  .input-wrapper {
+    @apply flex items-end gap-2.5 bg-bg-secondary border border-border rounded-xl px-3.5 py-3 transition-all duration-normal;
+  }
+
+  .input-wrapper:focus-within {
+    @apply border-accent;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
 }
 
-/* Focus visible styles for better keyboard navigation */
-*:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-/* Smooth scrolling for better UX */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Reduce motion for users who prefer it */
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -58,19 +157,6 @@ html {
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   :root {
-    --color-border: currentColor;
+    --border: currentColor;
   }
-}
-
-/* Screen reader only utility class */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
 }

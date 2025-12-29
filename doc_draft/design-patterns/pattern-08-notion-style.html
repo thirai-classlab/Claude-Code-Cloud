@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pattern 08: Notion Style</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #fbfbfa;
+      --bg-hover: #f1f1ef;
+      --bg-active: #e8e8e6;
+      --text-primary: #37352f;
+      --text-secondary: #6b6b6b;
+      --text-tertiary: #9b9a97;
+      --accent: #2eaadc;
+      --border: #e9e9e7;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* Layout */
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background: var(--bg-secondary);
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+    }
+
+    .sidebar-header {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .workspace-icon {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #ff6b6b, #feca57);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .workspace-name {
+      font-weight: 500;
+      flex: 1;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      padding: 8px;
+      overflow-y: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background 0.1s ease;
+      margin-bottom: 2px;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .nav-item.active {
+      background: var(--bg-active);
+      color: var(--text-primary);
+    }
+
+    .nav-icon {
+      font-size: 16px;
+      width: 22px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .nav-text {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .nav-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 0;
+    }
+
+    .nav-section-title {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      padding: 8px 8px 4px;
+      font-weight: 500;
+    }
+
+    /* Toggle Arrow */
+    .toggle-arrow {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      padding: 2px;
+      border-radius: 2px;
+    }
+
+    .toggle-arrow:hover {
+      background: var(--bg-active);
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      height: 45px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px 0 12px;
+      font-size: 14px;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-secondary);
+    }
+
+    .breadcrumb-item {
+      padding: 4px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .breadcrumb-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .breadcrumb-sep {
+      color: var(--text-tertiary);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .header-btn {
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .header-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    /* Page Content */
+    .page-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 96px;
+    }
+
+    .page-header {
+      padding: 80px 0 32px;
+    }
+
+    .page-icon {
+      font-size: 72px;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+
+    .page-title {
+      font-size: 40px;
+      font-weight: 700;
+      color: var(--text-primary);
+      border: none;
+      outline: none;
+      width: 100%;
+      padding: 0;
+    }
+
+    .page-title::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    /* Chat Messages */
+    .messages {
+      max-width: 720px;
+    }
+
+    .message {
+      margin-bottom: 24px;
+    }
+
+    .message-block {
+      padding: 12px 0;
+      border-radius: 4px;
+      transition: background 0.1s ease;
+    }
+
+    .message-block:hover {
+      background: var(--bg-secondary);
+    }
+
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .avatar.user {
+      background: #ffeaa7;
+    }
+
+    .avatar.assistant {
+      background: #a29bfe;
+      color: white;
+    }
+
+    .message-role {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .message-content {
+      color: var(--text-primary);
+      line-height: 1.6;
+      font-size: 16px;
+      padding-left: 32px;
+    }
+
+    /* Code Block */
+    .code-block {
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      margin: 8px 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--bg-hover);
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .code-lang {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .copy-btn {
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: none;
+      background: transparent;
+      color: var(--text-tertiary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover {
+      background: var(--bg-active);
+      color: var(--text-secondary);
+    }
+
+    .code-content {
+      padding: 16px;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-x: auto;
+      color: var(--text-primary);
+    }
+
+    /* Callout */
+    .callout {
+      display: flex;
+      gap: 8px;
+      padding: 16px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      margin: 8px 0;
+    }
+
+    .callout-icon {
+      font-size: 20px;
+    }
+
+    .callout-content {
+      flex: 1;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    /* Input Area */
+    .input-area {
+      padding: 24px 96px 48px;
+      background: linear-gradient(to top, var(--bg-primary) 50%, transparent);
+    }
+
+    .input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      max-width: 720px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .input-wrapper:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(46, 170, 220, 0.15);
+    }
+
+    .input-wrapper textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 15px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      min-height: 24px;
+      max-height: 200px;
+      line-height: 1.5;
+    }
+
+    .input-wrapper textarea::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .send-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--accent);
+      border: none;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all 0.1s ease;
+    }
+
+    .send-btn:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="workspace-icon">C</div>
+        <span class="workspace-name">Claude Code</span>
+      </div>
+      <div class="sidebar-content">
+        <div class="nav-item">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-text">Search</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-section-title">Projects</div>
+        <div class="nav-item active">
+          <span class="toggle-arrow">▶</span>
+          <span class="nav-icon">📁</span>
+          <span class="nav-text">Project Alpha</span>
+        </div>
+        <div class="nav-item">
+          <span class="toggle-arrow">▶</span>
+          <span class="nav-icon">🔗</span>
+          <span class="nav-text">API Integration</span>
+        </div>
+        <div class="nav-item">
+          <span class="toggle-arrow">▶</span>
+          <span class="nav-icon">💾</span>
+          <span class="nav-text">Database Design</span>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-item">
+          <span class="nav-icon">➕</span>
+          <span class="nav-text">New page</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <header class="header">
+        <div class="breadcrumb">
+          <span class="breadcrumb-item">Project Alpha</span>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-item">Development</span>
+        </div>
+        <div class="header-actions">
+          <button class="header-btn">Share</button>
+          <button class="header-btn">⋯</button>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <div class="page-header">
+          <div class="page-icon">💬</div>
+          <input type="text" class="page-title" value="Authentication Development" placeholder="Untitled">
+        </div>
+
+        <div class="messages">
+          <div class="message">
+            <div class="message-block">
+              <div class="message-header">
+                <div class="avatar user">U</div>
+                <span class="message-role">You</span>
+              </div>
+              <div class="message-content">
+                Create a simple REST API endpoint for user authentication.
+              </div>
+            </div>
+          </div>
+
+          <div class="message">
+            <div class="message-block">
+              <div class="message-header">
+                <div class="avatar assistant">C</div>
+                <span class="message-role">Claude</span>
+              </div>
+              <div class="message-content">
+                I'll create a REST API endpoint for user authentication using FastAPI.
+
+                <div class="code-block">
+                  <div class="code-header">
+                    <div class="code-lang">
+                      <span>Python</span>
+                      <span>auth.py</span>
+                    </div>
+                    <button class="copy-btn">Copy</button>
+                  </div>
+                  <div class="code-content">
+@router.post("/auth/login")
+async def login(credentials: LoginRequest):
+    user = await authenticate_user(
+        credentials.email,
+        credentials.password
+    )
+    return {"token": create_access_token(user)}
+                  </div>
+                </div>
+
+                <div class="callout">
+                  <span class="callout-icon">💡</span>
+                  <div class="callout-content">
+                    This endpoint uses JWT tokens for authentication. Make sure to set up your secret key in the environment variables.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-wrapper">
+          <textarea placeholder="Ask Claude..." rows="1"></textarea>
+          <button class="send-btn">↑</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

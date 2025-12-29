@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pattern 07 v2: Dark Elegant - No Icons</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #18181b;
+      --bg-secondary: #1f1f23;
+      --bg-tertiary: #27272a;
+      --bg-elevated: #2c2c31;
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-tertiary: #71717a;
+      --accent: #a78bfa;
+      --accent-secondary: #8b5cf6;
+      --accent-muted: rgba(167, 139, 250, 0.15);
+      --border: #3f3f46;
+      --border-subtle: #27272a;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* Layout */
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-mark {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      border-radius: 6px;
+    }
+
+    .logo {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+    }
+
+    .sidebar-search {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .search-input::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .sidebar-content {
+      flex: 1;
+      padding: 12px;
+      overflow-y: auto;
+    }
+
+    .nav-section {
+      margin-bottom: 20px;
+    }
+
+    .nav-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-tertiary);
+      margin-bottom: 8px;
+      padding-left: 12px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-bottom: 2px;
+      font-size: 14px;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background: var(--accent-muted);
+      color: var(--accent);
+    }
+
+    .nav-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-tertiary);
+    }
+
+    .nav-item.active .nav-indicator {
+      background: var(--accent);
+    }
+
+    .nav-badge {
+      margin-left: auto;
+      padding: 2px 8px;
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      height: 60px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--bg-secondary);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .header-badge {
+      padding: 4px 10px;
+      background: var(--accent-muted);
+      border-radius: 12px;
+      font-size: 12px;
+      color: var(--accent);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: var(--bg-elevated);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-secondary);
+    }
+
+    /* Chat Area */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 880px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 24px;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: 24px;
+    }
+
+    .message {
+      margin-bottom: 28px;
+    }
+
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .avatar.user {
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+    }
+
+    .avatar.assistant {
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      color: white;
+    }
+
+    .message-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .message-role {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .message-time {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .message-content {
+      color: var(--text-secondary);
+      line-height: 1.7;
+      font-size: 15px;
+      padding-left: 44px;
+    }
+
+    /* Code Block */
+    .code-block {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      margin: 14px 0;
+      overflow: hidden;
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .code-lang {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+
+    .lang-dot {
+      width: 10px;
+      height: 10px;
+      background: var(--accent);
+      border-radius: 3px;
+    }
+
+    .code-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .code-btn {
+      padding: 5px 10px;
+      border-radius: 5px;
+      border: none;
+      background: transparent;
+      color: var(--text-tertiary);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .code-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-elevated);
+    }
+
+    .code-content {
+      padding: 16px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      color: var(--text-secondary);
+    }
+
+    .code-content .keyword { color: #c792ea; }
+    .code-content .function { color: #82aaff; }
+    .code-content .string { color: #c3e88d; }
+    .code-content .comment { color: var(--text-tertiary); }
+
+    /* Input Area */
+    .input-area {
+      padding: 16px 0;
+    }
+
+    .input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+      transition: all 0.15s ease;
+    }
+
+    .input-wrapper:focus-within {
+      border-color: var(--accent);
+    }
+
+    .input-wrapper textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 15px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      min-height: 24px;
+      max-height: 200px;
+      line-height: 1.5;
+    }
+
+    .input-wrapper textarea::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--accent);
+      border: none;
+      color: var(--bg-primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: all 0.15s ease;
+    }
+
+    .send-btn:hover {
+      background: var(--accent-secondary);
+      transform: scale(1.02);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-mark"></div>
+        <span class="logo">Claude Code</span>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" class="search-input" placeholder="Search...">
+      </div>
+      <div class="sidebar-content">
+        <div class="nav-section">
+          <div class="nav-label">Projects</div>
+          <div class="nav-item active">
+            <span class="nav-indicator"></span>
+            <span>Project Alpha</span>
+            <span class="nav-badge">3</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-indicator"></span>
+            <span>API Integration</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-indicator"></span>
+            <span>Database Design</span>
+          </div>
+        </div>
+        <div class="nav-section">
+          <div class="nav-label">Recent</div>
+          <div class="nav-item">
+            <span class="nav-indicator"></span>
+            <span>Auth System</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <header class="header">
+        <div class="header-left">
+          <span class="header-title">Development Session</span>
+          <span class="header-badge">Active</span>
+        </div>
+        <div class="header-actions">
+          <button class="btn">Settings</button>
+          <button class="btn btn-primary">+ New Chat</button>
+        </div>
+      </header>
+
+      <div class="chat-container">
+        <div class="messages">
+          <div class="message">
+            <div class="message-header">
+              <div class="avatar user">U</div>
+              <div class="message-meta">
+                <span class="message-role">You</span>
+                <span class="message-time">12:34 PM</span>
+              </div>
+            </div>
+            <div class="message-content">
+              Create a simple REST API endpoint for user authentication.
+            </div>
+          </div>
+
+          <div class="message">
+            <div class="message-header">
+              <div class="avatar assistant">C</div>
+              <div class="message-meta">
+                <span class="message-role">Claude</span>
+                <span class="message-time">12:34 PM</span>
+              </div>
+            </div>
+            <div class="message-content">
+              I'll create a REST API endpoint for user authentication using FastAPI.
+              <div class="code-block">
+                <div class="code-header">
+                  <div class="code-lang">
+                    <span class="lang-dot"></span>
+                    <span>auth.py</span>
+                  </div>
+                  <div class="code-actions">
+                    <button class="code-btn">Copy</button>
+                    <button class="code-btn">Open</button>
+                  </div>
+                </div>
+                <div class="code-content">
+<span class="comment">// Authentication endpoint</span>
+<span class="keyword">@router</span>.post(<span class="string">"/auth/login"</span>)
+<span class="keyword">async def</span> <span class="function">login</span>(credentials: LoginRequest):
+    user = <span class="keyword">await</span> authenticate_user(
+        credentials.email,
+        credentials.password
+    )
+    <span class="keyword">return</span> {<span class="string">"token"</span>: create_access_token(user)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <div class="input-wrapper">
+            <textarea placeholder="Ask Claude anything..." rows="1"></textarea>
+            <button class="send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

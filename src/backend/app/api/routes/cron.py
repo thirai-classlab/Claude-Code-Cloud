@@ -11,11 +11,9 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from redis.asyncio import Redis
 
 from app.config import settings
 from app.core.cron_scheduler import get_cron_scheduler, CronScheduler
-from app.utils.redis_client import get_redis
 
 router = APIRouter(prefix="/cron", tags=["cron"])
 
@@ -105,9 +103,9 @@ def save_cron_config(project_id: str, config: Dict[str, Any]) -> None:
         json.dump(config, f, indent=2, ensure_ascii=False)
 
 
-async def get_scheduler(redis: Redis = Depends(get_redis)) -> CronScheduler:
+async def get_scheduler() -> CronScheduler:
     """Get the cron scheduler instance"""
-    return await get_cron_scheduler(redis)
+    return await get_cron_scheduler()
 
 
 @router.get("/projects/{project_id}/schedules", response_model=CronConfigResponse)

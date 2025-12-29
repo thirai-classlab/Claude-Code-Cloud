@@ -4,7 +4,6 @@ Pytest Configuration and Fixtures
 
 import pytest
 from fastapi.testclient import TestClient
-from redis.asyncio import Redis
 
 from app.main import app
 
@@ -13,18 +12,6 @@ from app.main import app
 def client():
     """FastAPI TestClient fixture"""
     return TestClient(app)
-
-
-@pytest.fixture
-async def redis_client():
-    """Redis client fixture for testing"""
-    redis = Redis.from_url(
-        "redis://localhost:6379", db=15, encoding="utf-8", decode_responses=True
-    )
-    yield redis
-    # Cleanup
-    await redis.flushdb()
-    await redis.close()
 
 
 @pytest.fixture

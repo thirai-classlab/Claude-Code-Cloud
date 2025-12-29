@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { SessionItem } from './SessionItem';
 import { CreateSessionModal } from './CreateSessionModal';
-import { Button } from '@/components/common/Button';
+import { Button } from '@/components/atoms';
 import { useSessions } from '@/hooks/useSessions';
 
 export interface SessionListProps {
@@ -78,28 +78,15 @@ export const SessionList: React.FC<SessionListProps> = ({ projectId }) => {
         variant="ghost"
         size="sm"
         onClick={() => setIsCreateModalOpen(true)}
-        className="w-full justify-start text-gray-600 dark:text-gray-400"
+        className="w-full justify-start"
       >
-        <svg
-          className="w-4 h-4 mr-2"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-        New Session
+        + New Session
       </Button>
 
       {/* Session Items */}
       {sessions.length === 0 ? (
         <div className="py-4 text-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-text-tertiary">
             No sessions yet
           </p>
         </div>
@@ -118,11 +105,11 @@ export const SessionList: React.FC<SessionListProps> = ({ projectId }) => {
       {/* Context Menu */}
       {contextMenu && (
         <div
-          className="fixed bg-bg-primary shadow-lg rounded-md py-1 z-50 border border-border"
+          className="fixed bg-bg-secondary border border-border-subtle rounded-md py-1 z-50 animate-fade-in"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button
-            className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+            className="block w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-bg-hover transition-colors duration-100"
             onClick={() => handleDeleteSession(contextMenu.sessionId)}
           >
             Delete Session

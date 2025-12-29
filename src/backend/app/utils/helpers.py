@@ -6,7 +6,7 @@ Helper Functions
 
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 
@@ -22,7 +22,7 @@ def generate_hash(data: str) -> str:
 
 def current_timestamp() -> str:
     """現在のタイムスタンプをISO形式で取得"""
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def safe_dict_get(d: Dict[str, Any], key: str, default: Any = None) -> Any:

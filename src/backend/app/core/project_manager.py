@@ -5,7 +5,7 @@ Project Manager
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import select, func, delete
@@ -45,17 +45,7 @@ class ProjectManager:
 
     def _model_to_pydantic(self, model: ProjectModel) -> Project:
         """SQLAlchemyモデルをPydanticモデルに変換"""
-        return Project(
-            id=model.id,
-            name=model.name,
-            description=model.description,
-            user_id=model.user_id,
-            status=ProjectStatus(model.status),
-            workspace_path=model.workspace_path,
-            session_count=model.session_count,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-        )
+        return Project.model_validate(model)
 
     async def create_project(
         self,
@@ -85,7 +75,7 @@ class ProjectManager:
         # プロジェクト生成
         project_id = generate_id()
         workspace_path = self._get_workspace_path(project_id)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         project_model = ProjectModel(
             id=project_id,
@@ -182,7 +172,7 @@ class ProjectManager:
             project_model.name = name
         if description is not None:
             project_model.description = description
-        project_model.updated_at = datetime.utcnow()
+        project_model.updated_at = datetime.now(timezone.utc)
 
         await self.session.flush()
         logger.info("Project updated", project_id=project_id)
@@ -227,7 +217,7 @@ class ProjectManager:
 
         if project_model:
             project_model.session_count += 1
-            project_model.updated_at = datetime.utcnow()
+            project_model.updated_at = datetime.now(timezone.utc)
             await self.session.flush()
 
     async def decrement_session_count(self, project_id: str) -> None:
@@ -238,7 +228,7 @@ class ProjectManager:
 
         if project_model:
             project_model.session_count = max(0, project_model.session_count - 1)
-            project_model.updated_at = datetime.utcnow()
+            project_model.updated_at = datetime.now(timezone.utc)
             await self.session.flush()
 
     async def _count_projects(self, user_id: Optional[str] = None) -> int:

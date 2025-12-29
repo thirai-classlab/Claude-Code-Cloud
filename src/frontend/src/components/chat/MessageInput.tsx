@@ -190,8 +190,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-900" ref={containerRef}>
-      <div className="relative flex items-end gap-2">
+    <div className="p-4 bg-bg-primary" ref={containerRef}>
+      <div className="input-wrapper relative">
         {showSuggest && (
           <CommandSuggest
             items={filteredItems}
@@ -209,17 +209,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onKeyDown={handleKeyDown}
           onClick={handleClick}
           disabled={disabled}
-          placeholder="メッセージを入力... (/ でコマンド、Shift+Enter で送信)"
-          className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500"
-          aria-label="メッセージ入力"
+          placeholder="Type a message... (/ for commands, Shift+Enter to send)"
+          className="flex-1 resize-none bg-transparent text-text-primary placeholder-text-tertiary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed text-md"
+          aria-label="Message input"
           rows={1}
           style={{ maxHeight: '200px' }}
         />
         <button
           onClick={handleSend}
           disabled={disabled || !message.trim()}
-          className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-          aria-label="メッセージを送信"
+          className="btn btn-primary px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="Send message"
         >
           <svg
             className="w-5 h-5"

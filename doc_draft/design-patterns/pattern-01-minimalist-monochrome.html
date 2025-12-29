@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pattern 01: Minimalist Monochrome</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #141414;
+      --bg-tertiary: #1f1f1f;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0a0;
+      --text-tertiary: #666666;
+      --accent: #ffffff;
+      --border: #2a2a2a;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* Layout */
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-bottom: 4px;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      height: 60px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+
+    .header-title {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .btn-primary {
+      background: var(--text-primary);
+      color: var(--bg-primary);
+      border-color: var(--text-primary);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    /* Chat Area */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 24px;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: 24px;
+    }
+
+    .message {
+      margin-bottom: 24px;
+    }
+
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--bg-tertiary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .message-role {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .message-content {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .message-content code {
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 13px;
+    }
+
+    /* Input Area */
+    .input-area {
+      padding: 16px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+    }
+
+    .input-wrapper textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 14px;
+      resize: none;
+      outline: none;
+      min-height: 24px;
+      max-height: 200px;
+      line-height: 1.5;
+    }
+
+    .input-wrapper textarea::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .send-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--text-primary);
+      border: none;
+      color: var(--bg-primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.15s ease;
+    }
+
+    .send-btn:hover {
+      opacity: 0.9;
+    }
+
+    /* Code Block */
+    .code-block {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 16px 0;
+      overflow: hidden;
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .code-content {
+      padding: 16px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">Claude Code</div>
+      </div>
+      <div class="sidebar-content">
+        <div class="nav-item active">
+          <span>Project Alpha</span>
+        </div>
+        <div class="nav-item">
+          <span>API Integration</span>
+        </div>
+        <div class="nav-item">
+          <span>Database Design</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <header class="header">
+        <span class="header-title">Session: Main Development</span>
+        <div class="header-actions">
+          <button class="btn">Settings</button>
+          <button class="btn btn-primary">New Chat</button>
+        </div>
+      </header>
+
+      <div class="chat-container">
+        <div class="messages">
+          <div class="message">
+            <div class="message-header">
+              <div class="avatar">U</div>
+              <span class="message-role">You</span>
+            </div>
+            <div class="message-content">
+              Create a simple REST API endpoint for user authentication.
+            </div>
+          </div>
+
+          <div class="message">
+            <div class="message-header">
+              <div class="avatar">C</div>
+              <span class="message-role">Claude</span>
+            </div>
+            <div class="message-content">
+              I'll create a REST API endpoint for user authentication using FastAPI.
+              <div class="code-block">
+                <div class="code-header">
+                  <span>auth.py</span>
+                  <span>Copy</span>
+                </div>
+                <div class="code-content">
+@router.post("/auth/login")
+async def login(credentials: LoginRequest):
+    user = await authenticate_user(
+        credentials.email,
+        credentials.password
+    )
+    return {"token": create_access_token(user)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <div class="input-wrapper">
+            <textarea placeholder="Ask Claude anything..." rows="1"></textarea>
+            <button class="send-btn">→</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

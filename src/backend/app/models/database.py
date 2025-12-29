@@ -4,7 +4,7 @@ SQLAlchemy Database Models
 データベースモデル定義
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
@@ -41,8 +41,8 @@ class ProjectModel(Base):
     )
     workspace_path = Column(String(500), nullable=True)
     session_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     sessions = relationship("SessionModel", back_populates="project", cascade="all, delete-orphan")
@@ -69,9 +69,9 @@ class SessionModel(Base):
     message_count = Column(Integer, default=0)
     total_tokens = Column(Integer, default=0)
     total_cost_usd = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    last_activity_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    last_activity_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     project = relationship("ProjectModel", back_populates="sessions")
@@ -95,7 +95,7 @@ class MessageModel(Base):
     )
     content = Column(Text, nullable=False)
     tokens = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     session = relationship("SessionModel", back_populates="messages")
@@ -116,7 +116,7 @@ class CronLogModel(Base):
     finished_at = Column(DateTime, nullable=True)
     result = Column(Text, nullable=True)
     error = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
         Index("ix_cron_logs_job_created", "job_id", "created_at"),

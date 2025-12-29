@@ -7,7 +7,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 
-type Theme = 'light' | 'dark' | 'claude';
+type Theme = 'light' | 'dark' | 'claude' | 'linear';
 
 interface ThemeOption {
   value: Theme;
@@ -58,6 +58,20 @@ const themeOptions: ThemeOption[] = [
       </svg>
     ),
   },
+  {
+    value: 'linear',
+    label: 'Linear',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 6h16M4 12h16M4 18h16"
+        />
+      </svg>
+    ),
+  },
 ];
 
 export const ThemeSelector: React.FC = () => {
@@ -100,7 +114,7 @@ export const ThemeSelector: React.FC = () => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 hover:bg-primary-dark rounded transition-colors text-white flex items-center gap-2"
+        className="p-2 hover:bg-bg-tertiary rounded-md transition-colors text-text-primary flex items-center gap-2 border border-transparent hover:border-border-subtle"
         aria-label="Select theme"
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -119,7 +133,7 @@ export const ThemeSelector: React.FC = () => {
 
       {isOpen && (
         <div
-          className="absolute right-0 mt-2 w-40 bg-bg-secondary border border-border rounded-lg shadow-lg overflow-hidden z-50"
+          className="absolute right-0 mt-2 w-40 bg-bg-secondary border border-border-subtle rounded-lg shadow-lg overflow-hidden z-50"
           role="menu"
           aria-orientation="vertical"
         >
@@ -128,7 +142,7 @@ export const ThemeSelector: React.FC = () => {
               key={option.value}
               onClick={() => handleThemeSelect(option.value)}
               className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-bg-tertiary transition-colors ${
-                theme === option.value ? 'bg-bg-tertiary text-primary font-semibold' : 'text-text-primary'
+                theme === option.value ? 'bg-bg-tertiary text-accent-primary font-medium' : 'text-text-primary'
               }`}
               role="menuitem"
             >

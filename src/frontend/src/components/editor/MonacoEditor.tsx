@@ -140,7 +140,7 @@ export const MonacoEditor: React.FC<MonacoEditorProps> = ({ projectId, filePath 
     return (
       <div className="h-full flex items-center justify-center bg-bg-primary">
         <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
           <span className="text-sm text-text-secondary">Loading file...</span>
         </div>
       </div>
@@ -157,7 +157,7 @@ export const MonacoEditor: React.FC<MonacoEditorProps> = ({ projectId, filePath 
             <p className="text-sm text-text-secondary max-w-md">{error}</p>
             <button
               onClick={() => filePath && loadFileContent(filePath)}
-              className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
+              className="px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover"
             >
               Retry
             </button>
@@ -185,7 +185,7 @@ export const MonacoEditor: React.FC<MonacoEditorProps> = ({ projectId, filePath 
             <button
               onClick={saveFileContent}
               disabled={isSaving}
-              className="px-3 py-1.5 text-sm bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
+              className="px-3 py-1.5 text-sm bg-accent text-white rounded hover:bg-accent-hover disabled:opacity-50 flex items-center gap-2"
             >
               {isSaving ? (
                 <>

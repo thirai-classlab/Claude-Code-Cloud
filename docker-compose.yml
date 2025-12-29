@@ -58,10 +58,6 @@ services:
       - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-4.5}
       - MAX_TOKENS=${MAX_TOKENS:-4096}
 
-      # Redis
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - REDIS_MAX_CONNECTIONS=${REDIS_MAX_CONNECTIONS:-50}
-
       # MySQL
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
@@ -87,8 +83,6 @@ services:
       - workspace-data:/app/workspace:rw
       - ./src/backend/app:/app/app:ro  # Development only
     depends_on:
-      redis:
-        condition: service_healthy
       mysql:
         condition: service_healthy
     networks:
@@ -147,37 +141,6 @@ services:
           cpus: '0.25'
           memory: 512M
 
-  # Redis Service (Cache & Session Store)
-  redis:
-    container_name: claude-redis
-    image: redis:7.2-alpine
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis-data:/data:rw
-      - ./src/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
-    networks:
-      - claude-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    labels:
-      - "com.example.description=Redis Cache & Session Store"
-      - "com.example.service=redis"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 1G
-        reservations:
-          cpus: '0.25'
-          memory: 512M
-
   # code-server Service (VSCode Web) - Optional
   code-server:
     container_name: claude-code-server
@@ -225,10 +188,6 @@ volumes:
       type: none
       o: bind
       device: ${WORKSPACE_HOST_PATH:-./workspace}
-
-  redis-data:
-    driver: local
-    name: claude-redis-data
 
   mysql-data:
     driver: local
