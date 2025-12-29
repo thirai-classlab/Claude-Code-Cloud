@@ -195,8 +195,8 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
               </button>
             </div>
             <p className="text-xs text-text-tertiary mt-1">
-              プロジェクト固有のAnthropicAPIキーを設定すると、このプロジェクトでのみ使用されます。
-              設定しない場合はシステムのデフォルトAPIキーが使用されます。
+              このプロジェクトで使用するAnthropic APIキーを設定してください。
+              チャット機能を使用するにはAPIキーの設定が必要です。
             </p>
           </div>
 
