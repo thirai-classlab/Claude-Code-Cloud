@@ -44,5 +44,9 @@ class Project(BaseModel):
     workspace_path: Optional[str] = Field(default=None, description="ワークスペースパス")
     session_count: int = Field(default=0, description="セッション数")
     api_key: Optional[str] = Field(default=None, description="プロジェクト固有のAPIキー")
+    # 利用制限設定（USD単位、Noneは無制限）
+    cost_limit_daily: Optional[float] = Field(default=None, description="1日の利用制限（USD）")
+    cost_limit_weekly: Optional[float] = Field(default=None, description="7日の利用制限（USD）")
+    cost_limit_monthly: Optional[float] = Field(default=None, description="30日の利用制限（USD）")
     created_at: datetime = Field(default_factory=_utc_now, description="作成日時")
     updated_at: datetime = Field(default_factory=_utc_now, description="更新日時")

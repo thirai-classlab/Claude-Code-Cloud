@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from './client';
-import { Project } from '@/types/project';
+import { Project, UsageStats, CostLimitCheck, CostLimitUpdateRequest } from '@/types/project';
 import { Session } from '@/types/session';
 
 export interface CreateProjectRequest {
@@ -97,5 +97,37 @@ export const projectsApi = {
    */
   async createSession(projectId: string, data: CreateSessionRequest): Promise<Session> {
     return apiClient.post<Session>(`/api/projects/${projectId}/sessions`, data);
+  },
+
+  // ============================================
+  // 使用量・利用制限API
+  // ============================================
+
+  /**
+   * Get project usage statistics
+   */
+  async getUsage(projectId: string): Promise<UsageStats> {
+    return apiClient.get<UsageStats>(`/api/projects/${projectId}/usage`);
+  },
+
+  /**
+   * Check if project can be used (cost limits)
+   */
+  async checkCostLimits(projectId: string): Promise<CostLimitCheck> {
+    return apiClient.get<CostLimitCheck>(`/api/projects/${projectId}/cost-limit-check`);
+  },
+
+  /**
+   * Update project cost limits
+   */
+  async updateCostLimits(projectId: string, data: CostLimitUpdateRequest): Promise<Project> {
+    return apiClient.put<Project>(`/api/projects/${projectId}/cost-limits`, data);
+  },
+
+  /**
+   * Clear all cost limits
+   */
+  async clearCostLimits(projectId: string): Promise<Project> {
+    return apiClient.delete<Project>(`/api/projects/${projectId}/cost-limits`);
   },
 };

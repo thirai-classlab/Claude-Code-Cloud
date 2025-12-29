@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { StreamingText } from './StreamingText';
 import { ToolExecutionGroup } from './ToolExecutionGroup';
 import { useChat } from '@/hooks/useChat';
+import { projectsApi } from '@/lib/api';
 
 interface ChatContainerProps {
   sessionId: string;
@@ -25,6 +26,49 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
     sendMessage,
     interrupt,
   } = useChat({ sessionId });
+
+  const [costLimitError, setCostLimitError] = useState<string | null>(null);
+  const [isCheckingLimits, setIsCheckingLimits] = useState(false);
+
+  // 利用制限をチェックしてからメッセージを送信
+  const handleSendWithLimitCheck = useCallback(async (message: string) => {
+    if (!projectId) {
+      // projectIdがない場合は制限チェックなしで送信
+      sendMessage(message);
+      return;
+    }
+
+    setCostLimitError(null);
+    setIsCheckingLimits(true);
+
+    try {
+      const limitCheck = await projectsApi.checkCostLimits(projectId);
+
+      if (!limitCheck.can_use) {
+        // 利用制限超過
+        const exceededLabels = limitCheck.exceeded_limits.map(limit => {
+          switch (limit) {
+            case 'daily': return '1日';
+            case 'weekly': return '7日';
+            case 'monthly': return '30日';
+            default: return limit;
+          }
+        }).join('、');
+
+        setCostLimitError(`利用制限（${exceededLabels}）を超過しています。料金設定から制限を変更してください。`);
+        return;
+      }
+
+      // 制限内なのでメッセージ送信
+      sendMessage(message);
+    } catch (error) {
+      console.error('Failed to check cost limits:', error);
+      // エラー時は制限チェックをスキップして送信を許可
+      sendMessage(message);
+    } finally {
+      setIsCheckingLimits(false);
+    }
+  }, [projectId, sendMessage]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -108,11 +152,31 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
         {isThinking && <ThinkingIndicator />}
       </div>
 
+      {/* Cost Limit Error */}
+      {costLimitError && (
+        <div className="px-6 py-3 bg-red-500/10 border-t border-red-500/30">
+          <div className="flex items-center gap-2 text-red-400 text-sm">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{costLimitError}</span>
+            <button
+              onClick={() => setCostLimitError(null)}
+              className="ml-auto text-red-400 hover:text-red-300"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="border-t border-border bg-bg-primary">
         <MessageInput
-          onSend={sendMessage}
-          disabled={isStreaming || connectionStatus !== 'connected'}
+          onSend={handleSendWithLimitCheck}
+          disabled={isStreaming || isCheckingLimits || connectionStatus !== 'connected'}
           projectId={projectId}
         />
       </div>

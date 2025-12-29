@@ -24,6 +24,10 @@ class ProjectResponse(BaseModel):
     workspace_path: Optional[str]
     session_count: int
     api_key: Optional[str] = None
+    # 利用制限設定（USD単位、Noneは無制限）
+    cost_limit_daily: Optional[float] = None
+    cost_limit_weekly: Optional[float] = None
+    cost_limit_monthly: Optional[float] = None
     created_at: datetime
     updated_at: datetime
 
@@ -132,3 +136,43 @@ class MessageHistoryResponse(BaseModel):
     messages: List[ChatMessageResponse]
     total: int
     session_id: str
+
+
+class UsageStatsResponse(BaseModel):
+    """使用量統計レスポンス"""
+
+    project_id: str
+    total_tokens: int = Field(description="総トークン数")
+    total_cost: float = Field(description="総コスト（USD）")
+    input_tokens: int = Field(description="入力トークン数")
+    output_tokens: int = Field(description="出力トークン数")
+    session_count: int = Field(description="セッション数")
+    message_count: int = Field(description="メッセージ数")
+    # 期間別使用量
+    cost_daily: float = Field(description="過去1日のコスト（USD）")
+    cost_weekly: float = Field(description="過去7日のコスト（USD）")
+    cost_monthly: float = Field(description="過去30日のコスト（USD）")
+
+
+class CostLimitCheckResponse(BaseModel):
+    """利用制限チェックレスポンス"""
+
+    project_id: str
+    can_use: bool = Field(description="利用可能かどうか")
+    exceeded_limits: List[str] = Field(default_factory=list, description="超過した制限タイプのリスト")
+    # 現在の使用量
+    cost_daily: float = Field(description="過去1日のコスト（USD）")
+    cost_weekly: float = Field(description="過去7日のコスト（USD）")
+    cost_monthly: float = Field(description="過去30日のコスト（USD）")
+    # 制限値
+    limit_daily: Optional[float] = Field(None, description="1日の制限（USD）")
+    limit_weekly: Optional[float] = Field(None, description="7日の制限（USD）")
+    limit_monthly: Optional[float] = Field(None, description="30日の制限（USD）")
+
+
+class CostLimitUpdateRequest(BaseModel):
+    """利用制限更新リクエスト"""
+
+    cost_limit_daily: Optional[float] = Field(None, ge=0, description="1日の制限（USD）、nullで無制限")
+    cost_limit_weekly: Optional[float] = Field(None, ge=0, description="7日の制限（USD）、nullで無制限")
+    cost_limit_monthly: Optional[float] = Field(None, ge=0, description="30日の制限（USD）、nullで無制限")

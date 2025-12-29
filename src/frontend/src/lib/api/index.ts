@@ -18,6 +18,11 @@ export type {
   CreateSessionRequest,
   ListProjectsParams,
 } from './projects';
+export type {
+  UsageStats,
+  CostLimitCheck,
+  CostLimitUpdateRequest,
+} from '@/types/project';
 
 export { sessionsApi } from './sessions';
 export type {
@@ -70,3 +75,15 @@ export type {
   UpdateProjectCommandRequest,
   ProjectConfigResponse,
 } from '@/types/projectConfig';
+
+export { templatesApi } from './templates';
+export type {
+  Template,
+  TemplateListItem,
+  TemplateFile,
+  CreateTemplateRequest,
+  UpdateTemplateRequest,
+  CreateTemplateFileRequest,
+  CreateProjectFromTemplateRequest,
+  CreateTemplateFromProjectRequest,
+} from '@/types/template';

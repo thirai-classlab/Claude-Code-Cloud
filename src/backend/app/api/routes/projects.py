@@ -18,10 +18,19 @@ from app.core.security.validator import InputValidator
 from app.core.session_manager import SessionManager
 from app.models.database import UserModel
 from app.schemas.request import CreateProjectRequest, CreateSessionRequest, UpdateProjectRequest
-from app.schemas.response import ProjectListResponse, ProjectResponse, SessionListResponse, SessionResponse
+from app.schemas.response import (
+    CostLimitCheckResponse,
+    CostLimitUpdateRequest,
+    ProjectListResponse,
+    ProjectResponse,
+    SessionListResponse,
+    SessionResponse,
+    UsageStatsResponse,
+)
 from app.schemas.share import SharedProjectInfo
 from app.services.permission_service import PermissionService
 from app.services.share_service import ShareService
+from app.services.usage_service import UsageService
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -38,6 +47,13 @@ async def get_share_service(
 ) -> ShareService:
     """ShareService取得"""
     return ShareService(session)
+
+
+async def get_usage_service(
+    session: AsyncSession = Depends(get_db_session),
+) -> UsageService:
+    """UsageService取得"""
+    return UsageService(session)
 
 
 @router.post("", response_model=ProjectResponse, status_code=201)
@@ -424,3 +440,174 @@ async def delete_project_session(
 
     # プロジェクトのセッション数をデクリメント
     await project_manager.decrement_session_count(project_id)
+
+
+# ============================================
+# 使用量・利用制限エンドポイント
+# ============================================
+
+
+@router.get("/{project_id}/usage", response_model=UsageStatsResponse)
+@handle_exceptions
+async def get_project_usage(
+    project_id: str,
+    current_user: UserModel = Depends(current_active_user),
+    project_manager: ProjectManager = Depends(get_project_manager),
+    permission_service: PermissionService = Depends(get_permission_service),
+    usage_service: UsageService = Depends(get_usage_service),
+) -> UsageStatsResponse:
+    """
+    プロジェクトの使用量統計取得（認証必須）
+
+    Args:
+        project_id: プロジェクトID
+        current_user: 現在のログインユーザー
+        project_manager: プロジェクトマネージャー (DI)
+        permission_service: 権限サービス (DI)
+        usage_service: 使用量サービス (DI)
+
+    Returns:
+        UsageStatsResponse: 使用量統計
+    """
+    # プロジェクト存在確認
+    project = await project_manager.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+    # 権限チェック（アクセス権限が必要）
+    if not await permission_service.can_access_project(current_user.id, project_id):
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have access to this project"
+        )
+
+    stats = await usage_service.get_usage_stats(project_id)
+    return UsageStatsResponse(**stats)
+
+
+@router.get("/{project_id}/cost-limit-check", response_model=CostLimitCheckResponse)
+@handle_exceptions
+async def check_cost_limits(
+    project_id: str,
+    current_user: UserModel = Depends(current_active_user),
+    project_manager: ProjectManager = Depends(get_project_manager),
+    permission_service: PermissionService = Depends(get_permission_service),
+    usage_service: UsageService = Depends(get_usage_service),
+) -> CostLimitCheckResponse:
+    """
+    プロジェクトの利用制限チェック（認証必須）
+
+    チャット送信前に呼び出して、利用可能かどうかを確認します。
+
+    Args:
+        project_id: プロジェクトID
+        current_user: 現在のログインユーザー
+        project_manager: プロジェクトマネージャー (DI)
+        permission_service: 権限サービス (DI)
+        usage_service: 使用量サービス (DI)
+
+    Returns:
+        CostLimitCheckResponse: 利用制限チェック結果
+    """
+    # プロジェクト存在確認
+    project = await project_manager.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+    # 権限チェック（アクセス権限が必要）
+    if not await permission_service.can_access_project(current_user.id, project_id):
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have access to this project"
+        )
+
+    result = await usage_service.check_cost_limits(project_id)
+    return CostLimitCheckResponse(**result)
+
+
+@router.put("/{project_id}/cost-limits", response_model=ProjectResponse)
+@handle_exceptions
+async def update_cost_limits(
+    project_id: str,
+    request: CostLimitUpdateRequest,
+    current_user: UserModel = Depends(current_active_user),
+    project_manager: ProjectManager = Depends(get_project_manager),
+    permission_service: PermissionService = Depends(get_permission_service),
+    usage_service: UsageService = Depends(get_usage_service),
+) -> ProjectResponse:
+    """
+    プロジェクトの利用制限更新（認証必須）
+
+    Args:
+        project_id: プロジェクトID
+        request: 利用制限更新リクエスト
+        current_user: 現在のログインユーザー
+        project_manager: プロジェクトマネージャー (DI)
+        permission_service: 権限サービス (DI)
+        usage_service: 使用量サービス (DI)
+
+    Returns:
+        ProjectResponse: 更新されたプロジェクト
+    """
+    # 権限チェック（オーナーのみ変更可能）
+    if not await permission_service.is_owner(current_user.id, project_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the project owner can update cost limits"
+        )
+
+    project = await usage_service.update_cost_limits(
+        project_id=project_id,
+        cost_limit_daily=request.cost_limit_daily,
+        cost_limit_weekly=request.cost_limit_weekly,
+        cost_limit_monthly=request.cost_limit_monthly,
+    )
+
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+    # ProjectModelからProjectResponseへ変換
+    updated_project = await project_manager.get_project(project_id)
+    return ProjectResponse(**updated_project.model_dump())
+
+
+@router.delete("/{project_id}/cost-limits", response_model=ProjectResponse)
+@handle_exceptions
+async def clear_cost_limits(
+    project_id: str,
+    current_user: UserModel = Depends(current_active_user),
+    project_manager: ProjectManager = Depends(get_project_manager),
+    permission_service: PermissionService = Depends(get_permission_service),
+    usage_service: UsageService = Depends(get_usage_service),
+) -> ProjectResponse:
+    """
+    プロジェクトの利用制限を全てクリア（認証必須）
+
+    Args:
+        project_id: プロジェクトID
+        current_user: 現在のログインユーザー
+        project_manager: プロジェクトマネージャー (DI)
+        permission_service: 権限サービス (DI)
+        usage_service: 使用量サービス (DI)
+
+    Returns:
+        ProjectResponse: 更新されたプロジェクト
+    """
+    # 権限チェック（オーナーのみ変更可能）
+    if not await permission_service.is_owner(current_user.id, project_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the project owner can clear cost limits"
+        )
+
+    project = await usage_service.update_cost_limits(
+        project_id=project_id,
+        clear_limits=True,
+    )
+
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found")
+
+    # ProjectModelからProjectResponseへ変換
+    updated_project = await project_manager.get_project(project_id)
+    return ProjectResponse(**updated_project.model_dump())

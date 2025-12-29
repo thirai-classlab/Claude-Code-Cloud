@@ -9,9 +9,11 @@ import Link from 'next/link';
 import { Button } from '@/components/atoms';
 import { SearchInput } from '@/components/molecules';
 import { CreateProjectModal } from '@/components/project/CreateProjectModal';
+import { TemplateSection } from '@/components/template/TemplateSection';
 import { useProjects } from '@/hooks/useProjects';
 import { useNavigation } from '@/hooks/useRouteSync';
 import { Project } from '@/types/project';
+import type { TemplateListItem } from '@/types/template';
 
 export const HomePage: React.FC = () => {
   const {
@@ -25,6 +27,7 @@ export const HomePage: React.FC = () => {
 
   const [searchInput, setSearchInput] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
 
   // Load projects on mount
   useEffect(() => {
@@ -47,6 +50,16 @@ export const HomePage: React.FC = () => {
     const project = await createProject(data);
     navigateToProject(project.id);
     setIsCreateModalOpen(false);
+  };
+
+  const handleProjectCreated = (project: Project) => {
+    navigateToProject(project.id);
+    setIsCreateModalOpen(false);
+  };
+
+  const handleSelectTemplate = (template: TemplateListItem) => {
+    setSelectedTemplateId(template.id);
+    setIsCreateModalOpen(true);
   };
 
   return (
@@ -83,9 +96,17 @@ export const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Project Grid */}
+      {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-6xl mx-auto">
+          {/* Template Section */}
+          <TemplateSection onSelectTemplate={handleSelectTemplate} />
+
+          {/* Projects Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-text-primary">Projects</h2>
+          </div>
+
           {/* Loading State */}
           {isLoading && projects.length === 0 && (
             <div className="flex items-center justify-center py-16">
@@ -127,8 +148,13 @@ export const HomePage: React.FC = () => {
       {/* Create Project Modal */}
       <CreateProjectModal
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setSelectedTemplateId(undefined);
+        }}
         onSubmit={handleCreateProject}
+        onProjectCreated={handleProjectCreated}
+        selectedTemplateId={selectedTemplateId}
       />
     </div>
   );

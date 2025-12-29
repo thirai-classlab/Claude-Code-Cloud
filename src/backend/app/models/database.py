@@ -54,6 +54,7 @@ class UserModel(Base):
     owned_projects = relationship("ProjectModel", back_populates="owner", foreign_keys="ProjectModel.user_id")
     shared_projects = relationship("ProjectShareModel", back_populates="user", foreign_keys="ProjectShareModel.user_id")
     shares_given = relationship("ProjectShareModel", back_populates="sharer", foreign_keys="ProjectShareModel.shared_by")
+    templates = relationship("ProjectTemplateModel", back_populates="owner", cascade="all, delete-orphan")
 
 
 class ProjectModel(Base):
@@ -72,6 +73,10 @@ class ProjectModel(Base):
     workspace_path = Column(String(500), nullable=True)
     session_count = Column(Integer, default=0)
     api_key = Column(String(500), nullable=True)  # プロジェクト固有のAPIキー（暗号化推奨）
+    # 利用制限設定（USD単位、NULLは無制限）
+    cost_limit_daily = Column(Float, nullable=True)   # 過去1日の利用制限
+    cost_limit_weekly = Column(Float, nullable=True)  # 過去7日の利用制限
+    cost_limit_monthly = Column(Float, nullable=True) # 過去30日の利用制限
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -285,4 +290,55 @@ class ProjectCommandModel(Base):
     __table_args__ = (
         UniqueConstraint("project_id", "name", name="uq_project_commands_project_name"),
         Index("ix_project_commands_project", "project_id"),
+    )
+
+
+# ============================================
+# Project Template Models
+# ============================================
+
+
+class ProjectTemplateModel(Base):
+    """プロジェクトテンプレートテーブル"""
+    __tablename__ = "project_templates"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(String(500), nullable=True)
+    is_public = Column(Boolean, default=False, nullable=False)  # 公開テンプレートフラグ
+    # Project configurations stored as JSON
+    mcp_servers = Column(JSON, default=list)  # List of MCP server configs
+    agents = Column(JSON, default=list)       # List of agent configs
+    skills = Column(JSON, default=list)       # List of skill configs
+    commands = Column(JSON, default=list)     # List of command configs
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    owner = relationship("UserModel", back_populates="templates")
+    files = relationship("ProjectTemplateFileModel", back_populates="template", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_project_templates_user", "user_id"),
+        Index("ix_project_templates_public", "is_public"),
+    )
+
+
+class ProjectTemplateFileModel(Base):
+    """プロジェクトテンプレートファイルテーブル"""
+    __tablename__ = "project_template_files"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    template_id = Column(String(36), ForeignKey("project_templates.id", ondelete="CASCADE"), nullable=False, index=True)
+    file_path = Column(String(500), nullable=False)  # 相対パス (例: "src/main.py", "README.md")
+    content = Column(Text, nullable=True)  # ファイル内容 (バイナリは非対応)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    template = relationship("ProjectTemplateModel", back_populates="files")
+
+    __table_args__ = (
+        UniqueConstraint("template_id", "file_path", name="uq_template_files_template_path"),
+        Index("ix_template_files_template", "template_id"),
     )

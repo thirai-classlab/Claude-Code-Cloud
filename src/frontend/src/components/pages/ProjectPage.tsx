@@ -7,11 +7,13 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/atoms';
+import { Button } from '@/components/common/Button';
+import { Modal } from '@/components/common/Modal';
 import { CreateSessionModal } from '@/components/session/CreateSessionModal';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 import { useNavigation } from '@/hooks/useRouteSync';
+import { templatesApi } from '@/lib/api/templates';
 import { Session } from '@/types/session';
 
 interface ProjectPageProps {
@@ -30,6 +32,14 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ projectId }) => {
   const { navigateToSession } = useNavigation();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [templateIsPublic, setTemplateIsPublic] = useState(false);
+  const [includeFiles, setIncludeFiles] = useState(true);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [templateSuccess, setTemplateSuccess] = useState(false);
 
   // Find current project
   const project = projects.find(p => p.id === projectId);
@@ -44,6 +54,45 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ projectId }) => {
     const session = await createSession(projectId, data);
     navigateToSession(projectId, session.id);
     setIsCreateModalOpen(false);
+  };
+
+  const openTemplateModal = () => {
+    setTemplateName(project?.name ? `${project.name} Template` : '');
+    setTemplateDescription('');
+    setTemplateIsPublic(false);
+    setIncludeFiles(true);
+    setTemplateError(null);
+    setTemplateSuccess(false);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleCreateTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTemplateError(null);
+
+    if (!templateName.trim()) {
+      setTemplateError('Template name is required');
+      return;
+    }
+
+    setIsCreatingTemplate(true);
+    try {
+      await templatesApi.createFromProject({
+        project_id: projectId,
+        template_name: templateName.trim(),
+        template_description: templateDescription.trim() || undefined,
+        is_public: templateIsPublic,
+        include_files: includeFiles,
+      });
+      setTemplateSuccess(true);
+      setTimeout(() => {
+        setIsTemplateModalOpen(false);
+      }, 1500);
+    } catch (err: unknown) {
+      setTemplateError(err instanceof Error ? err.message : 'Failed to create template');
+    } finally {
+      setIsCreatingTemplate(false);
+    }
   };
 
   // Show loading while project is being fetched
@@ -74,13 +123,22 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ projectId }) => {
                 </p>
               )}
             </div>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setIsCreateModalOpen(true)}
-            >
-              + New Session
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={openTemplateModal}
+              >
+                Save as Template
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                + New Session
+              </Button>
+            </div>
           </div>
 
           {/* Project Stats */}
@@ -143,6 +201,122 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ projectId }) => {
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateSession}
       />
+
+      {/* Create Template Modal */}
+      <Modal
+        isOpen={isTemplateModalOpen}
+        onClose={() => !isCreatingTemplate && setIsTemplateModalOpen(false)}
+        title="Save as Template"
+        size="md"
+      >
+        {templateSuccess ? (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-status-success/20 flex items-center justify-center">
+              <svg className="w-8 h-8 text-status-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-text-primary mb-2">Template Created!</h3>
+            <p className="text-text-secondary">Your template has been saved successfully.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleCreateTemplate} className="space-y-4">
+            {/* Template Name */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                Template Name *
+              </label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="My Template"
+                className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                autoFocus
+                disabled={isCreatingTemplate}
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                Description
+              </label>
+              <textarea
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                placeholder="Describe this template..."
+                rows={3}
+                className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                disabled={isCreatingTemplate}
+              />
+            </div>
+
+            {/* Options */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="include_files"
+                  checked={includeFiles}
+                  onChange={(e) => setIncludeFiles(e.target.checked)}
+                  className="w-4 h-4 rounded border-border bg-bg-secondary text-accent focus:ring-accent"
+                  disabled={isCreatingTemplate}
+                />
+                <label htmlFor="include_files" className="text-sm text-text-secondary">
+                  Include workspace files
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_public"
+                  checked={templateIsPublic}
+                  onChange={(e) => setTemplateIsPublic(e.target.checked)}
+                  className="w-4 h-4 rounded border-border bg-bg-secondary text-accent focus:ring-accent"
+                  disabled={isCreatingTemplate}
+                />
+                <label htmlFor="is_public" className="text-sm text-text-secondary">
+                  Make this template public
+                </label>
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="p-3 bg-bg-tertiary rounded-md text-xs text-text-secondary">
+              <p className="mb-1">This template will include:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>MCP server configurations</li>
+                <li>Agent definitions</li>
+                <li>Skills and commands</li>
+                {includeFiles && <li>Workspace files (text files only)</li>}
+              </ul>
+            </div>
+
+            {/* Error */}
+            {templateError && (
+              <div className="p-3 bg-status-error/10 border border-status-error/30 rounded-md">
+                <p className="text-sm text-status-error">{templateError}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setIsTemplateModalOpen(false)}
+                disabled={isCreatingTemplate}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" isLoading={isCreatingTemplate}>
+                Create Template
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </>
   );
 };
