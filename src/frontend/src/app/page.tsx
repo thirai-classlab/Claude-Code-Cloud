@@ -1,12 +1,15 @@
 'use client';
 
-import { MainLayout } from '@/components/layout/MainLayout';
 import { AuthGuard } from '@/components/AuthGuard';
+import { BaseLayout } from '@/components/layout/BaseLayout';
+import { HomePage } from '@/components/pages/HomePage';
 
-export default function HomePage() {
+export default function Home() {
   return (
     <AuthGuard>
-      <MainLayout />
+      <BaseLayout>
+        <HomePage />
+      </BaseLayout>
     </AuthGuard>
   );
 }

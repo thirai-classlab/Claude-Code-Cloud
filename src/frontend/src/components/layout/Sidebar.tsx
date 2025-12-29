@@ -1,15 +1,17 @@
 /**
  * Sidebar Component
  * Displays project and session hierarchy with Linear Style (Pattern 09 v2) design
+ * Updated for route-based navigation
  */
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { ProjectList } from '@/components/project/ProjectList';
-import { SearchInput } from '@/components/molecules/SearchInput';
+import { ProjectListNav } from '@/components/project/ProjectListNav';
+import { SearchInput } from '@/components/molecules';
 import { Button } from '@/components/atoms';
 import { CreateProjectModal } from '@/components/project/CreateProjectModal';
 import { useProjects } from '@/hooks/useProjects';
+import { useNavigation } from '@/hooks/useRouteSync';
 
 /**
  * NavDivider - Subtle horizontal divider for sidebar sections
@@ -40,7 +42,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const { createProject, selectProject, loadProjects } = useProjects();
+  const { createProject, loadProjects } = useProjects();
+  const { navigateToProject } = useNavigation();
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
@@ -61,9 +64,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
 
   const handleCreateProject = useCallback(async (data: { name: string; description?: string }) => {
     const project = await createProject(data);
-    selectProject(project.id);
+    // Navigate to the new project page
+    navigateToProject(project.id);
     setIsCreateModalOpen(false);
-  }, [createProject, selectProject]);
+  }, [createProject, navigateToProject]);
 
   return (
     <div
@@ -77,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       {/* Fixed header area - does not scroll */}
       <div className="flex-shrink-0 px-2 pt-2 pb-2 space-y-2">
         {/* Projects section label */}
-        <NavLabel>プロジェクト</NavLabel>
+        <NavLabel>Projects</NavLabel>
 
         {/* New project button */}
         <Button
@@ -86,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           onClick={() => setIsCreateModalOpen(true)}
           className="w-full"
         >
-          + 新規プロジェクト
+          + New Project
         </Button>
 
         {/* Search input - Press Enter to search */}
@@ -94,14 +98,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           value={searchInput}
           onChange={handleSearchChange}
           onKeyDown={handleSearchKeyDown}
-          placeholder="検索してEnter..."
+          placeholder="Search..."
           size="sm"
         />
       </div>
 
-      {/* Project list with scroll */}
+      {/* Project list with scroll - now uses route navigation */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <ProjectList activeSearch={activeSearch} />
+        <ProjectListNav activeSearch={activeSearch} />
       </div>
 
       {/* Create Project Modal */}

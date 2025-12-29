@@ -1,44 +1,46 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useUIStore } from '@/stores/uiStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/atoms';
 import { ThemeSelector } from '@/components/common/ThemeSelector';
-
 export const Header: React.FC = () => {
+  const params = useParams();
   const { toggleSidebar, isSidebarOpen } = useUIStore();
-  const { getCurrentProject, setCurrentProject } = useProjectStore();
-  const { currentSessionId, setCurrentSession, sessions } = useSessionStore();
+  const { getCurrentProject, projects } = useProjectStore();
+  const { sessions } = useSessionStore();
   const { user, logout, isLoading: isAuthLoading } = useAuthStore();
 
-  const currentProject = getCurrentProject();
-  const currentSession = sessions.find(s => s.id === currentSessionId);
+  // Get IDs from URL params
+  const projectIdFromUrl = params?.id as string | undefined;
+  const sessionIdFromUrl = params?.sessionId as string | undefined;
+
+  // Find current project and session from stores
+  const currentProject = projectIdFromUrl
+    ? projects.find(p => p.id === projectIdFromUrl) || getCurrentProject()
+    : null;
+  const currentSession = sessionIdFromUrl
+    ? sessions.find(s => s.id === sessionIdFromUrl)
+    : null;
 
   const handleLogout = async () => {
     await logout();
   };
 
-  const handleBackToProjects = () => {
-    setCurrentSession(null);
-    setCurrentProject(null);
-  };
-
-  const handleBackToSessions = () => {
-    setCurrentSession(null);
-  };
-
   return (
     <header className="h-header flex items-center justify-between px-5 border-b border-border-subtle bg-bg-primary">
       <div className="flex items-center gap-4">
-        {/* Sidebar toggle - text-based, no icon per Pattern 09 v2 */}
+        {/* Sidebar toggle */}
         <Button
           variant="default"
           size="sm"
           onClick={toggleSidebar}
-          aria-label={isSidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'}
+          aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
           aria-expanded={isSidebarOpen}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,34 +48,31 @@ export const Header: React.FC = () => {
           </svg>
         </Button>
 
-        {/* Logo and title */}
-        <div className="flex items-center gap-2">
+        {/* Logo and title - links to home */}
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <span className="w-5 h-5 rounded-[5px] bg-gradient-to-br from-accent to-purple-500" />
           <h1 className="text-base font-semibold text-text-primary">
             <span className="hidden sm:inline">Claude Code</span>
             <span className="sm:hidden">CC</span>
           </h1>
-        </div>
+        </Link>
 
         {/* Breadcrumb navigation */}
         {currentProject && (
           <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
             <span className="text-text-tertiary">/</span>
-            <button
-              onClick={handleBackToProjects}
+            <Link
+              href={`/projects/${currentProject.id}`}
               className="text-text-secondary hover:text-text-primary transition-colors duration-fast"
             >
               {currentProject.name}
-            </button>
+            </Link>
             {currentSession && (
               <>
                 <span className="text-text-tertiary">/</span>
-                <button
-                  onClick={handleBackToSessions}
-                  className="text-text-secondary hover:text-text-primary transition-colors duration-fast"
-                >
+                <span className="text-text-primary">
                   {currentSession.name || 'Session'}
-                </button>
+                </span>
               </>
             )}
           </nav>
@@ -81,16 +80,17 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Home button - text-based, no icon per Pattern 09 v2 */}
-        {(currentProject || currentSessionId) && (
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleBackToProjects}
-            title="プロジェクトに戻る"
-          >
-            ホーム
-          </Button>
+        {/* Home button */}
+        {(projectIdFromUrl || sessionIdFromUrl) && (
+          <Link href="/">
+            <Button
+              variant="default"
+              size="sm"
+              title="Back to home"
+            >
+              Home
+            </Button>
+          </Link>
         )}
         <ThemeSelector />
 
@@ -105,9 +105,9 @@ export const Header: React.FC = () => {
               size="sm"
               onClick={handleLogout}
               disabled={isAuthLoading}
-              title="ログアウト"
+              title="Logout"
             >
-              {isAuthLoading ? 'ログアウト中...' : 'ログアウト'}
+              {isAuthLoading ? 'Logging out...' : 'Logout'}
             </Button>
           </div>
         )}
