@@ -3,18 +3,18 @@
  * Displays a list of projects with expand/collapse functionality
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProjectCard } from './ProjectCard';
 import { SessionList } from '../session/SessionList';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 
 export interface ProjectListProps {
-  /** Search query to filter projects by name */
-  searchQuery?: string;
+  /** Active search query (applied via API) */
+  activeSearch?: string;
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ searchQuery = '' }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ activeSearch = '' }) => {
   const {
     projects,
     currentProjectId,
@@ -26,18 +26,6 @@ export const ProjectList: React.FC<ProjectListProps> = ({ searchQuery = '' }) =>
   } = useProjects();
 
   const { loadSessions, clearSessions } = useSessions();
-
-  // Filter projects based on search query
-  const filteredProjects = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return projects;
-    }
-    const query = searchQuery.toLowerCase().trim();
-    return projects.filter((project) =>
-      project.name.toLowerCase().includes(query) ||
-      (project.description && project.description.toLowerCase().includes(query))
-    );
-  }, [projects, searchQuery]);
 
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{
@@ -127,7 +115,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ searchQuery = '' }) =>
 
       {/* Project List */}
       <div className="px-2">
-        {projects.length === 0 && !isLoading && (
+        {projects.length === 0 && !isLoading && !activeSearch && (
           <div className="text-center py-8 text-text-tertiary">
             <p className="text-sm">No projects yet</p>
             <p className="text-xs mt-1">Create one to get started</p>
@@ -135,13 +123,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ searchQuery = '' }) =>
         )}
 
         {/* No search results */}
-        {projects.length > 0 && filteredProjects.length === 0 && searchQuery && (
+        {projects.length === 0 && !isLoading && activeSearch && (
           <div className="text-center py-4 text-text-tertiary">
-            <p className="text-xs">該当するプロジェクトがありません</p>
+            <p className="text-xs">「{activeSearch}」に該当するプロジェクトがありません</p>
           </div>
         )}
 
-        {filteredProjects.map((project) => (
+        {projects.map((project) => (
           <div key={project.id} className="mb-1">
             <ProjectCard
               project={project}

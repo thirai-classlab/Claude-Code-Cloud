@@ -8,8 +8,9 @@ import os
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.models.database import ProjectModel, SessionModel
@@ -119,7 +120,11 @@ class ProjectManager:
         return self._model_to_pydantic(project_model)
 
     async def list_projects(
-        self, user_id: Optional[str] = None, limit: int = 50, offset: int = 0
+        self,
+        user_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        search: Optional[str] = None,
     ) -> List[Project]:
         """
         プロジェクト一覧取得
@@ -128,6 +133,7 @@ class ProjectManager:
             user_id: ユーザーID (指定時はそのユーザーのプロジェクトのみ)
             limit: 最大取得件数
             offset: オフセット
+            search: 検索クエリ (プロジェクト名、説明、セッション名で検索)
 
         Returns:
             List[Project]: プロジェクトリスト
@@ -136,6 +142,24 @@ class ProjectManager:
 
         if user_id is not None:
             stmt = stmt.where(ProjectModel.user_id == user_id)
+
+        # 検索クエリがある場合
+        if search and search.strip():
+            search_term = f"%{search.strip()}%"
+            # セッション名でも検索するためにサブクエリを作成
+            session_subquery = (
+                select(SessionModel.project_id)
+                .where(SessionModel.name.ilike(search_term))
+                .distinct()
+            )
+            # プロジェクト名、説明、または関連セッション名でマッチ
+            stmt = stmt.where(
+                or_(
+                    ProjectModel.name.ilike(search_term),
+                    ProjectModel.description.ilike(search_term),
+                    ProjectModel.id.in_(session_subquery),
+                )
+            )
 
         stmt = stmt.order_by(ProjectModel.updated_at.desc()).offset(offset).limit(limit)
 

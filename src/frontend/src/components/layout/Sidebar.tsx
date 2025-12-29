@@ -37,13 +37,27 @@ export interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [activeSearch, setActiveSearch] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const { createProject, selectProject } = useProjects();
+  const { createProject, selectProject, loadProjects } = useProjects();
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+    setSearchInput(e.target.value);
   }, []);
+
+  const executeSearch = useCallback(() => {
+    const trimmed = searchInput.trim();
+    setActiveSearch(trimmed);
+    loadProjects(trimmed ? { search: trimmed } : undefined);
+  }, [searchInput, loadProjects]);
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      executeSearch();
+    }
+  }, [executeSearch]);
 
   const handleCreateProject = useCallback(async (data: { name: string; description?: string }) => {
     const project = await createProject(data);
@@ -75,18 +89,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           + 新規プロジェクト
         </Button>
 
-        {/* Search input */}
+        {/* Search input - Press Enter to search */}
         <SearchInput
-          value={searchQuery}
+          value={searchInput}
           onChange={handleSearchChange}
-          placeholder="プロジェクトを検索..."
+          onKeyDown={handleSearchKeyDown}
+          placeholder="検索してEnter..."
           size="sm"
         />
       </div>
 
       {/* Project list with scroll */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <ProjectList searchQuery={searchQuery} />
+        <ProjectList activeSearch={activeSearch} />
       </div>
 
       {/* Create Project Modal */}

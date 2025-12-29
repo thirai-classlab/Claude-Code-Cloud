@@ -16,6 +16,7 @@ export type {
   ProjectsResponse,
   SessionsResponse,
   CreateSessionRequest,
+  ListProjectsParams,
 } from './projects';
 
 export { sessionsApi } from './sessions';

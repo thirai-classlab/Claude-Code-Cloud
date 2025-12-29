@@ -6,7 +6,7 @@
 import { useCallback } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { useSessionStore } from '@/stores/sessionStore';
-import { projectsApi, CreateProjectRequest, UpdateProjectRequest } from '@/lib/api';
+import { projectsApi, CreateProjectRequest, UpdateProjectRequest, ListProjectsParams } from '@/lib/api';
 
 export const useProjects = () => {
   const {
@@ -26,12 +26,13 @@ export const useProjects = () => {
 
   /**
    * Load all projects from the API
+   * @param params Optional search parameters
    */
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (params?: ListProjectsParams) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await projectsApi.list();
+      const response = await projectsApi.list(params);
       setProjects(response.projects);
     } catch (err: any) {
       setError(err.message || 'Failed to load projects');

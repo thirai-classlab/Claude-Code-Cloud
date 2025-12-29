@@ -30,12 +30,30 @@ export interface CreateSessionRequest {
   model?: string;
 }
 
+export interface ListProjectsParams {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export const projectsApi = {
   /**
    * Get all projects
    */
-  async list(): Promise<ProjectsResponse> {
-    return apiClient.get<ProjectsResponse>('/api/projects');
+  async list(params?: ListProjectsParams): Promise<ProjectsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.search) {
+      searchParams.set('search', params.search);
+    }
+    if (params?.limit) {
+      searchParams.set('limit', params.limit.toString());
+    }
+    if (params?.offset) {
+      searchParams.set('offset', params.offset.toString());
+    }
+    const query = searchParams.toString();
+    const url = query ? `/api/projects?${query}` : '/api/projects';
+    return apiClient.get<ProjectsResponse>(url);
   },
 
   /**

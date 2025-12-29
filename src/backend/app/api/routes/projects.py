@@ -76,6 +76,7 @@ async def create_project(
 async def list_projects(
     current_user: UserModel = Depends(current_active_user),
     include_shared: bool = Query(default=True, description="共有されたプロジェクトも含める"),
+    search: Optional[str] = Query(default=None, description="検索クエリ (プロジェクト名、説明、セッション名)"),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     manager: ProjectManager = Depends(get_project_manager),
@@ -89,6 +90,7 @@ async def list_projects(
     Args:
         current_user: 現在のログインユーザー
         include_shared: 共有されたプロジェクトも含めるか
+        search: 検索クエリ (プロジェクト名、説明、セッション名で検索)
         limit: 最大取得件数
         offset: オフセット
         manager: プロジェクトマネージャー (DI)
@@ -98,7 +100,9 @@ async def list_projects(
         ProjectListResponse: プロジェクト一覧
     """
     # 所有プロジェクト取得（認証ユーザーのプロジェクトのみ）
-    owned_projects = await manager.list_projects(user_id=current_user.id, limit=limit, offset=offset)
+    owned_projects = await manager.list_projects(
+        user_id=current_user.id, limit=limit, offset=offset, search=search
+    )
     project_responses = [ProjectResponse(**p.model_dump()) for p in owned_projects]
 
     # 共有プロジェクトを含める場合
