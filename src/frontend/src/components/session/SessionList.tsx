@@ -59,7 +59,7 @@ export const SessionList: React.FC<SessionListProps> = ({ projectId }) => {
     }
   };
 
-  const handleCreateSession = async (data: { title?: string }) => {
+  const handleCreateSession = async (data: { name?: string }) => {
     const session = await createSession(projectId, data);
     selectSession(session.id);
   };

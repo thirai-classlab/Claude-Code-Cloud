@@ -88,6 +88,8 @@ const config: Config = {
       animation: {
         'fade-in': 'fadeIn 0.15s ease-out',
         'slide-in': 'slideIn 0.2s ease-out',
+        'slide-in-right': 'slideInRight 0.2s ease-out',
+        'slide-out-right': 'slideOutRight 0.2s ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -97,6 +99,14 @@ const config: Config = {
         slideIn: {
           '0%': { opacity: '0', transform: 'translateY(-4px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideInRight: {
+          '0%': { opacity: '0', transform: 'translateX(100%)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        slideOutRight: {
+          '0%': { opacity: '1', transform: 'translateX(0)' },
+          '100%': { opacity: '0', transform: 'translateX(100%)' },
         },
       },
       boxShadow: {

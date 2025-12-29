@@ -17,9 +17,11 @@ RUN apk add --no-cache libc6-compat curl
 # Set working directory
 WORKDIR /app
 
-# Create non-root user
+# Create non-root user with home directory
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001
+    adduser -S nextjs -u 1001 -h /home/nextjs && \
+    mkdir -p /home/nextjs/.npm && \
+    chown -R nextjs:nodejs /home/nextjs
 
 # ============================================
 # Dependencies Stage: Install Node modules

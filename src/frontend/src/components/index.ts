@@ -9,3 +9,6 @@ export * from './organisms';
 
 // Templates
 export * from './templates';
+
+// Auth
+export { AuthGuard } from './AuthGuard';

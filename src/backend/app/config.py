@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     session_timeout: int = Field(default=3600, description="Session timeout in seconds")
 
     # Security Configuration
+    secret_key: str = Field(
+        default="changeme-insecure-secret-key-for-development-only",
+        description="Secret key for JWT tokens"
+    )
     allowed_origins: str = Field(
         default="http://localhost:3000", description="CORS allowed origins (comma-separated)"
     )

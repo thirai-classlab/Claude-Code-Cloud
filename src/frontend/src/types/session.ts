@@ -3,14 +3,16 @@ import { Message } from './message';
 export interface Session {
   id: string;
   project_id: string;
-  title: string;
+  name: string;
   status: 'active' | 'expired' | 'terminated';
   created_at: string;
   updated_at: string;
-  expires_at: string;
+  last_activity_at?: string;
   message_count: number;
   model: string;
-  workspace_path: string;
+  total_tokens?: number;
+  total_cost_usd?: number;
+  user_id?: string;
 }
 
 export interface SessionHistory {
@@ -25,13 +27,6 @@ export interface SessionHistory {
 }
 
 export interface CreateSessionRequest {
-  title?: string;
-  options?: {
-    model?: string;
-    max_turns?: number;
-  };
-  sandbox_config?: {
-    allowed_tools?: string[];
-    permission_mode?: string;
-  };
+  name?: string;
+  model?: string;
 }

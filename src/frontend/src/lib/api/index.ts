@@ -6,6 +6,9 @@
 export { apiClient } from './client';
 export type { ApiError } from './client';
 
+export { authApi } from './auth';
+export type { LoginResponse, RegisterRequest, User as AuthUser } from './auth';
+
 export { projectsApi } from './projects';
 export type {
   CreateProjectRequest,

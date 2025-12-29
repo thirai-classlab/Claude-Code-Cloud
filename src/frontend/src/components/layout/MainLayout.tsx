@@ -15,7 +15,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 export const MainLayout: React.FC = () => {
-  const { isSidebarOpen, chatWidth, toggleSidebar } = useUIStore();
+  const { isSidebarOpen, chatWidth, toggleSidebar, isEditorPanelOpen } = useUIStore();
   const isMdOrLarger = useMediaQuery('(min-width: 768px)');
   const { currentSessionId } = useSessionStore();
   const { getCurrentProject } = useProjectStore();
@@ -104,13 +104,17 @@ export const MainLayout: React.FC = () => {
           </div>
         )}
 
-        {/* Chat Panel - Responsive width */}
+        {/* Chat Panel - Responsive width, expands when editor is collapsed */}
         <div
-          className="border-r border-border-subtle bg-bg-primary flex-shrink-0 w-full md:w-auto flex flex-col overflow-hidden"
-          style={{
+          className={`border-r border-border-subtle bg-bg-primary w-full md:w-auto flex flex-col overflow-hidden ${
+            isEditorPanelOpen ? 'flex-shrink-0' : 'flex-1'
+          }`}
+          style={isEditorPanelOpen ? {
             width: isMdOrLarger ? `${chatWidth}px` : '100%',
             minWidth: isMdOrLarger ? '320px' : '100%',
             maxWidth: isMdOrLarger ? 'var(--chat-max-width, 860px)' : '100%',
+          } : {
+            minWidth: isMdOrLarger ? '320px' : '100%',
           }}
         >
           {/* プロジェクトとセッション両方が選択された場合のみチャット表示 */}
@@ -121,8 +125,12 @@ export const MainLayout: React.FC = () => {
           )}
         </div>
 
-        {/* Editor Panel - Hidden on mobile by default */}
-        <div className="flex-1 bg-bg-tertiary hidden lg:flex lg:flex-col overflow-hidden">
+        {/* Editor Panel - Hidden on mobile, collapsible on desktop */}
+        <div
+          className={`bg-bg-tertiary hidden lg:flex lg:flex-col overflow-hidden ${
+            isEditorPanelOpen ? 'flex-1 animate-slide-in-right' : 'flex-shrink-0'
+          }`}
+        >
           {currentProject ? (
             <EditorContainer
               projectId={currentProject.id}

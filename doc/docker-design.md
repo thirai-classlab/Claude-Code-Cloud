@@ -1337,7 +1337,53 @@ async def metrics_middleware(request: Request, call_next):
     return response
 ```
 
-### 8.4 起動・停止スクリプト
+### 8.4 コンテナリビルドルール（必須）
+
+**変更があったコンテナのみをリビルドすること。全体リビルドは禁止。**
+
+```mermaid
+flowchart LR
+    subgraph RebuildRules["コンテナリビルドルール"]
+        R1[変更検出] --> R2{どのサービスが変更?}
+        R2 -->|frontend| R3[frontendのみリビルド]
+        R2 -->|backend| R4[backendのみリビルド]
+        R2 -->|両方| R5[frontend + backendリビルド]
+        R2 -->|MySQL/DinD/code-server| R6[通常リビルド不要]
+
+        R3 --> B1[build frontend → up -d frontend]
+        R4 --> B2[build backend → up -d backend]
+        R5 --> B3[build frontend backend → up -d frontend backend]
+    end
+```
+
+```bash
+# フロントエンドのみ変更した場合
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml build frontend
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml up -d frontend
+
+# バックエンドのみ変更した場合
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml build backend
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml up -d backend
+
+# 両方変更した場合
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml build frontend backend
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml up -d frontend backend
+```
+
+| オプション | 使用タイミング |
+|-----------|---------------|
+| `build <service>` | 通常のリビルド（キャッシュ使用） |
+| `build --no-cache <service>` | Dockerfile変更時、依存関係更新時のみ |
+| `up -d <service>` | 該当サービスのみ再起動 |
+
+**注意事項:**
+- `docker-compose build` (サービス指定なし) は使用禁止
+- `--no-cache` は必要な場合のみ使用（ビルド時間短縮のため）
+- MySQL, DinD, code-server は通常リビルド不要
+
+---
+
+### 8.5 起動・停止スクリプト
 
 ```bash
 #!/bin/bash

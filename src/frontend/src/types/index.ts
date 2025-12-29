@@ -1,4 +1,5 @@
 export * from './agent';
+export * from './auth';
 export * from './command';
 export * from './skill';
 export * from './message';

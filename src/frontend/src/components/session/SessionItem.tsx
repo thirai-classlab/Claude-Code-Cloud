@@ -51,7 +51,7 @@ export const SessionItem: React.FC<SessionItemProps> = ({
       {/* Session Info */}
       <div className="flex-1 min-w-0 flex items-baseline justify-between gap-2">
         <span className="truncate text-sm">
-          {session.title || 'Untitled Session'}
+          {session.name || 'Untitled Session'}
         </span>
         <span className="text-xs text-text-tertiary flex-shrink-0">
           {formattedTime}

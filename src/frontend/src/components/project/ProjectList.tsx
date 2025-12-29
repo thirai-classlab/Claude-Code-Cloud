@@ -3,30 +3,43 @@
  * Displays a list of projects with expand/collapse functionality
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ProjectCard } from './ProjectCard';
 import { SessionList } from '../session/SessionList';
-import { CreateProjectModal } from './CreateProjectModal';
-import { Button } from '@/components/atoms';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
 
-export const ProjectList: React.FC = () => {
+export interface ProjectListProps {
+  /** Search query to filter projects by name */
+  searchQuery?: string;
+}
+
+export const ProjectList: React.FC<ProjectListProps> = ({ searchQuery = '' }) => {
   const {
     projects,
     currentProjectId,
     isLoading,
     error,
     loadProjects,
-    createProject,
     deleteProject,
     selectProject,
   } = useProjects();
 
   const { loadSessions, clearSessions } = useSessions();
 
+  // Filter projects based on search query
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return projects;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return projects.filter((project) =>
+      project.name.toLowerCase().includes(query) ||
+      (project.description && project.description.toLowerCase().includes(query))
+    );
+  }, [projects, searchQuery]);
+
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     projectId: string;
     x: number;
@@ -89,13 +102,6 @@ export const ProjectList: React.FC = () => {
     }
   };
 
-  const handleCreateProject = async (data: { name: string; description?: string }) => {
-    const project = await createProject(data);
-    // Auto-expand and select the new project
-    setExpandedProjects((prev) => new Set(prev).add(project.id));
-    selectProject(project.id);
-  };
-
   // Close context menu on click outside
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -104,19 +110,7 @@ export const ProjectList: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header with New Project Button */}
-      <div className="px-2 py-2 border-b border-border-subtle">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setIsCreateModalOpen(true)}
-          className="w-full"
-        >
-          + New Project
-        </Button>
-      </div>
-
+    <div className="flex flex-col">
       {/* Loading State */}
       {isLoading && projects.length === 0 && (
         <div className="flex items-center justify-center p-8">
@@ -132,7 +126,7 @@ export const ProjectList: React.FC = () => {
       )}
 
       {/* Project List */}
-      <div className="flex-1 overflow-y-auto p-2 min-h-0">
+      <div className="px-2">
         {projects.length === 0 && !isLoading && (
           <div className="text-center py-8 text-text-tertiary">
             <p className="text-sm">No projects yet</p>
@@ -140,7 +134,14 @@ export const ProjectList: React.FC = () => {
           </div>
         )}
 
-        {projects.map((project) => (
+        {/* No search results */}
+        {projects.length > 0 && filteredProjects.length === 0 && searchQuery && (
+          <div className="text-center py-4 text-text-tertiary">
+            <p className="text-xs">該当するプロジェクトがありません</p>
+          </div>
+        )}
+
+        {filteredProjects.map((project) => (
           <div key={project.id} className="mb-1">
             <ProjectCard
               project={project}
@@ -175,12 +176,6 @@ export const ProjectList: React.FC = () => {
         </div>
       )}
 
-      {/* Create Project Modal */}
-      <CreateProjectModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSubmit={handleCreateProject}
-      />
     </div>
   );
 };

@@ -50,7 +50,7 @@ export const WelcomePanel: React.FC = () => {
     setIsCreateProjectModalOpen(false);
   };
 
-  const handleCreateSession = async (data: { title?: string }) => {
+  const handleCreateSession = async (data: { name?: string }) => {
     if (!currentProjectId) return;
     const session = await createSession(currentProjectId, data);
     selectSession(session.id);
@@ -194,7 +194,7 @@ export const WelcomePanel: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-text-primary truncate">
-                          {session.title || `Session ${session.id.slice(0, 8)}`}
+                          {session.name || `Session ${session.id.slice(0, 8)}`}
                         </h3>
                         <p className="text-xs text-text-tertiary">
                           Created {new Date(session.created_at).toLocaleDateString()}

@@ -4,6 +4,7 @@ import React from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/atoms';
 import { ThemeSelector } from '@/components/common/ThemeSelector';
 
@@ -11,9 +12,14 @@ export const Header: React.FC = () => {
   const { toggleSidebar, isSidebarOpen } = useUIStore();
   const { getCurrentProject, setCurrentProject } = useProjectStore();
   const { currentSessionId, setCurrentSession, sessions } = useSessionStore();
+  const { user, logout, isLoading: isAuthLoading } = useAuthStore();
 
   const currentProject = getCurrentProject();
   const currentSession = sessions.find(s => s.id === currentSessionId);
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   const handleBackToProjects = () => {
     setCurrentSession(null);
@@ -35,7 +41,9 @@ export const Header: React.FC = () => {
           aria-label={isSidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'}
           aria-expanded={isSidebarOpen}
         >
-          Menu
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
         </Button>
 
         {/* Logo and title */}
@@ -64,7 +72,7 @@ export const Header: React.FC = () => {
                   onClick={handleBackToSessions}
                   className="text-text-secondary hover:text-text-primary transition-colors duration-fast"
                 >
-                  {currentSession.title || 'Session'}
+                  {currentSession.name || 'Session'}
                 </button>
               </>
             )}
@@ -72,7 +80,7 @@ export const Header: React.FC = () => {
         )}
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         {/* Home button - text-based, no icon per Pattern 09 v2 */}
         {(currentProject || currentSessionId) && (
           <Button
@@ -81,10 +89,28 @@ export const Header: React.FC = () => {
             onClick={handleBackToProjects}
             title="プロジェクトに戻る"
           >
-            Home
+            ホーム
           </Button>
         )}
         <ThemeSelector />
+
+        {/* User info and logout */}
+        {user && (
+          <div className="flex items-center gap-2 ml-2 pl-2 border-l border-border-subtle">
+            <span className="text-sm text-text-secondary hidden sm:inline">
+              {user.display_name || user.email}
+            </span>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleLogout}
+              disabled={isAuthLoading}
+              title="ログアウト"
+            >
+              {isAuthLoading ? 'ログアウト中...' : 'ログアウト'}
+            </Button>
+          </div>
+        )}
       </div>
     </header>
   );

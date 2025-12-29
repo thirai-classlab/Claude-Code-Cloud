@@ -26,11 +26,8 @@ export interface SessionsResponse {
 }
 
 export interface CreateSessionRequest {
-  title?: string;
-  options?: {
-    model?: string;
-    max_turns?: number;
-  };
+  name?: string;
+  model?: string;
 }
 
 export const projectsApi = {

@@ -4,8 +4,12 @@
  */
 'use client';
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { ProjectList } from '@/components/project/ProjectList';
+import { SearchInput } from '@/components/molecules/SearchInput';
+import { Button } from '@/components/atoms';
+import { CreateProjectModal } from '@/components/project/CreateProjectModal';
+import { useProjects } from '@/hooks/useProjects';
 
 /**
  * NavDivider - Subtle horizontal divider for sidebar sections
@@ -27,26 +31,26 @@ const NavLabel: React.FC<NavLabelProps> = ({ children }) => (
   </div>
 );
 
-/**
- * SidebarHeader - Logo and brand area
- */
-const SidebarHeader: React.FC = () => (
-  <div className="px-4 py-4 flex items-center gap-2 border-b border-border-subtle">
-    <div
-      className="w-5 h-5 rounded-[5px]"
-      style={{ background: 'linear-gradient(135deg, var(--accent), #8b5cf6)' }}
-      aria-hidden="true"
-    />
-    <span className="font-semibold text-base text-text-primary">Claude Code</span>
-  </div>
-);
-
 export interface SidebarProps {
   /** Optional className for custom styling */
   className?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { createProject, selectProject } = useProjects();
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const handleCreateProject = useCallback(async (data: { name: string; description?: string }) => {
+    const project = await createProject(data);
+    selectProject(project.id);
+    setIsCreateModalOpen(false);
+  }, [createProject, selectProject]);
+
   return (
     <div
       className={`
@@ -56,18 +60,41 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       role="navigation"
       aria-label="Projects and Sessions"
     >
-      {/* Header with logo */}
-      <SidebarHeader />
+      {/* Fixed header area - does not scroll */}
+      <div className="flex-shrink-0 px-2 pt-2 pb-2 space-y-2">
+        {/* Projects section label */}
+        <NavLabel>プロジェクト</NavLabel>
 
-      {/* Main navigation content */}
-      <div className="flex-1 overflow-y-auto p-2">
-        {/* Projects section */}
-        <NavLabel>Projects</NavLabel>
-        <ProjectList />
+        {/* New project button */}
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setIsCreateModalOpen(true)}
+          className="w-full"
+        >
+          + 新規プロジェクト
+        </Button>
 
-        {/* Divider before settings (optional future section) */}
-        <NavDivider />
+        {/* Search input */}
+        <SearchInput
+          value={searchQuery}
+          onChange={handleSearchChange}
+          placeholder="プロジェクトを検索..."
+          size="sm"
+        />
       </div>
+
+      {/* Project list with scroll */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <ProjectList searchQuery={searchQuery} />
+      </div>
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateProject}
+      />
     </div>
   );
 };

@@ -9,6 +9,35 @@ export interface ApiError {
   data?: any;
 }
 
+// Helper to get auth token from localStorage (Zustand persist)
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.accessToken || null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+// Helper to clear auth state and redirect to login
+function handleUnauthorized() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('auth-storage');
+  } catch {
+    // Ignore storage errors
+  }
+  // Redirect to login page
+  if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+    window.location.href = '/login';
+  }
+}
+
 export class ApiClient {
   private baseUrl: string;
 
@@ -26,6 +55,12 @@ export class ApiClient {
       'Content-Type': 'application/json',
     };
 
+    // Add Authorization header if token exists
+    const token = getAuthToken();
+    if (token) {
+      (defaultHeaders as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+
     const config: RequestInit = {
       ...options,
       headers: {
@@ -38,6 +73,11 @@ export class ApiClient {
       const response = await fetch(url, config);
 
       if (!response.ok) {
+        // Handle 401 Unauthorized - redirect to login
+        if (response.status === 401) {
+          handleUnauthorized();
+        }
+
         const errorData = await response.json().catch(() => ({}));
         // Handle FastAPI validation errors (422)
         let message: string;

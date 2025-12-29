@@ -224,6 +224,173 @@ cp .env.example .env
 | API Docs | http://localhost:8000/docs | Swagger UI |
 | code-server | http://localhost:8080 | VSCode Web |
 
+### コンテナリビルドルール（必須）
+
+**変更があったコンテナのみをリビルドすること。全体リビルドは禁止。**
+
+```bash
+# フロントエンドのみ変更した場合
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml build frontend
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml up -d frontend
+
+# バックエンドのみ変更した場合
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml build backend
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml up -d backend
+
+# 両方変更した場合
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml build frontend backend
+docker-compose -f docker-compose.yml -f docker-compose.dind.yml up -d frontend backend
+```
+
+| オプション | 使用タイミング |
+|-----------|---------------|
+| `build <service>` | 通常のリビルド（キャッシュ使用） |
+| `build --no-cache <service>` | Dockerfile変更時、依存関係更新時のみ |
+| `up -d <service>` | 該当サービスのみ再起動 |
+
+**注意事項:**
+- `docker-compose build` (サービス指定なし) は使用禁止
+- `--no-cache` は必要な場合のみ使用（ビルド時間短縮のため）
+- MySQL, DinD, code-server は通常リビルド不要
+
+---
+
+## プロジェクト設定管理（DB Config Management）
+
+プロジェクトごとにMCP Server、Agent、Skill、Commandをデータベースで管理し、Claude Agent SDKに渡します。
+
+### データモデル
+
+```mermaid
+erDiagram
+    ProjectModel ||--o{ ProjectMCPServerModel : has
+    ProjectModel ||--o{ ProjectAgentModel : has
+    ProjectModel ||--o{ ProjectSkillModel : has
+    ProjectModel ||--o{ ProjectCommandModel : has
+
+    ProjectMCPServerModel {
+        string id PK
+        string project_id FK
+        string name
+        string command
+        json args
+        json env
+        bool enabled
+    }
+
+    ProjectAgentModel {
+        string id PK
+        string project_id FK
+        string name
+        string description
+        string category
+        string model
+        json tools
+        text system_prompt
+        bool enabled
+    }
+
+    ProjectSkillModel {
+        string id PK
+        string project_id FK
+        string name
+        string description
+        string category
+        text content
+        bool enabled
+    }
+
+    ProjectCommandModel {
+        string id PK
+        string project_id FK
+        string name
+        string description
+        string category
+        text content
+        bool enabled
+    }
+```
+
+### API エンドポイント
+
+| エンドポイント | メソッド | 説明 |
+|---------------|---------|------|
+| `/api/projects/{id}/mcp-servers` | GET/POST | MCPサーバー一覧/作成 |
+| `/api/projects/{id}/mcp-servers/{mcp_id}` | GET/PUT/DELETE | MCPサーバー詳細/更新/削除 |
+| `/api/projects/{id}/agents` | GET/POST | エージェント一覧/作成 |
+| `/api/projects/{id}/agents/{agent_id}` | GET/PUT/DELETE | エージェント詳細/更新/削除 |
+| `/api/projects/{id}/skills` | GET/POST | スキル一覧/作成 |
+| `/api/projects/{id}/skills/{skill_id}` | GET/PUT/DELETE | スキル詳細/更新/削除 |
+| `/api/projects/{id}/commands` | GET/POST | コマンド一覧/作成 |
+| `/api/projects/{id}/commands/{command_id}` | GET/PUT/DELETE | コマンド詳細/更新/削除 |
+| `/api/projects/{id}/config` | GET | 有効な設定をJSON形式で取得 |
+
+### SDK統合フロー
+
+```mermaid
+sequenceDiagram
+    participant UI as Frontend
+    participant API as Backend API
+    participant DB as Database
+    participant FS as Filesystem
+    participant SDK as Claude Agent SDK
+
+    Note over UI,API: CRUD操作時
+    UI->>API: POST/PUT/DELETE Skill/Command
+    API->>DB: DB更新
+    API->>FS: .claude/skills/ または .claude/commands/ に同期
+    API-->>UI: 成功レスポンス
+
+    Note over UI,SDK: チャット開始時
+    UI->>API: WebSocket接続 + チャット開始
+    API->>DB: 有効な設定を取得
+    API->>SDK: ClaudeAgentOptions に設定
+    Note over SDK: mcp_servers: McpStdioServerConfig
+    Note over SDK: agents: AgentDefinition
+    Note over SDK: setting_sources: ["project"]
+    SDK-->>API: Agent実行
+```
+
+### 設定の渡し方
+
+| 設定タイプ | SDK パラメータ | 形式 |
+|-----------|---------------|------|
+| MCP Servers | `mcp_servers` | `Dict[str, McpStdioServerConfig]` |
+| Agents | `agents` | `Dict[str, AgentDefinition]` |
+| Skills | ファイルシステム | `.claude/skills/[name]/SKILL.md` |
+| Commands | ファイルシステム | `.claude/commands/[name].md` |
+
+### Skills/Commands ファイル形式
+
+**Skill ファイル** (`.claude/skills/[name]/SKILL.md`):
+```markdown
+---
+description: スキルの説明
+category: カテゴリ名
+---
+
+スキルの内容（プロンプト）
+```
+
+**Command ファイル** (`.claude/commands/[name].md`):
+```markdown
+---
+description: コマンドの説明
+---
+
+コマンドの内容（プロンプト）
+```
+
+### 関連ファイル
+
+| ファイル | 説明 |
+|---------|------|
+| `models/database.py` | DBモデル定義 |
+| `schemas/project_config.py` | Pydanticスキーマ |
+| `services/project_config_service.py` | CRUDサービス + ファイル同期 |
+| `api/routes/project_config.py` | APIエンドポイント |
+| `api/websocket/handlers.py` | SDK設定構築 |
+
 ---
 
 ## SubAgent（サブエージェント）

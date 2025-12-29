@@ -10,7 +10,7 @@ import { Button } from '@/components/common/Button';
 export interface CreateSessionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { title?: string }) => Promise<void>;
+  onSubmit: (data: { name?: string }) => Promise<void>;
 }
 
 export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
@@ -29,7 +29,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     setIsSubmitting(true);
     try {
       await onSubmit({
-        title: title.trim() || undefined,
+        name: title.trim() || undefined,
       });
       // Reset form
       setTitle('');
