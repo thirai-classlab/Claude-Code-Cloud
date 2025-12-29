@@ -1,19 +1,12 @@
 # DinD実装概要
 
+> 作成日: 2025-12-20
+> 最終更新: 2025-12-29
+> バージョン: 1.1
+
 Backend (Agent SDK) とcode-serverで共有実行環境を実現するDinD実装の概要です。
 
 ## 実装内容
-
-```mermaid
-flowchart TB
-    subgraph 実装ファイル
-        A[docker-compose.dind.yml] --> A1[DinD設定更新]
-        B[Dockerfile Backend] --> B1[Docker CLI追加]
-        C[dind_executor.py] --> C1[実行ユーティリティ]
-        D[.env.example] --> D1[環境変数定義]
-        E[ドキュメント] --> E1[使用ガイド/セットアップ]
-    end
-```
 
 ### 変更ファイル一覧
 
@@ -137,16 +130,6 @@ flowchart LR
 
 ### 3. 環境変数
 
-```mermaid
-classDiagram
-    class DinD環境変数 {
-        DIND_ENABLED: DinD機能の有効化
-        DOCKER_HOST: Dockerデーモンエンドポイント
-        DIND_WORKSPACE_PATH: DinD内ワークスペースパス
-        DOCKER_BUILDKIT: BuildKit有効化
-    }
-```
-
 | 変数名 | デフォルト値 | 説明 |
 |--------|------------|------|
 | `DIND_ENABLED` | `false` | DinD機能の有効/無効 |
@@ -156,23 +139,16 @@ classDiagram
 
 ## ワークスペースマッピング
 
-```mermaid
-flowchart LR
-    Host[Host<br/>./workspace] --> Vol[Volume<br/>claude-workspace]
-    Vol --> Backend[Backend<br/>/app/workspace]
-    Vol --> CodeServer[code-server<br/>/home/coder/workspace]
-    Vol --> DinD[DinD<br/>/workspaces]
-    DinD --> Exec[実行コンテナ<br/>/workspaces]
-```
-
 全てのサービスが同じボリューム (`claude-workspace`) を経由してワークスペースを共有:
 
-1. **Host**: `./workspace` - ホストのディレクトリ
-2. **Volume**: `claude-workspace` - Docker volume
-3. **Backend**: `/app/workspace` - Backend内のマウントポイント
-4. **code-server**: `/home/coder/workspace` - code-server内のマウントポイント
-5. **DinD**: `/workspaces` - DinD内のマウントポイント
-6. **実行コンテナ**: `/workspaces` - DinDから起動されるコンテナ内のマウントポイント
+| レイヤー | パス | 説明 |
+|---------|------|------|
+| Host | `./workspace` | ホストのディレクトリ |
+| Volume | `claude-workspace` | Docker volume |
+| Backend | `/app/workspace` | Backend内のマウントポイント |
+| code-server | `/home/coder/workspace` | code-server内のマウントポイント |
+| DinD | `/workspaces` | DinD内のマウントポイント |
+| 実行コンテナ | `/workspaces` | DinDから起動されるコンテナ内のマウントポイント |
 
 ## 実行フロー
 
@@ -229,38 +205,15 @@ stateDiagram-v2
 
 ## セキュリティ考慮事項
 
-```mermaid
-flowchart TD
-    subgraph セキュリティ対策
-        A[ネットワーク分離] --> A1[内部ネットワークのみ]
-        B[コンテナ分離] --> B1[実行ごとに独立]
-        C[リソース制限] --> C1[CPU/メモリ制限]
-        D[タイムアウト] --> D1[実行時間制限]
-        E[権限分離] --> E1[DinDのみPrivileged]
-    end
-```
-
 ### 実装されたセキュリティ機能
 
-1. **ネットワーク分離**
-   - DinDは内部ネットワーク (`claude-network`) のみ
-   - ポート2375は外部非公開
-
-2. **コンテナ分離**
-   - 各実行は独立した一時コンテナ
-   - `--rm` フラグで自動削除
-
-3. **リソース制限**
-   - DinDコンテナにCPU/メモリ制限
-   - 実行タイムアウトの強制
-
-4. **権限分離**
-   - DinDコンテナのみがprivileged mode
-   - 実行コンテナは非特権
-
-5. **TLS設定**
-   - 内部通信のみのためTLS無効
-   - 外部アクセスは不可
+| 対策 | 実装 | 効果 |
+|------|------|------|
+| ネットワーク分離 | DinDは内部ネットワーク (`claude-network`) のみ | 外部攻撃防止 |
+| コンテナ分離 | 各実行は独立した一時コンテナ (`--rm`) | 相互影響排除 |
+| リソース制限 | DinDコンテナにCPU/メモリ制限 | リソース枯渇防止 |
+| 権限分離 | DinDコンテナのみがprivileged mode | 権限最小化 |
+| TLS設定 | 内部通信のみのためTLS無効 | パフォーマンス最適化 |
 
 ## 使用例
 
@@ -319,15 +272,14 @@ CMD ["python", "app.py"]
 
 ## パフォーマンス最適化
 
-```mermaid
-flowchart LR
-    subgraph 最適化ポイント
-        A[イメージキャッシュ] --> A1[よく使うイメージを事前Pull]
-        B[BuildKit] --> B1[ビルド高速化]
-        C[リソース配分] --> C1[DinDに十分なリソース]
-        D[ストレージ] --> D1[overlay2使用]
-    end
-```
+**最適化ポイント:**
+
+| 項目 | 対策 | 効果 |
+|------|------|------|
+| イメージキャッシュ | よく使うイメージを事前Pull | 起動時間短縮 |
+| BuildKit | DOCKER_BUILDKIT=1 | ビルド高速化 |
+| リソース配分 | DinDに十分なリソース | 処理速度向上 |
+| ストレージ | overlay2使用 | I/O性能向上 |
 
 ### 推奨設定
 
@@ -354,16 +306,13 @@ flowchart LR
 
 ## トラブルシューティング
 
-```mermaid
-flowchart TD
-    A[問題発生] --> B{症状は?}
-    B -->|接続できない| C[DinD状態確認]
-    B -->|遅い| D[リソース確認]
-    B -->|ワークスペース見えない| E[マウント確認]
-    C --> F[ログ確認]
-    D --> G[リソース制限調整]
-    E --> H[ボリューム確認]
-```
+**問題別対処法:**
+
+| 症状 | 確認事項 | 解決方法 |
+|------|---------|---------|
+| 接続できない | DinD状態確認 | ログ確認・再起動 |
+| 遅い | リソース確認 | リソース制限調整 |
+| ワークスペース見えない | マウント確認 | ボリューム確認 |
 
 ### よくある問題と解決方法
 
@@ -387,33 +336,51 @@ flowchart TD
 
 ## 次のステップ
 
-```mermaid
-flowchart LR
-    A[実装完了] --> B[セットアップ]
-    B --> C[動作確認]
-    C --> D[API統合]
-    D --> E[本番運用]
-```
-
-1. **セットアップ**: [DinD Setup Guide](./dind-setup-guide.md)
-2. **使用方法**: [DinD Executor Usage](./dind-executor-usage.md)
-3. **API統合**: Backend APIへの統合
-4. **本番運用**: モニタリングとメンテナンス
+| ステップ | 作業 | 参照 |
+|---------|------|------|
+| 1 | セットアップ | [DinD Setup Guide](./dind-setup-guide.md) |
+| 2 | 使用方法確認 | [DinD Executor Usage](./dind-executor-usage.md) |
+| 3 | API統合 | Backend APIへの統合 |
+| 4 | 本番運用 | モニタリングとメンテナンス |
 
 ## まとめ
 
-実装により以下を実現:
+**実装成果:**
 
-- Backend (Agent SDK) がDinD経由で安全にコードを実行可能
-- code-serverのターミナルから同じDocker環境にアクセス可能
-- 統一されたワークスペースで両者がファイルを共有
-- セキュアで分離された実行環境
-- シンプルで拡張性の高い設計
+| 機能 | 説明 | 状態 |
+|------|------|:----:|
+| 安全なコード実行 | Backend (Agent SDK) がDinD経由で実行 | ✅ |
+| Docker環境共有 | code-serverから同じDocker環境にアクセス | ✅ |
+| 統一ワークスペース | 両者がファイルを共有 | ✅ |
+| セキュア分離 | 分離された実行環境 | ✅ |
+| 拡張性 | シンプルで拡張性の高い設計 | ✅ |
 
-```mermaid
-pie title 実装の成果
-    "自動化" : 30
-    "セキュリティ" : 25
-    "柔軟性" : 25
-    "保守性" : 20
-```
+---
+
+## 関連ドキュメント
+
+| ドキュメント | 説明 |
+|-------------|------|
+| [DinDセットアップガイド](./dind-setup-guide.md) | 環境構築手順 |
+| [DinD Executor使用ガイド](./dind-executor-usage.md) | Executorの使い方 |
+| [Docker設計書](./docker-design.md) | インフラ全体設計 |
+
+---
+
+## 変更履歴
+
+| バージョン | 日付 | 変更内容 |
+|-----------|------|----------|
+| v1.0 | 2025-12-20 | 初版作成 |
+| v1.1 | 2025-12-29 | テーブル形式に統一 |
+
+---
+
+**ドキュメント管理情報**
+
+| 項目 | 値 |
+|------|-----|
+| バージョン | 1.1 |
+| 最終更新 | 2025-12-29 |
+| 作成者 | Claude Code |
+| レビューステータス | ✅ 完了 |

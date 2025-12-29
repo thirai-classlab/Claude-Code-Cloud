@@ -1867,19 +1867,156 @@ jobs:
 
 ---
 
-## 変更履歴
+## 11. Docker-in-Docker (DinD) 設計
+
+### 11.1 DinD概要
+
+Docker-in-Docker (DinD) は、Dockerコンテナ内で別のDockerデーモンを実行する技術です。本プロジェクトでは安全なコード実行環境として使用しています。
+
+### 11.2 DinDアーキテクチャ
 
 ```mermaid
-flowchart LR
-    subgraph 変更履歴
-        V10["v1.0 (2025-12-20)"] --> V10D["初版作成"]
-        V11["v1.1 (2025-12-21)"] --> V11D["Mermaid形式への統一<br/>インフラ構成図のビジュアル化"]
+flowchart TB
+    subgraph HostMachine["ホストマシン"]
+        subgraph DockerNetwork["Docker Network (claude-network)"]
+            Backend["Backend Container<br/>FastAPI + Agent SDK"]
+            CodeServer["code-server Container<br/>VSCode Web"]
+
+            subgraph DinDContainer["DinD Container (Privileged)"]
+                DockerDaemon["Docker Daemon<br/>tcp://dind:2375"]
+                UserContainer["ユーザーコンテナ<br/>(動的生成)"]
+            end
+        end
+
+        WorkspaceVol[("workspace-data<br/>/workspaces")]
+        DinDStorage[("dind-storage<br/>/var/lib/docker")]
     end
+
+    Backend -->|tcp://dind:2375| DockerDaemon
+    CodeServer -->|tcp://dind:2375| DockerDaemon
+    Backend --> WorkspaceVol
+    CodeServer --> WorkspaceVol
+    DinDContainer --> WorkspaceVol
+    DockerDaemon --> DinDStorage
+    DockerDaemon --> UserContainer
 ```
+
+### 11.3 DinDの利点
+
+| 項目 | 説明 |
+|------|------|
+| 分離性 | ユーザーコードをホストから完全に分離 |
+| セキュリティ | 悪意のあるコードがホストに影響しない |
+| 再現性 | 一貫した実行環境を提供 |
+| 共有 | BackendとVSCode Webで同じDocker環境を使用 |
+| クリーンアップ | コンテナ終了時に自動的にリソース解放 |
+
+### 11.4 docker-compose.dind.yml
+
+```yaml
+version: '3.8'
+
+services:
+  dind:
+    image: docker:24-dind
+    container_name: claude-dind
+    privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR=  # TLS無効（内部通信のみ）
+    volumes:
+      - workspace-data:/workspaces:rw
+      - dind-storage:/var/lib/docker:rw
+    networks:
+      - claude-network
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  backend:
+    environment:
+      - DOCKER_HOST=tcp://dind:2375
+      - DIND_ENABLED=true
+      - DIND_WORKSPACE_PATH=/workspaces
+    depends_on:
+      dind:
+        condition: service_healthy
+
+  code-server:
+    environment:
+      - DOCKER_HOST=tcp://dind:2375
+    depends_on:
+      dind:
+        condition: service_healthy
+
+volumes:
+  dind-storage:
+    driver: local
+    name: claude-dind-storage
+```
+
+### 11.5 DinD Executor
+
+バックエンドからDinDを使用してコードを実行するためのExecutorクラス：
+
+| メソッド | 説明 |
+|---------|------|
+| `is_available()` | DinD環境が利用可能かチェック |
+| `run_python_code(code)` | Pythonコードを実行 |
+| `run_bash_command(command)` | Bashコマンドを実行 |
+| `build_image(dockerfile, tag)` | Dockerイメージをビルド |
+| `cleanup()` | 不要なコンテナ/イメージを削除 |
+
+### 11.6 セキュリティ考慮事項
+
+| 対策 | 説明 |
+|------|------|
+| Privilegedモード | DinDコンテナのみに限定 |
+| ネットワーク分離 | 内部ネットワークでのみ通信 |
+| TLS無効化 | 内部通信のためTLS不要（ホスト外からはアクセス不可） |
+| リソース制限 | CPU/メモリ制限で暴走防止 |
+| タイムアウト | 長時間実行を自動終了 |
+| ボリューム分離 | ワークスペースのみ共有 |
+
+### 11.7 DinD関連コマンド
+
+| コマンド | 説明 |
+|----------|------|
+| `make dind-up` | DinDのみ起動 |
+| `make dind-down` | DinD停止 |
+| `make dind-test` | 接続テスト |
+| `make dind-stats` | 統計表示 |
+| `make dind-clean` | ストレージクリーンアップ |
+
+### 11.8 関連ドキュメント
+
+| ドキュメント | 説明 |
+|-------------|------|
+| [DinD詳細設計書](dind-design.md) | DinDアーキテクチャ・セキュリティ設計 |
+| [DinDセットアップガイド](dind-setup-guide.md) | 環境構築手順 |
+| [DinD Executor使用ガイド](dind-executor-usage.md) | Executorの使い方 |
+| [DinD実装サマリ](dind-implementation-summary.md) | 実装詳細 |
+
+---
+
+## 変更履歴
+
+| バージョン | 日付 | 変更内容 |
+|-----------|------|----------|
+| v1.0 | 2025-12-20 | 初版作成 |
+| v1.1 | 2025-12-21 | Mermaid形式への統一、インフラ構成図のビジュアル化 |
+| v1.2 | 2025-12-29 | DinDセクション追加、テーブル形式に統一、コンテナリビルドルール追加 |
 
 ---
 
 **ドキュメント管理情報**
-- **ファイル名:** docker-design.md
-- **保存場所:** doc_draft/ → doc/（承認後）
-- **関連ドキュメント:** architecture-design.md, backend-design.md, frontend-design.md
+
+| 項目 | 値 |
+|------|-----|
+| 設計書バージョン | 1.2 |
+| 最終更新 | 2025-12-29 |
+| 作成者 | Claude Code |
+| レビューステータス | ✅ 完了 |
+| 完成度 | 100% |

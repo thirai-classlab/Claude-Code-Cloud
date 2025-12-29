@@ -635,6 +635,7 @@ graph TB
 | フロントエンド設計 | doc/frontend-design.md | UI設計 |
 | データベース設計書 | doc/database-design.md | ER図、テーブル定義、インデックス |
 | Docker設計書 | doc/docker-design.md | コンテナ構成 |
+| DinD詳細設計書 | doc/dind-design.md | DinDアーキテクチャ・セキュリティ |
 | DinDセットアップ | doc/dind-setup-guide.md | DinD環境構築 |
 | DinD Executor使用ガイド | doc/dind-executor-usage.md | DinDでのコード実行 |
 | ユーザーガイド | doc/user-guide.md | 利用方法 |

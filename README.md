@@ -294,6 +294,7 @@ MIT License
 
 | ドキュメント | 説明 | 状態 |
 |-------------|------|------|
+| [DinD詳細設計書](doc/dind-design.md) | DinDアーキテクチャ・セキュリティ設計 | ✅ 完了 |
 | [DinD セットアップガイド](doc/dind-setup-guide.md) | DinD環境構築手順 | ✅ 完了 |
 | [DinD Executor使用ガイド](doc/dind-executor-usage.md) | コード実行環境の使い方 | ✅ 完了 |
 | [DinD 実装概要](doc/dind-implementation-summary.md) | DinD実装詳細、変更履歴 | ✅ 完了 |

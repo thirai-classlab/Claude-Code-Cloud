@@ -1,10 +1,23 @@
 # DinD Executor - 使用ガイド
 
+> 作成日: 2025-12-20
+> 最終更新: 2025-12-29
+> バージョン: 1.1
+
 Docker-in-Docker (DinD) を使用した分離実行環境のガイドです。
 
 ## 概要
 
 DinD Executorは、Backend (Agent SDK) とcode-serverで共有のDocker実行環境を提供します。
+
+**機能一覧:**
+
+| 機能 | 説明 | 使用例 |
+|------|------|--------|
+| Python実行 | Pythonコードの分離実行 | `run_python_code()` |
+| Shell実行 | シェルスクリプト実行 | `run_shell_script()` |
+| 汎用コマンド | 任意のDockerイメージで実行 | `run_command()` |
+| ビルド実行 | Dockerfileからビルド | `build_and_run()` |
 
 ```mermaid
 flowchart TB
@@ -199,42 +212,25 @@ result = executor.build_and_run(
 
 ## ワークスペースの共有
 
-```mermaid
-classDiagram
-    class ワークスペースマッピング {
-        Host: ./workspace
-        Backend: /app/workspace
-        code-server: /home/coder/workspace
-        DinD: /workspaces
-        実行コンテナ: /workspaces
-    }
-```
-
 全てのサービスが同じボリューム (`claude-workspace`) を共有:
 
-- **Host**: `./workspace`
-- **Backend**: `/app/workspace`
-- **code-server**: `/home/coder/workspace`
-- **DinD**: `/workspaces`
-- **実行コンテナ**: `/workspaces` (DinDからマウント)
+| サービス | マウントポイント | 備考 |
+|---------|-----------------|------|
+| Host | `./workspace` | ホストディレクトリ |
+| Backend | `/app/workspace` | APIからアクセス |
+| code-server | `/home/coder/workspace` | VSCode Webからアクセス |
+| DinD | `/workspaces` | Docker Daemon内 |
+| 実行コンテナ | `/workspaces` | DinDからマウント |
 
 ## セキュリティ考慮事項
 
-```mermaid
-flowchart LR
-    subgraph セキュリティ対策
-        A[分離実行] --> A1[コンテナ分離]
-        B[リソース制限] --> B1[CPU/メモリ制限]
-        C[タイムアウト] --> C1[実行時間制限]
-        D[ネットワーク] --> D1[内部ネットワークのみ]
-    end
-```
-
-- **分離実行**: 各実行は独立したコンテナで実行され、相互に影響しない
-- **リソース制限**: DinDコンテナにCPU/メモリ制限を設定
-- **タイムアウト**: 全ての実行にタイムアウトを設定
-- **ネットワーク分離**: DinDは内部ネットワークのみアクセス可能
-- **TLS無効化**: 内部ネットワークのためTLSは無効（外部公開しないこと）
+| 対策 | 実装 | 効果 |
+|------|------|------|
+| 分離実行 | 各実行は独立したコンテナ | 相互影響なし |
+| リソース制限 | CPU/メモリ制限設定 | リソース枯渇防止 |
+| タイムアウト | 全実行に時間制限 | 無限ループ防止 |
+| ネットワーク分離 | 内部ネットワークのみ | 外部攻撃防止 |
+| TLS無効化 | 内部通信専用 | パフォーマンス最適化 |
 
 ## トラブルシューティング
 
@@ -263,13 +259,14 @@ docker exec claude-dind ls -la /workspaces
 
 ### パフォーマンスが遅い
 
-```mermaid
-pie title リソース配分
-    "DinD" : 40
-    "Backend" : 30
-    "code-server" : 20
-    "その他" : 10
-```
+**推奨リソース配分:**
+
+| サービス | CPU配分 | メモリ配分 |
+|---------|---------|-----------|
+| DinD | 40% | 40% |
+| Backend | 30% | 30% |
+| code-server | 20% | 20% |
+| その他 | 10% | 10% |
 
 DinDのリソース制限を調整:
 
@@ -287,20 +284,12 @@ deploy:
 
 ## ベストプラクティス
 
-```mermaid
-flowchart TD
-    subgraph 推奨事項
-        A[1. タイムアウト設定] --> A1[必ず設定する]
-        B[2. エラーハンドリング] --> B1[戻り値を確認]
-        C[3. リソース管理] --> C1[不要なイメージを削除]
-        D[4. ログ記録] --> D1[実行履歴を保存]
-    end
-```
-
-1. **タイムアウト設定**: 必ず適切なタイムアウトを設定
-2. **エラーハンドリング**: `returncode`を確認して適切に処理
-3. **リソース管理**: 定期的に不要なイメージ・コンテナを削除
-4. **ログ記録**: 実行履歴を保存して問題追跡を容易に
+| 項目 | 推奨事項 | 理由 |
+|------|---------|------|
+| タイムアウト設定 | 必ず適切な値を設定 | 無限ループ防止 |
+| エラーハンドリング | `returncode`を確認 | 失敗検知 |
+| リソース管理 | 不要なイメージ・コンテナを削除 | ディスク節約 |
+| ログ記録 | 実行履歴を保存 | 問題追跡容易化 |
 
 ## 実装例
 
@@ -356,19 +345,41 @@ async def execute_code(request: CodeExecuteRequest):
 
 DinD Executorにより、Agent SDKとcode-serverで共有の安全な実行環境を実現しました。
 
-```mermaid
-flowchart LR
-    subgraph 実現された機能
-        A[分離実行] --> Success
-        B[ワークスペース共有] --> Success
-        C[統一環境] --> Success
-        D[セキュリティ] --> Success
-        Success[完了]
-    end
-```
+**実現された機能:**
 
-この設定により:
-- Backend (Agent SDK) がDinD内でコードを安全に実行可能
-- code-serverのターミナルから同じDocker環境にアクセス可能
-- 両者が同じワークスペースを共有
-- 分離された安全な実行環境を提供
+| 機能 | 説明 | 状態 |
+|------|------|:----:|
+| 分離実行 | 各コードは独立したコンテナで実行 | ✅ |
+| ワークスペース共有 | 全サービスが同一ボリュームを共有 | ✅ |
+| 統一環境 | BackendとVSCode Webで同一Docker | ✅ |
+| セキュリティ | リソース制限・タイムアウト・分離 | ✅ |
+
+---
+
+## 関連ドキュメント
+
+| ドキュメント | 説明 |
+|-------------|------|
+| [DinDセットアップガイド](./dind-setup-guide.md) | 環境構築手順 |
+| [DinD実装サマリ](./dind-implementation-summary.md) | 実装詳細 |
+| [Docker設計書](./docker-design.md) | インフラ全体設計 |
+
+---
+
+## 変更履歴
+
+| バージョン | 日付 | 変更内容 |
+|-----------|------|----------|
+| v1.0 | 2025-12-20 | 初版作成 |
+| v1.1 | 2025-12-29 | テーブル形式に統一 |
+
+---
+
+**ドキュメント管理情報**
+
+| 項目 | 値 |
+|------|-----|
+| バージョン | 1.1 |
+| 最終更新 | 2025-12-29 |
+| 作成者 | Claude Code |
+| レビューステータス | ✅ 完了 |
