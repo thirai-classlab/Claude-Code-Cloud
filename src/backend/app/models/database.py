@@ -204,6 +204,7 @@ class ProjectMCPServerModel(Base):
     args = Column(JSON, default=list)  # List of arguments
     env = Column(JSON, default=dict)   # Environment variables
     enabled = Column(Boolean, default=True, nullable=False)
+    enabled_tools = Column(JSON, nullable=True)  # List[str] or None (null = all tools enabled)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 

@@ -1,39 +1,36 @@
 /**
  * Skills Settings Editor Component
- * Allows managing skill configurations per project
+ * Allows managing skill configurations per project using database-backed API
  */
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/common/Button';
-import { skillsApi } from '@/lib/api';
-import type {
-  SkillDefinition,
-  SkillsConfig,
-  SkillCategory,
-  CreateCustomSkillRequest,
-} from '@/types/skill';
+import { projectConfigApi } from '@/lib/api';
+import type { ProjectSkill, CreateProjectSkillRequest, UpdateProjectSkillRequest } from '@/types';
 
 interface SkillsSettingsEditorProps {
   projectId: string;
-  onFileCreated?: (relativePath: string) => void;
 }
+
+// Skill category type
+type SkillCategory = 'custom' | 'exploration' | 'development' | 'quality' | 'documentation' | 'devops' | 'data';
 
 // Category display configuration
 const CATEGORY_CONFIG: Record<SkillCategory, { label: string; icon: React.ReactNode }> = {
-  core: {
-    label: 'Core',
+  custom: {
+    label: 'Custom',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
       </svg>
     ),
   },
-  planning: {
-    label: 'Planning & Design',
+  exploration: {
+    label: 'Exploration',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
     ),
   },
@@ -45,11 +42,11 @@ const CATEGORY_CONFIG: Record<SkillCategory, { label: string; icon: React.ReactN
       </svg>
     ),
   },
-  analysis: {
-    label: 'Analysis & Research',
+  quality: {
+    label: 'Quality',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
@@ -61,87 +58,111 @@ const CATEGORY_CONFIG: Record<SkillCategory, { label: string; icon: React.ReactN
       </svg>
     ),
   },
-  git: {
-    label: 'Git & Version Control',
+  devops: {
+    label: 'DevOps',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
       </svg>
     ),
   },
-  session: {
-    label: 'Session Management',
+  data: {
+    label: 'Data',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  specialized: {
-    label: 'Specialized',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-  help: {
-    label: 'Help',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
       </svg>
     ),
   },
 };
 
 const CATEGORY_ORDER: SkillCategory[] = [
-  'core',
-  'planning',
+  'custom',
+  'exploration',
   'development',
-  'analysis',
+  'quality',
   'documentation',
-  'git',
-  'session',
-  'specialized',
-  'help',
+  'devops',
+  'data',
 ];
 
-export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ projectId, onFileCreated }) => {
-  const [availableSkills, setAvailableSkills] = useState<SkillDefinition[]>([]);
-  const [config, setConfig] = useState<SkillsConfig | null>(null);
-  const [configPath, setConfigPath] = useState<string>('');
+interface SkillFormData {
+  name: string;
+  description: string;
+  category: SkillCategory;
+  content: string;
+  enabled: boolean;
+}
+
+const emptySkillForm: SkillFormData = {
+  name: '',
+  description: '',
+  category: 'custom',
+  content: '',
+  enabled: true,
+};
+
+// Parse YAML frontmatter from markdown
+interface ParsedMarkdown {
+  meta: Record<string, unknown>;
+  content: string;
+}
+
+const parseMarkdownWithFrontmatter = (markdown: string): ParsedMarkdown | null => {
+  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
+  const match = markdown.match(frontmatterRegex);
+  if (!match) return null;
+
+  const frontmatter = match[1];
+  const content = match[2].trim();
+
+  // Simple YAML parser
+  const meta: Record<string, unknown> = {};
+  const lines = frontmatter.split('\n');
+
+  for (const line of lines) {
+    // Key: value
+    if (line.match(/^(\w+):\s*(.+)$/)) {
+      const matches = line.match(/^(\w+):\s*(.+)$/);
+      if (matches) {
+        const [, key, value] = matches;
+        meta[key] = value === 'true' ? true : value === 'false' ? false : value;
+      }
+    }
+  }
+
+  return { meta, content };
+};
+
+export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ projectId }) => {
+  const [skills, setSkills] = useState<ProjectSkill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<Set<SkillCategory>>(
-    new Set(CATEGORY_ORDER)
-  );
 
-  // Create skill modal state
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newSkillForm, setNewSkillForm] = useState<CreateCustomSkillRequest>({
-    name: '',
-    description: '',
-    category: 'development',
-  });
-  const [isCreating, setIsCreating] = useState(false);
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
+  const [skillForm, setSkillForm] = useState<SkillFormData>(emptySkillForm);
 
-  const loadData = useCallback(async () => {
+  // Delete confirmation state
+  const [deletingSkill, setDeletingSkill] = useState<ProjectSkill | null>(null);
+
+  // Import modal state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importMarkdownText, setImportMarkdownText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const loadSkills = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [skillsResponse, configResponse] = await Promise.all([
-        skillsApi.getAvailable(),
-        skillsApi.getConfig(projectId),
-      ]);
-      setAvailableSkills(skillsResponse);
-      setConfig(configResponse.config);
-      setConfigPath(configResponse.path);
+      const skillList = await projectConfigApi.listSkills(projectId);
+      setSkills(skillList);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load skill configuration';
+      const message = err instanceof Error ? err.message : 'Failed to load skills';
       setError(message);
     } finally {
       setIsLoading(false);
@@ -149,156 +170,190 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
   }, [projectId]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadSkills();
+  }, [loadSkills]);
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleToggleSkill = async (skillName: string, enabled: boolean) => {
-    if (!config) return;
-
-    // Optimistic update
-    const newConfig = { ...config };
-    if (newConfig.skills[skillName]) {
-      newConfig.skills[skillName] = { ...newConfig.skills[skillName], enabled };
-    }
-    setConfig(newConfig);
-
-    try {
-      setIsSaving(true);
-      await skillsApi.toggleSkill(projectId, skillName, enabled);
-      showSuccess(`${skillName} ${enabled ? 'enabled' : 'disabled'}`);
-    } catch (err: unknown) {
-      // Revert on error
-      loadData();
-      const message = err instanceof Error ? err.message : 'Failed to toggle skill';
-      setError(message);
-    } finally {
-      setIsSaving(false);
-    }
+  const handleOpenCreateModal = () => {
+    setEditingSkillId(null);
+    setSkillForm(emptySkillForm);
+    setIsModalOpen(true);
+    setError(null);
   };
 
-  const handleEnableAll = async () => {
-    if (!config) return;
-
-    try {
-      setIsSaving(true);
-      const newConfig: SkillsConfig = {
-        ...config,
-        skills: Object.fromEntries(
-          Object.entries(config.skills).map(([name, skill]) => [
-            name,
-            { ...skill, enabled: true },
-          ])
-        ),
-      };
-      await skillsApi.updateConfig(projectId, newConfig);
-      setConfig(newConfig);
-      showSuccess('All skills enabled');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to enable all skills';
-      setError(message);
-    } finally {
-      setIsSaving(false);
-    }
+  const handleOpenEditModal = (skill: ProjectSkill) => {
+    setEditingSkillId(skill.id);
+    setSkillForm({
+      name: skill.name,
+      description: skill.description || '',
+      category: (skill.category as SkillCategory) || 'custom',
+      content: skill.content || '',
+      enabled: skill.enabled,
+    });
+    setIsModalOpen(true);
+    setError(null);
   };
 
-  const handleDisableAll = async () => {
-    if (!config) return;
-
-    try {
-      setIsSaving(true);
-      const newConfig: SkillsConfig = {
-        ...config,
-        skills: Object.fromEntries(
-          Object.entries(config.skills).map(([name, skill]) => [
-            name,
-            { ...skill, enabled: false },
-          ])
-        ),
-      };
-      await skillsApi.updateConfig(projectId, newConfig);
-      setConfig(newConfig);
-      showSuccess('All skills disabled');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to disable all skills';
-      setError(message);
-    } finally {
-      setIsSaving(false);
-    }
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingSkillId(null);
+    setSkillForm(emptySkillForm);
+    setError(null);
   };
 
-  const handleResetDefaults = async () => {
-    if (!confirm('Reset all skill settings to defaults?')) return;
-
-    try {
-      setIsSaving(true);
-      const response = await skillsApi.resetConfig(projectId);
-      setConfig(response.config);
-      showSuccess('Settings reset to defaults');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to reset settings';
-      setError(message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const toggleCategory = (category: SkillCategory) => {
-    const newExpanded = new Set(expandedCategories);
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category);
-    } else {
-      newExpanded.add(category);
-    }
-    setExpandedCategories(newExpanded);
-  };
-
-  const handleCreateSkill = async () => {
-    if (!newSkillForm.name || !newSkillForm.description) {
-      setError('Name and description are required');
+  const handleSaveSkill = async () => {
+    if (!skillForm.name.trim()) {
+      setError('Skill name is required');
       return;
     }
 
     try {
-      setIsCreating(true);
-      const response = await skillsApi.createCustomSkill(projectId, newSkillForm);
-      showSuccess(response.message);
-      setIsCreateModalOpen(false);
-      setNewSkillForm({
-        name: '',
-        description: '',
-        category: 'development',
-      });
-      // Notify parent to open the file in VSCode
-      if (onFileCreated) {
-        onFileCreated(response.relative_path);
+      setIsSaving(true);
+      setError(null);
+
+      if (editingSkillId) {
+        // Update existing skill
+        const updateData: UpdateProjectSkillRequest = {
+          name: skillForm.name.trim(),
+          description: skillForm.description.trim() || undefined,
+          category: skillForm.category,
+          content: skillForm.content.trim() || undefined,
+          enabled: skillForm.enabled,
+        };
+        const updated = await projectConfigApi.updateSkill(projectId, editingSkillId, updateData);
+        setSkills(prev => prev.map(s => s.id === editingSkillId ? updated : s));
+        showSuccess(`Skill "${skillForm.name}" updated successfully`);
+      } else {
+        // Create new skill
+        const createData: CreateProjectSkillRequest = {
+          name: skillForm.name.trim(),
+          description: skillForm.description.trim() || undefined,
+          category: skillForm.category,
+          content: skillForm.content.trim() || undefined,
+          enabled: skillForm.enabled,
+        };
+        const created = await projectConfigApi.createSkill(projectId, createData);
+        setSkills(prev => [...prev, created]);
+        showSuccess(`Skill "${skillForm.name}" created successfully`);
       }
+
+      handleCloseModal();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create custom skill';
+      const message = err instanceof Error ? err.message : 'Failed to save skill';
       setError(message);
     } finally {
-      setIsCreating(false);
+      setIsSaving(false);
     }
+  };
+
+  const handleDeleteSkill = async () => {
+    if (!deletingSkill) return;
+
+    try {
+      setIsSaving(true);
+      await projectConfigApi.deleteSkill(projectId, deletingSkill.id);
+      setSkills(prev => prev.filter(s => s.id !== deletingSkill.id));
+      showSuccess(`Skill "${deletingSkill.name}" deleted successfully`);
+      setDeletingSkill(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete skill';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleToggleEnabled = async (skill: ProjectSkill) => {
+    try {
+      setIsSaving(true);
+      const updated = await projectConfigApi.updateSkill(projectId, skill.id, {
+        enabled: !skill.enabled,
+      });
+      setSkills(prev => prev.map(s => s.id === skill.id ? updated : s));
+      showSuccess(`Skill "${skill.name}" ${updated.enabled ? 'enabled' : 'disabled'}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update skill';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle import markdown
+  const handleImportMarkdown = async () => {
+    if (!importMarkdownText.trim()) {
+      setImportError('Please paste Markdown content');
+      return;
+    }
+
+    setImportError(null);
+    setIsImporting(true);
+
+    try {
+      const parsed = parseMarkdownWithFrontmatter(importMarkdownText);
+
+      if (!parsed) {
+        setImportError('Invalid Markdown format. Please include YAML frontmatter with --- delimiters.');
+        setIsImporting(false);
+        return;
+      }
+
+      const { meta, content } = parsed;
+
+      // Validate required fields
+      if (!meta.name || typeof meta.name !== 'string') {
+        setImportError('Missing required field: name');
+        setIsImporting(false);
+        return;
+      }
+
+      // Build skill data
+      const skillData: CreateProjectSkillRequest = {
+        name: meta.name,
+        description: typeof meta.description === 'string' ? meta.description : undefined,
+        category: typeof meta.category === 'string' ? meta.category : 'custom',
+        content: content || undefined,
+        enabled: typeof meta.enabled === 'boolean' ? meta.enabled : true,
+      };
+
+      // Create the skill
+      const createdSkill = await projectConfigApi.createSkill(projectId, skillData);
+      setSkills((prev) => [...prev, createdSkill]);
+      showSuccess(`Skill "${createdSkill.name}" imported successfully`);
+
+      // Close modal
+      setIsImportModalOpen(false);
+      setImportMarkdownText('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setImportError(`Failed to import: ${message}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleCloseImportModal = () => {
+    setIsImportModalOpen(false);
+    setImportMarkdownText('');
+    setImportError(null);
   };
 
   // Group skills by category
   const skillsByCategory = CATEGORY_ORDER.reduce(
     (acc, category) => {
-      acc[category] = availableSkills.filter((s) => s.category === category);
+      acc[category] = skills.filter((s) => s.category === category);
       return acc;
     },
-    {} as Record<SkillCategory, SkillDefinition[]>
+    {} as Record<SkillCategory, ProjectSkill[]>
   );
 
   // Calculate stats
-  const enabledCount = config
-    ? Object.values(config.skills).filter((s) => s.enabled).length
-    : 0;
-  const totalCount = availableSkills.length;
+  const enabledCount = skills.filter((s) => s.enabled).length;
+  const totalCount = skills.length;
 
   if (isLoading) {
     return (
@@ -311,162 +366,281 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
   return (
     <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h2 className="text-lg font-semibold text-text-primary">Skills Settings</h2>
-            <p className="text-xs text-text-tertiary mt-1 font-mono">{configPath}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-text-secondary">
-              {enabledCount} / {totalCount} enabled
-            </span>
-          </div>
+      <div className="p-4 border-b border-border flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">Skills Settings</h2>
+          <p className="text-xs text-text-tertiary mt-1">
+            {enabledCount} / {totalCount} enabled
+          </p>
         </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 mt-3">
-          <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsImportModalOpen(true)}
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import Markdown
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleOpenCreateModal}
+          >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Create New Skill
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleEnableAll} disabled={isSaving}>
-            Enable All
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleDisableAll} disabled={isSaving}>
-            Disable All
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleResetDefaults} disabled={isSaving}>
-            Reset to Defaults
+            Create Skill
           </Button>
         </div>
       </div>
 
       {/* Messages */}
-      {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
+      {error && !isModalOpen && (
+        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
       {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-          <p className="text-sm text-green-600">{successMessage}</p>
+        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
+          <p className="text-sm text-green-400">{successMessage}</p>
         </div>
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {CATEGORY_ORDER.map((category) => {
-          const skills = skillsByCategory[category];
-          if (skills.length === 0) return null;
-
-          const categoryConfig = CATEGORY_CONFIG[category];
-          const isExpanded = expandedCategories.has(category);
-          const enabledInCategory = skills.filter(
-            (s) => config?.skills[s.name]?.enabled
-          ).length;
-
-          return (
-            <div
-              key={category}
-              className="rounded-lg border border-border bg-bg-secondary overflow-hidden"
+      <div className="flex-1 overflow-y-auto p-4">
+        {skills.length === 0 ? (
+          <div className="text-center py-12">
+            <svg
+              className="w-16 h-16 mx-auto mb-4 text-text-tertiary"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              {/* Category Header */}
-              <button
-                onClick={() => toggleCategory(category)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary">
-                    {categoryConfig.icon}
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-medium text-text-primary">{categoryConfig.label}</h3>
-                    <p className="text-xs text-text-tertiary">
-                      {enabledInCategory} / {skills.length} enabled
-                    </p>
-                  </div>
-                </div>
-                <svg
-                  className={`w-5 h-5 text-text-tertiary transition-transform ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+            <h3 className="text-lg font-medium text-text-secondary mb-2">No Skills Configured</h3>
+            <p className="text-text-tertiary mb-4">
+              Create skills to define specialized prompts and behaviors for Claude.
+            </p>
+            <Button variant="primary" onClick={handleOpenCreateModal}>
+              Create Your First Skill
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {CATEGORY_ORDER.map((category) => {
+              const categorySkills = skillsByCategory[category];
+              if (categorySkills.length === 0) return null;
+
+              const categoryConfig = CATEGORY_CONFIG[category];
+              const enabledInCategory = categorySkills.filter((s) => s.enabled).length;
+
+              return (
+                <div
+                  key={category}
+                  className="rounded-lg border border-border bg-bg-secondary overflow-hidden"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
+                  {/* Category Header */}
+                  <div className="px-4 py-3 flex items-center gap-3 border-b border-border bg-bg-tertiary/30">
+                    <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary">
+                      {categoryConfig.icon}
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-text-primary">{categoryConfig.label}</h3>
+                      <p className="text-xs text-text-tertiary">
+                        {enabledInCategory} / {categorySkills.length} enabled
+                      </p>
+                    </div>
+                  </div>
 
-              {/* Skill List */}
-              {isExpanded && (
-                <div className="border-t border-border divide-y divide-border">
-                  {skills.map((skill) => {
-                    // No global defaults - if not in config, it's disabled
-                    const isEnabled = config?.skills[skill.name]?.enabled ?? false;
-
-                    return (
+                  {/* Skill List */}
+                  <div className="divide-y divide-border">
+                    {categorySkills.map((skill) => (
                       <div
-                        key={skill.name}
-                        className="px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary/50 transition-colors"
+                        key={skill.id}
+                        className={`px-4 py-3 flex items-center justify-between transition-colors ${
+                          skill.enabled ? 'hover:bg-bg-tertiary/50' : 'opacity-60'
+                        }`}
                       >
                         <div className="flex-1 min-w-0 pr-4">
                           <div className="flex items-center gap-2">
                             <h4 className="font-medium text-text-primary text-sm font-mono">
-                              /{skill.name}
+                              {skill.name}
                             </h4>
+                            {!skill.enabled && (
+                              <span className="text-xs text-text-tertiary bg-bg-tertiary px-2 py-0.5 rounded">
+                                Disabled
+                              </span>
+                            )}
                           </div>
+                          {skill.description && (
+                            <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">
+                              {skill.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* Toggle Switch */}
+                          <button
+                            onClick={() => handleToggleEnabled(skill)}
+                            disabled={isSaving}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
+                              skill.enabled ? 'bg-primary' : 'bg-bg-tertiary'
+                            }`}
+                            role="switch"
+                            aria-checked={skill.enabled}
+                            title={skill.enabled ? 'Disable skill' : 'Enable skill'}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                skill.enabled ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+
+                          {/* Edit button */}
+                          <button
+                            onClick={() => handleOpenEditModal(skill)}
+                            className="p-2 text-text-secondary hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                            title="Edit"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+
+                          {/* Delete button */}
+                          <button
+                            onClick={() => setDeletingSkill(skill)}
+                            disabled={isSaving}
+                            className="p-2 text-text-secondary hover:text-red-400 hover:bg-red-900/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Skills without category or with unknown category */}
+            {skills.filter(s => !CATEGORY_ORDER.includes(s.category as SkillCategory)).length > 0 && (
+              <div className="rounded-lg border border-border bg-bg-secondary overflow-hidden">
+                <div className="px-4 py-3 flex items-center gap-3 border-b border-border bg-bg-tertiary/30">
+                  <div className="w-8 h-8 rounded bg-bg-tertiary flex items-center justify-center text-text-tertiary">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-text-primary">Other</h3>
+                  </div>
+                </div>
+                <div className="divide-y divide-border">
+                  {skills.filter(s => !CATEGORY_ORDER.includes(s.category as SkillCategory)).map((skill) => (
+                    <div
+                      key={skill.id}
+                      className={`px-4 py-3 flex items-center justify-between transition-colors ${
+                        skill.enabled ? 'hover:bg-bg-tertiary/50' : 'opacity-60'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-text-primary text-sm font-mono">
+                            {skill.name}
+                          </h4>
+                          {!skill.enabled && (
+                            <span className="text-xs text-text-tertiary bg-bg-tertiary px-2 py-0.5 rounded">
+                              Disabled
+                            </span>
+                          )}
+                        </div>
+                        {skill.description && (
                           <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">
                             {skill.description}
                           </p>
-                        </div>
+                        )}
+                      </div>
 
-                        {/* Toggle Switch */}
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleToggleSkill(skill.name, !isEnabled)}
+                          onClick={() => handleToggleEnabled(skill)}
                           disabled={isSaving}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                            isEnabled ? 'bg-primary' : 'bg-gray-200'
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
+                            skill.enabled ? 'bg-primary' : 'bg-bg-tertiary'
                           }`}
                           role="switch"
-                          aria-checked={isEnabled}
+                          aria-checked={skill.enabled}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              isEnabled ? 'translate-x-5' : 'translate-x-0'
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              skill.enabled ? 'translate-x-6' : 'translate-x-1'
                             }`}
                           />
                         </button>
+                        <button
+                          onClick={() => handleOpenEditModal(skill)}
+                          className="p-2 text-text-secondary hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                          title="Edit"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeletingSkill(skill)}
+                          disabled={isSaving}
+                          className="p-2 text-text-secondary hover:text-red-400 hover:bg-red-900/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Delete"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Create Skill Modal */}
-      {isCreateModalOpen && (
+      {/* Create/Edit Skill Modal */}
+      {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-text-primary">Create New Skill</h3>
+              <h3 className="text-lg font-semibold text-text-primary">
+                {editingSkillId ? 'Edit Skill' : 'Create New Skill'}
+              </h3>
               <p className="text-sm text-text-tertiary mt-1">
-                Create a custom skill definition file
+                {editingSkillId ? 'Update skill configuration' : 'Define a new skill for Claude'}
               </p>
             </div>
 
             <div className="p-4 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+                  <p className="text-sm text-red-400">{error}</p>
+                </div>
+              )}
+
               {/* Skill Name */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
@@ -474,9 +648,9 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                 </label>
                 <input
                   type="text"
-                  value={newSkillForm.name}
-                  onChange={(e) => setNewSkillForm({ ...newSkillForm, name: e.target.value })}
-                  placeholder="sc:my-skill"
+                  value={skillForm.name}
+                  onChange={(e) => setSkillForm({ ...skillForm, name: e.target.value })}
+                  placeholder="my-skill"
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary font-mono"
                 />
               </div>
@@ -484,14 +658,14 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description *
+                  Description
                 </label>
-                <textarea
-                  value={newSkillForm.description}
-                  onChange={(e) => setNewSkillForm({ ...newSkillForm, description: e.target.value })}
-                  placeholder="A custom skill that..."
-                  rows={2}
-                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                <input
+                  type="text"
+                  value={skillForm.description}
+                  onChange={(e) => setSkillForm({ ...skillForm, description: e.target.value })}
+                  placeholder="A skill that..."
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -501,8 +675,8 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                   Category
                 </label>
                 <select
-                  value={newSkillForm.category}
-                  onChange={(e) => setNewSkillForm({ ...newSkillForm, category: e.target.value as SkillCategory })}
+                  value={skillForm.category}
+                  onChange={(e) => setSkillForm({ ...skillForm, category: e.target.value as SkillCategory })}
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {CATEGORY_ORDER.map((cat) => (
@@ -512,22 +686,173 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                   ))}
                 </select>
               </div>
+
+              {/* Content */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Skill Content (Prompt)
+                </label>
+                <textarea
+                  value={skillForm.content}
+                  onChange={(e) => setSkillForm({ ...skillForm, content: e.target.value })}
+                  placeholder="Enter the skill prompt content here..."
+                  rows={10}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm resize-y"
+                />
+                <p className="text-xs text-text-tertiary mt-1">
+                  This content will be used as part of the system prompt when the skill is enabled.
+                </p>
+              </div>
+
+              {/* Enabled */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSkillForm({ ...skillForm, enabled: !skillForm.enabled })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary ${
+                    skillForm.enabled ? 'bg-primary' : 'bg-bg-tertiary'
+                  }`}
+                  role="switch"
+                  aria-checked={skillForm.enabled}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      skillForm.enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <label className="text-sm text-text-secondary">
+                  {skillForm.enabled ? 'Enabled' : 'Disabled'}
+                </label>
+              </div>
             </div>
 
             <div className="p-4 border-t border-border flex justify-end gap-2">
               <Button
                 variant="secondary"
-                onClick={() => setIsCreateModalOpen(false)}
-                disabled={isCreating}
+                onClick={handleCloseModal}
+                disabled={isSaving}
               >
                 Cancel
               </Button>
               <Button
                 variant="primary"
-                onClick={handleCreateSkill}
-                disabled={isCreating || !newSkillForm.name || !newSkillForm.description}
+                onClick={handleSaveSkill}
+                disabled={isSaving || !skillForm.name.trim()}
               >
-                {isCreating ? 'Creating...' : 'Create Skill'}
+                {isSaving ? 'Saving...' : (editingSkillId ? 'Update Skill' : 'Create Skill')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingSkill && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-md mx-4 border border-border">
+            <div className="p-4 border-b border-border">
+              <h3 className="text-lg font-semibold text-text-primary">Delete Skill</h3>
+            </div>
+
+            <div className="p-4">
+              <p className="text-text-secondary">
+                Are you sure you want to delete the skill &quot;{deletingSkill.name}&quot;? This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="p-4 border-t border-border flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setDeletingSkill(null)}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleDeleteSkill}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Markdown Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">Import from Markdown</h3>
+                <p className="text-sm text-text-tertiary mt-1">
+                  Paste skill definition with YAML frontmatter
+                </p>
+              </div>
+              <button
+                onClick={handleCloseImportModal}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {importError && (
+                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+                  <p className="text-sm text-red-400 whitespace-pre-wrap">{importError}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Markdown Content
+                </label>
+                <textarea
+                  value={importMarkdownText}
+                  onChange={(e) => setImportMarkdownText(e.target.value)}
+                  placeholder='Paste your Markdown here...'
+                  rows={12}
+                  className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm resize-y"
+                />
+              </div>
+
+              <div className="text-sm text-text-tertiary">
+                <p className="font-medium text-text-secondary mb-2">Expected format:</p>
+                <div className="bg-bg-secondary rounded-md p-3 font-mono text-xs overflow-x-auto">
+                  <pre>{`---
+name: my-skill
+description: Description of the skill
+category: development
+enabled: true
+---
+
+Skill prompt content here...`}</pre>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCloseImportModal}
+                disabled={isImporting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleImportMarkdown}
+                disabled={isImporting || !importMarkdownText.trim()}
+              >
+                {isImporting ? 'Importing...' : 'Import'}
               </Button>
             </div>
           </div>

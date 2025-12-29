@@ -5,6 +5,7 @@ export * from './skill';
 export * from './message';
 export * from './websocket';
 export * from './project';
+export * from './projectConfig';
 export * from './session';
 export * from './file';
 export * from './tool';

@@ -16,10 +16,13 @@ from app.core.auth.users import current_active_user
 from app.models.database import UserModel
 from app.services.permission_service import PermissionService
 from app.services.project_config_service import ProjectConfigService
+from app.services.mcp_service import MCPService
 from app.schemas.project_config import (
     MCPServerCreate,
     MCPServerUpdate,
     MCPServerResponse,
+    MCPTestResponse,
+    MCPToolsResponse,
     AgentCreate,
     AgentUpdate,
     AgentResponse,
@@ -179,6 +182,75 @@ async def delete_mcp_server(
     await check_write_permission(project_id, current_user, permission_service)
     if not await config_service.delete_mcp_server(project_id, mcp_id):
         raise HTTPException(status_code=404, detail="MCP server not found")
+
+
+@router.post("/mcp-servers/{mcp_id}/test", response_model=MCPTestResponse)
+@handle_exceptions
+async def test_mcp_server(
+    project_id: str,
+    mcp_id: str,
+    current_user: UserModel = Depends(current_active_user),
+    config_service: ProjectConfigService = Depends(get_config_service),
+    permission_service: PermissionService = Depends(get_permission_service),
+) -> MCPTestResponse:
+    """
+    MCPサーバーへの接続テストを実行（認証必須）
+
+    MCPサーバーを起動し、ツール一覧を取得します。
+    接続が成功すると、利用可能なツール一覧を返します。
+
+    Returns:
+        MCPTestResponse: { success: bool, tools: List[MCPTool], error?: str }
+    """
+    await check_read_permission(project_id, current_user, permission_service)
+
+    # MCPサーバー設定を取得
+    server = await config_service.get_mcp_server(project_id, mcp_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="MCP server not found")
+
+    # 接続テスト実行
+    result = await MCPService.test_connection(
+        command=server.command,
+        args=server.args or [],
+        env=server.env or {},
+    )
+
+    return result
+
+
+@router.get("/mcp-servers/{mcp_id}/tools", response_model=MCPToolsResponse)
+@handle_exceptions
+async def get_mcp_tools(
+    project_id: str,
+    mcp_id: str,
+    current_user: UserModel = Depends(current_active_user),
+    config_service: ProjectConfigService = Depends(get_config_service),
+    permission_service: PermissionService = Depends(get_permission_service),
+) -> MCPToolsResponse:
+    """
+    MCPサーバーのツール一覧を取得（認証必須）
+
+    MCPサーバーに接続して利用可能なツール一覧を取得します。
+
+    Returns:
+        MCPToolsResponse: { tools: List[MCPTool] }
+    """
+    await check_read_permission(project_id, current_user, permission_service)
+
+    # MCPサーバー設定を取得
+    server = await config_service.get_mcp_server(project_id, mcp_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="MCP server not found")
+
+    # ツール一覧取得
+    result = await MCPService.get_tools(
+        command=server.command,
+        args=server.args or [],
+        env=server.env or {},
+    )
+
+    return result
 
 
 # ============================================

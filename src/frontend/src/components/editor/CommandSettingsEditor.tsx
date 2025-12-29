@@ -1,39 +1,40 @@
 /**
  * Command Settings Editor Component
- * Allows managing slash command configurations per project
+ * Manages command configurations per project using DB-based API
  */
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/common/Button';
-import { commandsApi } from '@/lib/api';
+import { projectConfigApi } from '@/lib/api';
 import type {
-  CommandDefinition,
-  CommandsConfig,
-  CommandCategory,
-  CreateCustomCommandRequest,
-} from '@/types/command';
+  ProjectCommand,
+  CreateProjectCommandRequest,
+  UpdateProjectCommandRequest,
+} from '@/types/projectConfig';
 
 interface CommandSettingsEditorProps {
   projectId: string;
-  onFileCreated?: (relativePath: string) => void;
 }
+
+// Category type for grouping
+type CommandCategory = 'custom' | 'exploration' | 'development' | 'quality' | 'documentation' | 'devops' | 'data';
 
 // Category display configuration
 const CATEGORY_CONFIG: Record<CommandCategory, { label: string; icon: React.ReactNode }> = {
-  core: {
-    label: 'Core',
+  custom: {
+    label: 'Custom',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
       </svg>
     ),
   },
-  planning: {
-    label: 'Planning & Design',
+  exploration: {
+    label: 'Exploration & Planning',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
     ),
   },
@@ -45,11 +46,11 @@ const CATEGORY_CONFIG: Record<CommandCategory, { label: string; icon: React.Reac
       </svg>
     ),
   },
-  analysis: {
-    label: 'Analysis & Research',
+  quality: {
+    label: 'Quality & Testing',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
@@ -61,56 +62,69 @@ const CATEGORY_CONFIG: Record<CommandCategory, { label: string; icon: React.Reac
       </svg>
     ),
   },
-  git: {
-    label: 'Git & Version Control',
+  devops: {
+    label: 'DevOps & Infrastructure',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
       </svg>
     ),
   },
-  session: {
-    label: 'Session Management',
+  data: {
+    label: 'Data & AI',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-      </svg>
-    ),
-  },
-  specialized: {
-    label: 'Specialized',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-      </svg>
-    ),
-  },
-  help: {
-    label: 'Help',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
   },
 };
 
-const CATEGORY_ORDER: CommandCategory[] = [
-  'core',
-  'planning',
-  'development',
-  'analysis',
-  'documentation',
-  'git',
-  'session',
-  'specialized',
-  'help',
-];
+const CATEGORY_ORDER: CommandCategory[] = ['custom', 'exploration', 'development', 'quality', 'documentation', 'devops', 'data'];
 
-export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ projectId, onFileCreated }) => {
-  const [availableCommands, setAvailableCommands] = useState<CommandDefinition[]>([]);
-  const [config, setConfig] = useState<CommandsConfig | null>(null);
-  const [configPath, setConfigPath] = useState<string>('');
+// Default form state for creating commands
+const getDefaultCommandForm = (): CreateProjectCommandRequest => ({
+  name: '',
+  description: '',
+  category: 'custom',
+  content: '',
+  enabled: true,
+});
+
+// Parse YAML frontmatter from markdown
+interface ParsedMarkdown {
+  meta: Record<string, unknown>;
+  content: string;
+}
+
+const parseMarkdownWithFrontmatter = (markdown: string): ParsedMarkdown | null => {
+  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
+  const match = markdown.match(frontmatterRegex);
+  if (!match) return null;
+
+  const frontmatter = match[1];
+  const content = match[2].trim();
+
+  // Simple YAML parser
+  const meta: Record<string, unknown> = {};
+  const lines = frontmatter.split('\n');
+
+  for (const line of lines) {
+    // Key: value
+    if (line.match(/^(\w+):\s*(.+)$/)) {
+      const matches = line.match(/^(\w+):\s*(.+)$/);
+      if (matches) {
+        const [, key, value] = matches;
+        meta[key] = value === 'true' ? true : value === 'false' ? false : value;
+      }
+    }
+  }
+
+  return { meta, content };
+};
+
+export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ projectId }) => {
+  const [commands, setCommands] = useState<ProjectCommand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,26 +135,33 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
 
   // Create command modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newCommandForm, setNewCommandForm] = useState<CreateCustomCommandRequest>({
-    name: '',
-    description: '',
-    category: 'development',
-  });
+  const [newCommandForm, setNewCommandForm] = useState<CreateProjectCommandRequest>(getDefaultCommandForm());
   const [isCreating, setIsCreating] = useState(false);
+
+  // Edit command modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCommand, setEditingCommand] = useState<ProjectCommand | null>(null);
+  const [editCommandForm, setEditCommandForm] = useState<UpdateProjectCommandRequest>({});
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Delete confirmation state
+  const [deletingCommandId, setDeletingCommandId] = useState<string | null>(null);
+
+  // Import modal state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importMarkdownText, setImportMarkdownText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [commandsResponse, configResponse] = await Promise.all([
-        commandsApi.getAvailableCommands(),
-        commandsApi.getConfig(projectId),
-      ]);
-      setAvailableCommands(commandsResponse);
-      setConfig(configResponse.config);
-      setConfigPath(configResponse.path);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load command configuration');
+      const commandsList = await projectConfigApi.listCommands(projectId);
+      setCommands(commandsList);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load command configuration';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -155,87 +176,25 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleToggleCommand = async (commandName: string, enabled: boolean) => {
-    if (!config) return;
+  const handleToggleCommand = async (command: ProjectCommand) => {
+    const newEnabled = !command.enabled;
 
     // Optimistic update
-    const newConfig = { ...config };
-    if (newConfig.commands[commandName]) {
-      newConfig.commands[commandName] = { ...newConfig.commands[commandName], enabled };
-    }
-    setConfig(newConfig);
+    setCommands((prev) =>
+      prev.map((c) => (c.id === command.id ? { ...c, enabled: newEnabled } : c))
+    );
 
     try {
       setIsSaving(true);
-      await commandsApi.toggleCommand(projectId, commandName, enabled);
-      showSuccess(`${commandName} ${enabled ? 'enabled' : 'disabled'}`);
-    } catch (err: any) {
+      await projectConfigApi.updateCommand(projectId, command.id, { enabled: newEnabled });
+      showSuccess(`${command.name} ${newEnabled ? 'enabled' : 'disabled'}`);
+    } catch (err: unknown) {
       // Revert on error
-      loadData();
-      setError(err.message || 'Failed to toggle command');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleEnableAll = async () => {
-    if (!config) return;
-
-    try {
-      setIsSaving(true);
-      const newConfig: CommandsConfig = {
-        ...config,
-        commands: Object.fromEntries(
-          Object.entries(config.commands).map(([name, cmd]) => [
-            name,
-            { ...cmd, enabled: true },
-          ])
-        ),
-      };
-      await commandsApi.updateConfig(projectId, newConfig);
-      setConfig(newConfig);
-      showSuccess('All commands enabled');
-    } catch (err: any) {
-      setError(err.message || 'Failed to enable all commands');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDisableAll = async () => {
-    if (!config) return;
-
-    try {
-      setIsSaving(true);
-      const newConfig: CommandsConfig = {
-        ...config,
-        commands: Object.fromEntries(
-          Object.entries(config.commands).map(([name, cmd]) => [
-            name,
-            { ...cmd, enabled: false },
-          ])
-        ),
-      };
-      await commandsApi.updateConfig(projectId, newConfig);
-      setConfig(newConfig);
-      showSuccess('All commands disabled');
-    } catch (err: any) {
-      setError(err.message || 'Failed to disable all commands');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleResetDefaults = async () => {
-    if (!confirm('Reset all command settings to defaults?')) return;
-
-    try {
-      setIsSaving(true);
-      const response = await commandsApi.resetConfig(projectId);
-      setConfig(response.config);
-      showSuccess('Settings reset to defaults');
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset settings');
+      setCommands((prev) =>
+        prev.map((c) => (c.id === command.id ? { ...c, enabled: !newEnabled } : c))
+      );
+      const errorMessage = err instanceof Error ? err.message : 'Failed to toggle command';
+      setError(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -252,46 +211,163 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
   };
 
   const handleCreateCommand = async () => {
-    if (!newCommandForm.name || !newCommandForm.description) {
-      setError('Name and description are required');
+    if (!newCommandForm.name) {
+      setError('Name is required');
       return;
     }
 
     try {
       setIsCreating(true);
-      const response = await commandsApi.createCustomCommand(projectId, newCommandForm);
-      showSuccess(response.message);
+      const createdCommand = await projectConfigApi.createCommand(projectId, newCommandForm);
+      setCommands((prev) => [...prev, createdCommand]);
+      showSuccess(`Command "${createdCommand.name}" created successfully`);
       setIsCreateModalOpen(false);
-      setNewCommandForm({
-        name: '',
-        description: '',
-        category: 'development',
-      });
-      // Notify parent to open the file in VSCode
-      if (onFileCreated) {
-        onFileCreated(response.relative_path);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create custom command');
+      setNewCommandForm(getDefaultCommandForm());
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create command';
+      setError(errorMessage);
     } finally {
       setIsCreating(false);
     }
   };
 
+  const handleOpenEditModal = (command: ProjectCommand) => {
+    setEditingCommand(command);
+    setEditCommandForm({
+      name: command.name,
+      description: command.description || '',
+      category: command.category,
+      content: command.content || '',
+      enabled: command.enabled,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateCommand = async () => {
+    if (!editingCommand) return;
+
+    try {
+      setIsUpdating(true);
+      const updatedCommand = await projectConfigApi.updateCommand(
+        projectId,
+        editingCommand.id,
+        editCommandForm
+      );
+      setCommands((prev) =>
+        prev.map((c) => (c.id === editingCommand.id ? updatedCommand : c))
+      );
+      showSuccess(`Command "${updatedCommand.name}" updated successfully`);
+      setIsEditModalOpen(false);
+      setEditingCommand(null);
+      setEditCommandForm({});
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update command';
+      setError(errorMessage);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteCommand = async (commandId: string) => {
+    const command = commands.find((c) => c.id === commandId);
+    if (!command) return;
+
+    if (!confirm(`Are you sure you want to delete "${command.name}"?`)) {
+      return;
+    }
+
+    try {
+      setDeletingCommandId(commandId);
+      await projectConfigApi.deleteCommand(projectId, commandId);
+      setCommands((prev) => prev.filter((c) => c.id !== commandId));
+      showSuccess(`Command "${command.name}" deleted successfully`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete command';
+      setError(errorMessage);
+    } finally {
+      setDeletingCommandId(null);
+    }
+  };
+
+  // Handle import markdown
+  const handleImportMarkdown = async () => {
+    if (!importMarkdownText.trim()) {
+      setImportError('Please paste Markdown content');
+      return;
+    }
+
+    setImportError(null);
+    setIsImporting(true);
+
+    try {
+      const parsed = parseMarkdownWithFrontmatter(importMarkdownText);
+
+      if (!parsed) {
+        setImportError('Invalid Markdown format. Please include YAML frontmatter with --- delimiters.');
+        setIsImporting(false);
+        return;
+      }
+
+      const { meta, content } = parsed;
+
+      // Validate required fields
+      if (!meta.name || typeof meta.name !== 'string') {
+        setImportError('Missing required field: name');
+        setIsImporting(false);
+        return;
+      }
+
+      // Build command data
+      const commandData: CreateProjectCommandRequest = {
+        name: meta.name,
+        description: typeof meta.description === 'string' ? meta.description : undefined,
+        category: typeof meta.category === 'string' ? meta.category : 'custom',
+        content: content || undefined,
+        enabled: typeof meta.enabled === 'boolean' ? meta.enabled : true,
+      };
+
+      // Create the command
+      const createdCommand = await projectConfigApi.createCommand(projectId, commandData);
+      setCommands((prev) => [...prev, createdCommand]);
+      showSuccess(`Command "${createdCommand.name}" imported successfully`);
+
+      // Close modal
+      setIsImportModalOpen(false);
+      setImportMarkdownText('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setImportError(`Failed to import: ${message}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleCloseImportModal = () => {
+    setIsImportModalOpen(false);
+    setImportMarkdownText('');
+    setImportError(null);
+  };
+
+  // Normalize category to known categories or 'custom'
+  const normalizeCategory = (category: string): CommandCategory => {
+    if (CATEGORY_ORDER.includes(category as CommandCategory)) {
+      return category as CommandCategory;
+    }
+    return 'custom';
+  };
+
   // Group commands by category
   const commandsByCategory = CATEGORY_ORDER.reduce(
     (acc, category) => {
-      acc[category] = availableCommands.filter((c) => c.category === category);
+      acc[category] = commands.filter((c) => normalizeCategory(c.category) === category);
       return acc;
     },
-    {} as Record<CommandCategory, CommandDefinition[]>
+    {} as Record<CommandCategory, ProjectCommand[]>
   );
 
   // Calculate stats
-  const enabledCount = config
-    ? Object.values(config.commands).filter((c) => c.enabled).length
-    : 0;
-  const totalCount = availableCommands.length;
+  const enabledCount = commands.filter((c) => c.enabled).length;
+  const totalCount = commands.length;
 
   if (isLoading) {
     return (
@@ -308,7 +384,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">Command Settings</h2>
-            <p className="text-xs text-text-tertiary mt-1 font-mono">{configPath}</p>
+            <p className="text-xs text-text-tertiary mt-1">Manage slash commands for this project</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-text-secondary">
@@ -319,143 +395,182 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 mt-3">
+          <Button variant="secondary" size="sm" onClick={() => setIsImportModalOpen(true)}>
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import Markdown
+          </Button>
           <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Create New Command
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleEnableAll} disabled={isSaving}>
-            Enable All
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleDisableAll} disabled={isSaving}>
-            Disable All
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleResetDefaults} disabled={isSaving}>
-            Reset to Defaults
-          </Button>
         </div>
       </div>
 
       {/* Messages */}
       {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+          <p className="text-sm text-red-400">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="text-xs text-red-400 hover:text-red-300 mt-1 underline"
+          >
+            Dismiss
+          </button>
         </div>
       )}
       {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-          <p className="text-sm text-green-600">{successMessage}</p>
+        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
+          <p className="text-sm text-green-400">{successMessage}</p>
         </div>
       )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {CATEGORY_ORDER.map((category) => {
-          const commands = commandsByCategory[category];
-          if (commands.length === 0) return null;
+        {commands.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="w-12 h-12 mx-auto text-text-tertiary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p className="text-text-secondary mb-2">No commands configured</p>
+            <p className="text-text-tertiary text-sm mb-4">Create your first command to get started</p>
+            <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
+              Create Command
+            </Button>
+          </div>
+        ) : (
+          CATEGORY_ORDER.map((category) => {
+            const categoryCommands = commandsByCategory[category];
+            if (categoryCommands.length === 0) return null;
 
-          const categoryConfig = CATEGORY_CONFIG[category];
-          const isExpanded = expandedCategories.has(category);
-          const enabledInCategory = commands.filter(
-            (c) => config?.commands[c.name]?.enabled
-          ).length;
+            const categoryConfig = CATEGORY_CONFIG[category];
+            const isExpanded = expandedCategories.has(category);
+            const enabledInCategory = categoryCommands.filter((c) => c.enabled).length;
 
-          return (
-            <div
-              key={category}
-              className="rounded-lg border border-border bg-bg-secondary overflow-hidden"
-            >
-              {/* Category Header */}
-              <button
-                onClick={() => toggleCategory(category)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary transition-colors"
+            return (
+              <div
+                key={category}
+                className="rounded-lg border border-border bg-bg-secondary overflow-hidden"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary">
-                    {categoryConfig.icon}
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-medium text-text-primary">{categoryConfig.label}</h3>
-                    <p className="text-xs text-text-tertiary">
-                      {enabledInCategory} / {commands.length} enabled
-                    </p>
-                  </div>
-                </div>
-                <svg
-                  className={`w-5 h-5 text-text-tertiary transition-transform ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                {/* Category Header */}
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary">
+                      {categoryConfig.icon}
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-medium text-text-primary">{categoryConfig.label}</h3>
+                      <p className="text-xs text-text-tertiary">
+                        {enabledInCategory} / {categoryCommands.length} enabled
+                      </p>
+                    </div>
+                  </div>
+                  <svg
+                    className={`w-5 h-5 text-text-tertiary transition-transform ${
+                      isExpanded ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
 
-              {/* Command List */}
-              {isExpanded && (
-                <div className="border-t border-border divide-y divide-border">
-                  {commands.map((command) => {
-                    // No global defaults - if not in config, it's disabled
-                    const isEnabled = config?.commands[command.name]?.enabled ?? false;
-
-                    return (
+                {/* Command List */}
+                {isExpanded && (
+                  <div className="border-t border-border divide-y divide-border">
+                    {categoryCommands.map((command) => (
                       <div
-                        key={command.name}
+                        key={command.id}
                         className="px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary/50 transition-colors"
                       >
                         <div className="flex-1 min-w-0 pr-4">
                           <div className="flex items-center gap-2">
                             <h4 className="font-medium text-text-primary text-sm font-mono">
-                              {command.name}
+                              /{command.name}
                             </h4>
                           </div>
                           <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">
-                            {command.description}
+                            {command.description || 'No description'}
                           </p>
                         </div>
 
-                        {/* Toggle Switch */}
-                        <button
-                          onClick={() => handleToggleCommand(command.name, !isEnabled)}
-                          disabled={isSaving}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                            isEnabled ? 'bg-primary' : 'bg-gray-200'
-                          }`}
-                          role="switch"
-                          aria-checked={isEnabled}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              isEnabled ? 'translate-x-5' : 'translate-x-0'
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2">
+                          {/* Edit Button */}
+                          <button
+                            onClick={() => handleOpenEditModal(command)}
+                            className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
+                            title="Edit command"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDeleteCommand(command.id)}
+                            disabled={deletingCommandId === command.id}
+                            className="p-1.5 text-text-tertiary hover:text-red-400 hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
+                            title="Delete command"
+                          >
+                            {deletingCommandId === command.id ? (
+                              <div className="w-4 h-4 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )}
+                          </button>
+
+                          {/* Toggle Switch */}
+                          <button
+                            onClick={() => handleToggleCommand(command)}
+                            disabled={isSaving}
+                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
+                              command.enabled ? 'bg-primary' : 'bg-gray-600'
                             }`}
-                          />
-                        </button>
+                            role="switch"
+                            aria-checked={command.enabled}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                command.enabled ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Create Command Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border">
               <h3 className="text-lg font-semibold text-text-primary">Create New Command</h3>
               <p className="text-sm text-text-tertiary mt-1">
-                Create a custom command definition file
+                Define a new slash command for this project
               </p>
             </div>
 
@@ -469,20 +584,21 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
                   type="text"
                   value={newCommandForm.name}
                   onChange={(e) => setNewCommandForm({ ...newCommandForm, name: e.target.value })}
-                  placeholder="sc:my-command"
+                  placeholder="my-command"
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary font-mono"
                 />
+                <p className="text-xs text-text-tertiary mt-1">Will be invoked as /{newCommandForm.name || 'command-name'}</p>
               </div>
 
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description *
+                  Description
                 </label>
                 <textarea
-                  value={newCommandForm.description}
+                  value={newCommandForm.description || ''}
                   onChange={(e) => setNewCommandForm({ ...newCommandForm, description: e.target.value })}
-                  placeholder="A custom command that..."
+                  placeholder="A command that..."
                   rows={2}
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
@@ -494,8 +610,8 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
                   Category
                 </label>
                 <select
-                  value={newCommandForm.category}
-                  onChange={(e) => setNewCommandForm({ ...newCommandForm, category: e.target.value as CommandCategory })}
+                  value={newCommandForm.category || 'custom'}
+                  onChange={(e) => setNewCommandForm({ ...newCommandForm, category: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {CATEGORY_ORDER.map((cat) => (
@@ -505,12 +621,50 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
                   ))}
                 </select>
               </div>
+
+              {/* Content */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Command Content
+                </label>
+                <textarea
+                  value={newCommandForm.content || ''}
+                  onChange={(e) => setNewCommandForm({ ...newCommandForm, content: e.target.value })}
+                  placeholder="Enter the command script or prompt content..."
+                  rows={8}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary resize-y font-mono text-sm"
+                />
+                <p className="text-xs text-text-tertiary mt-1">The content/prompt that will be executed when the command is invoked</p>
+              </div>
+
+              {/* Enabled */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setNewCommandForm({ ...newCommandForm, enabled: !newCommandForm.enabled })}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary ${
+                    newCommandForm.enabled ? 'bg-primary' : 'bg-gray-600'
+                  }`}
+                  role="switch"
+                  aria-checked={newCommandForm.enabled}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      newCommandForm.enabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                <span className="text-sm text-text-secondary">Enable command after creation</span>
+              </div>
             </div>
 
             <div className="p-4 border-t border-border flex justify-end gap-2">
               <Button
                 variant="secondary"
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setNewCommandForm(getDefaultCommandForm());
+                }}
                 disabled={isCreating}
               >
                 Cancel
@@ -518,9 +672,206 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               <Button
                 variant="primary"
                 onClick={handleCreateCommand}
-                disabled={isCreating || !newCommandForm.name || !newCommandForm.description}
+                disabled={isCreating || !newCommandForm.name}
               >
                 {isCreating ? 'Creating...' : 'Create Command'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Command Modal */}
+      {isEditModalOpen && editingCommand && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+            <div className="p-4 border-b border-border">
+              <h3 className="text-lg font-semibold text-text-primary">Edit Command</h3>
+              <p className="text-sm text-text-tertiary mt-1">
+                Modify command configuration
+              </p>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Command Name */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Command Name *
+                </label>
+                <input
+                  type="text"
+                  value={editCommandForm.name || ''}
+                  onChange={(e) => setEditCommandForm({ ...editCommandForm, name: e.target.value })}
+                  placeholder="my-command"
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                />
+                <p className="text-xs text-text-tertiary mt-1">Will be invoked as /{editCommandForm.name || 'command-name'}</p>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={editCommandForm.description || ''}
+                  onChange={(e) => setEditCommandForm({ ...editCommandForm, description: e.target.value })}
+                  placeholder="A command that..."
+                  rows={2}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Category
+                </label>
+                <select
+                  value={editCommandForm.category || 'custom'}
+                  onChange={(e) => setEditCommandForm({ ...editCommandForm, category: e.target.value })}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {CATEGORY_ORDER.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {CATEGORY_CONFIG[cat].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Content */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Command Content
+                </label>
+                <textarea
+                  value={editCommandForm.content || ''}
+                  onChange={(e) => setEditCommandForm({ ...editCommandForm, content: e.target.value })}
+                  placeholder="Enter the command script or prompt content..."
+                  rows={8}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary resize-y font-mono text-sm"
+                />
+                <p className="text-xs text-text-tertiary mt-1">The content/prompt that will be executed when the command is invoked</p>
+              </div>
+
+              {/* Enabled */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditCommandForm({ ...editCommandForm, enabled: !editCommandForm.enabled })}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary ${
+                    editCommandForm.enabled ? 'bg-primary' : 'bg-gray-600'
+                  }`}
+                  role="switch"
+                  aria-checked={editCommandForm.enabled}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      editCommandForm.enabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                <span className="text-sm text-text-secondary">Command enabled</span>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingCommand(null);
+                  setEditCommandForm({});
+                }}
+                disabled={isUpdating}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleUpdateCommand}
+                disabled={isUpdating || !editCommandForm.name}
+              >
+                {isUpdating ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Markdown Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">Import from Markdown</h3>
+                <p className="text-sm text-text-tertiary mt-1">
+                  Paste command definition with YAML frontmatter
+                </p>
+              </div>
+              <button
+                onClick={handleCloseImportModal}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {importError && (
+                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+                  <p className="text-sm text-red-400 whitespace-pre-wrap">{importError}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Markdown Content
+                </label>
+                <textarea
+                  value={importMarkdownText}
+                  onChange={(e) => setImportMarkdownText(e.target.value)}
+                  placeholder='Paste your Markdown here...'
+                  rows={12}
+                  className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm resize-y"
+                />
+              </div>
+
+              <div className="text-sm text-text-tertiary">
+                <p className="font-medium text-text-secondary mb-2">Expected format:</p>
+                <div className="bg-bg-secondary rounded-md p-3 font-mono text-xs overflow-x-auto">
+                  <pre>{`---
+name: my-command
+description: Description of the command
+category: development
+enabled: true
+---
+
+Command content/script here...`}</pre>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCloseImportModal}
+                disabled={isImporting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleImportMarkdown}
+                disabled={isImporting || !importMarkdownText.trim()}
+              >
+                {isImporting ? 'Importing...' : 'Import'}
               </Button>
             </div>
           </div>

@@ -22,6 +22,7 @@ class MCPServerBase(BaseModel):
     args: List[str] = Field(default_factory=list, description="コマンド引数")
     env: Dict[str, str] = Field(default_factory=dict, description="環境変数")
     enabled: bool = Field(default=True, description="有効フラグ")
+    enabled_tools: Optional[List[str]] = Field(default=None, description="有効化されたツールのリスト（nullは全ツール有効）")
 
 
 class MCPServerCreate(MCPServerBase):
@@ -36,6 +37,7 @@ class MCPServerUpdate(BaseModel):
     args: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
     enabled: Optional[bool] = None
+    enabled_tools: Optional[List[str]] = None
 
 
 class MCPServerResponse(MCPServerBase):
@@ -47,6 +49,30 @@ class MCPServerResponse(MCPServerBase):
 
     class Config:
         from_attributes = True
+
+
+# ============================================
+# MCP Test/Tools Schemas
+# ============================================
+
+
+class MCPTool(BaseModel):
+    """MCPツールスキーマ"""
+    name: str = Field(..., description="ツール名")
+    description: Optional[str] = Field(None, description="ツール説明")
+    input_schema: Optional[Dict[str, Any]] = Field(None, description="入力スキーマ")
+
+
+class MCPTestResponse(BaseModel):
+    """MCPサーバー接続テストレスポンス"""
+    success: bool = Field(..., description="接続成功フラグ")
+    tools: List[MCPTool] = Field(default_factory=list, description="利用可能なツール一覧")
+    error: Optional[str] = Field(None, description="エラーメッセージ")
+
+
+class MCPToolsResponse(BaseModel):
+    """MCPサーバーツール一覧レスポンス"""
+    tools: List[MCPTool] = Field(default_factory=list, description="利用可能なツール一覧")
 
 
 # ============================================

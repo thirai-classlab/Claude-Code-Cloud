@@ -2,59 +2,90 @@
 
 ## Current Session
 - **Date**: 2025-12-29
-- **Status**: Site structure renewal + Right panel optimization completed
+- **Status**: MCP Tool Selection & Import Features completed
 - **Active Project**: AGENTSDK (Web版Claude Code)
 
 ## Project State Summary
 - Frontend renewal (Phase 1-7) completed
 - Adopted design: Pattern 09 v2 (Linear Style - No Icons)
-- **DB Config Management**: Implemented (MCP/Agent/Skill/Command CRUD + SDK integration)
+- **DB Config Management**: Backend API + Frontend UI both completed
 - **Collapsible Editor Panel**: Implemented with vertical icon bar
 - **Session name fix**: Fixed field mismatch (title → name)
 - **Project search**: Implemented API-based search
 - **Site Structure Renewal**: Implemented URL routing with Next.js App Router
 - **Right Panel Optimization**: Shared layout prevents re-rendering on navigation
+- **Project Settings & Pricing Tabs**: Completed
+- **Project-Specific API Key**: Implemented
+- **MCP Tool Selection**: Connection test + individual tool enable/disable
+- **Import Features**: JSON/Markdown paste import for all config types
 
 ## Recent Session Updates
 
-### Right Panel Optimization (Completed)
-Prevented right sidebar (VSCode) re-rendering when navigating between project top and session detail pages.
+### MCP Server Tool Selection & Import Features (Completed - 2025-12-29)
+Enhanced project config management with connection testing and import functionality.
 
-**Solution**: Created shared layout at `/projects/[id]/layout.tsx`
+**New Features:**
 
-| File | Change |
-|------|--------|
-| `app/projects/[id]/layout.tsx` | **NEW** - Shared layout with EditorContainer |
-| `app/projects/[id]/page.tsx` | Simplified (layout handles AuthGuard/BaseLayout) |
-| `app/projects/[id]/sessions/[sessionId]/page.tsx` | Simplified |
-| `components/pages/ProjectPage.tsx` | Removed SplitLayout wrapper |
-| `components/pages/SessionPage.tsx` | Removed SplitLayout wrapper |
+1. **MCP Server Connection Test & Tool Selection**
+   - Connection test button to verify MCP server connectivity
+   - Tool discovery via MCP Protocol (JSON-RPC 2.0 over stdio)
+   - Individual tool enable/disable toggles
+   - `enabled_tools` column added to database (null = all tools enabled)
 
-**Technical Pattern**: Next.js App Router layouts persist across child route navigation.
+2. **Import Features (Paste-based)**
+   - **MCP Servers**: JSON paste import (supports Claude Desktop format, object, array)
+   - **Sub-Agents**: Markdown with YAML frontmatter import
+   - **Commands**: Markdown with YAML frontmatter import
+   - **Skills**: Markdown with YAML frontmatter import
 
-### Site Structure Renewal (Completed)
-New URL-based routing implemented:
+**Files Created:**
+- `src/backend/app/services/mcp_service.py` - MCP Protocol implementation
+- `src/backend/migrations/add_enabled_tools_column.sql` - DB migration
 
-| Page | URL | Content | Layout |
-|------|-----|---------|--------|
-| Home | `/` | Project list (card grid) | Sidebar + Main |
-| Project Top | `/projects/:id` | Project info + Session list | Sidebar + Main + Right Panel (VSCode) |
-| Session Detail | `/projects/:id/sessions/:sid` | Chat | Sidebar + Main + Right Panel (VSCode) |
+**Files Modified:**
+- `src/backend/app/models/database.py` - Added enabled_tools column
+- `src/backend/app/api/routes/project_config.py` - Added test/tools endpoints
+- `src/frontend/src/types/projectConfig.ts` - Added MCPTool, MCPTestResponse types
+- `src/frontend/src/lib/api/projectConfig.ts` - Added testMCPServer, getMCPTools
+- `MCPSettingsEditor.tsx` - Connection test UI, tool toggles, JSON import modal
+- `AgentSettingsEditor.tsx` - Markdown import modal
+- `SkillsSettingsEditor.tsx` - Markdown import modal
+- `CommandSettingsEditor.tsx` - Markdown import modal
 
-#### Key Files Created
-- `hooks/useRouteSync.ts` - URL sync hook
-- `components/layout/BaseLayout.tsx` - Base layout (Sidebar + Main)
-- `components/layout/SplitLayout.tsx` - Split layout (Main + Right Panel)
-- `components/project/ProjectListNav.tsx` - Routing-aware project list
-- `components/project/ProjectCardNav.tsx` - Routing-aware project card
-- `components/session/SessionListNav.tsx` - Routing-aware session list
-- `components/session/SessionItemNav.tsx` - Routing-aware session item
-- `components/pages/HomePage.tsx` - Home page (project grid)
-- `components/pages/ProjectPage.tsx` - Project top page
-- `components/pages/SessionPage.tsx` - Session detail page (chat)
-- `app/projects/[id]/layout.tsx` - Project layout (shared right panel)
-- `app/projects/[id]/page.tsx` - Project route
-- `app/projects/[id]/sessions/[sessionId]/page.tsx` - Session route
+**Import Format Examples:**
+
+MCP Server (JSON - Claude Desktop format):
+```json
+{ "mcpServers": { "serverName": { "command": "npx", "args": [...] } } }
+```
+
+Agent/Skill/Command (Markdown with YAML frontmatter):
+```markdown
+---
+name: example
+description: Example description
+category: general
+---
+Content here
+```
+
+### Project Config Management UI (Completed - 2025-12-29)
+Frontend UI for managing MCP Servers, Agents, Skills, and Commands using database-based API.
+
+**Files Created:**
+- `src/frontend/src/types/projectConfig.ts` - TypeScript types
+- `src/frontend/src/lib/api/projectConfig.ts` - API client for CRUD
+
+**Features:**
+- Full CRUD operations for MCP Servers, Agents, Skills, Commands
+- Enable/disable toggle switches for each item
+- Edit and delete modals with form validation
+- Category grouping for Agents, Skills, Commands
+- Dark theme (Linear style) consistent UI
+
+### Previous Updates
+- **Project Settings & Pricing Tabs**: Added api_key column to projects table
+- **Project-Specific API Key**: Chat/Cron use project's api_key only
 
 ## Available Sub-Agents
 - Explore: Codebase exploration
@@ -73,61 +104,14 @@ New URL-based routing implemented:
 - Container-specific rebuilds only
 - API-based search (not local filtering)
 - URL-based routing with Next.js App Router
-- useRouteSync hook for URL ↔ Store sync
-- Shared layout for right panel persistence
+- DB-based project config management (not file-based)
+- MCP Protocol (JSON-RPC 2.0 over stdio) for server testing
 
 ## Blockers
 - None identified
 
-## Recent Session Updates
-
-### Project Settings & Pricing Tabs (Completed)
-Added new tabs to the right panel for project settings and pricing:
-
-**Backend Changes:**
-- `ProjectModel`: Added `api_key` column (String 500)
-- `Project` Pydantic model: Added `api_key` field
-- `UpdateProjectRequest`: Added `api_key` field
-- `ProjectResponse`: Added `api_key` field
-- `ProjectManager.update_project()`: Added api_key parameter handling
-- `projects.py` API route: Updated to pass api_key
-
-**Frontend Changes:**
-- `uiStore.ts`: Extended EditorTab type with 'settings' | 'pricing'
-- `types/project.ts`: Added api_key to Project and UpdateProjectRequest
-- `lib/api/projects.ts`: Added api_key to UpdateProjectRequest
-- `ProjectSettingsEditor.tsx`: NEW - Edit project name, description, API key
-- `PricingEditor.tsx`: NEW - Display usage stats and pricing table
-- `EditorContainer.tsx`: Added settings and pricing tabs (Settings rightmost, Pricing second from right)
-
-**Tab Order (updated):**
-VSCode → MCP → サブエージェント → コマンド → スキル → スケジュール → 料金 → 設定
-
-### Project-Specific API Key Only (Completed)
-Changed system to use ONLY project-specific API keys (not system default):
-
-**Key Changes:**
-- `handlers.py`: 
-  - Get project's api_key from DB before chat
-  - Return error if no api_key configured
-  - Pass api_key via `ClaudeAgentOptions.env={"ANTHROPIC_API_KEY": project.api_key}`
-- `cron_scheduler.py`:
-  - Get project's api_key from DB before cron execution
-  - Fail execution if no api_key configured
-  - Pass api_key via ClaudeAgentOptions.env
-
-**Error Handling:**
-- Chat: Error message "プロジェクトにAPIキーが設定されていません。設定画面でAPIキーを設定してください。"
-- Cron: Execution logged as failed with error message
-
-**Database Migration (completed):**
-```sql
-ALTER TABLE projects ADD COLUMN api_key VARCHAR(500) NULL;
-```
-
 ## Next Actions
-1. Run database migration for api_key column
-2. Frontend UI for managing MCP/Agent/Skill/Command
-3. Import/Export functionality for project configs
-4. Template-based project initialization
-5. UI refinements based on user feedback
+1. Export functionality for project configs (download as file)
+2. Template-based project initialization
+3. Bulk import with validation and preview
+4. UI refinements based on user feedback

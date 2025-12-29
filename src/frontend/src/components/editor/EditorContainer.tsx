@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { MCPSettingsEditor } from './MCPSettingsEditor';
 import { AgentSettingsEditor } from './AgentSettingsEditor';
@@ -107,13 +107,6 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   const { isEditorPanelOpen, activeEditorTab, setActiveEditorTab, openEditorTab, toggleEditorPanel } = useUIStore();
   const [pendingFile, setPendingFile] = useState<string | null>(null);
 
-  // Handle file creation from settings editors
-  const handleFileCreated = useCallback((relativePath: string) => {
-    // Store the file path and switch to VSCode tab
-    setPendingFile(relativePath);
-    openEditorTab('vscode');
-  }, [openEditorTab]);
-
   // Collapsed view: vertical icon bar on the right
   if (!isEditorPanelOpen) {
     return (
@@ -180,13 +173,13 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
           <MCPSettingsEditor projectId={projectId} />
         )}
         {activeEditorTab === 'agents' && (
-          <AgentSettingsEditor projectId={projectId} onFileCreated={handleFileCreated} />
+          <AgentSettingsEditor projectId={projectId} />
         )}
         {activeEditorTab === 'commands' && (
-          <CommandSettingsEditor projectId={projectId} onFileCreated={handleFileCreated} />
+          <CommandSettingsEditor projectId={projectId} />
         )}
         {activeEditorTab === 'skills' && (
-          <SkillsSettingsEditor projectId={projectId} onFileCreated={handleFileCreated} />
+          <SkillsSettingsEditor projectId={projectId} />
         )}
         {activeEditorTab === 'cron' && (
           <CronSettingsEditor projectId={projectId} />

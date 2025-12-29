@@ -38,6 +38,7 @@ export { agentsApi } from './agents';
 export { commandsApi } from './commands';
 export { skillsApi } from './skills';
 export { cronApi } from './cron';
+export { projectConfigApi } from './projectConfig';
 export type {
   SkillsConfig,
   SkillsConfigResponse,
@@ -54,3 +55,18 @@ export type {
   CronExecutionLog,
   CronPreset,
 } from '@/types/cron';
+export type {
+  ProjectMCPServer,
+  CreateProjectMCPServerRequest,
+  UpdateProjectMCPServerRequest,
+  ProjectAgent,
+  CreateProjectAgentRequest,
+  UpdateProjectAgentRequest,
+  ProjectSkill,
+  CreateProjectSkillRequest,
+  UpdateProjectSkillRequest,
+  ProjectCommand,
+  CreateProjectCommandRequest,
+  UpdateProjectCommandRequest,
+  ProjectConfigResponse,
+} from '@/types/projectConfig';

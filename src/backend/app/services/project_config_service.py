@@ -190,6 +190,7 @@ description: {cmd.description or ''}
             args=data.args,
             env=data.env,
             enabled=data.enabled,
+            enabled_tools=data.enabled_tools,
         )
         self.session.add(mcp_server)
         await self.session.commit()
@@ -498,6 +499,7 @@ description: {cmd.description or ''}
                     "command": s.command,
                     "args": s.args or [],
                     "env": s.env or {},
+                    "enabled_tools": s.enabled_tools,
                 }
                 for s in mcp_servers
             ],

@@ -1,12 +1,13 @@
 /**
  * MCP Settings Editor Component
- * Allows editing MCP server configurations
+ * Allows editing MCP server configurations using database-backed API
  */
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/common/Button';
-import { mcpApi, MCPConfig, MCPServerConfig } from '@/lib/api';
+import { projectConfigApi } from '@/lib/api';
+import type { ProjectMCPServer, CreateProjectMCPServerRequest, UpdateProjectMCPServerRequest, MCPTool } from '@/types';
 
 interface MCPSettingsEditorProps {
   projectId: string;
@@ -19,6 +20,13 @@ interface ServerFormData {
   env: string;
 }
 
+interface TestResult {
+  loading: boolean;
+  success?: boolean;
+  tools?: MCPTool[];
+  error?: string;
+}
+
 const emptyServerForm: ServerFormData = {
   name: '',
   command: '',
@@ -26,35 +34,53 @@ const emptyServerForm: ServerFormData = {
   env: '',
 };
 
+// Interface for parsed MCP server from JSON
+interface ParsedMCPServer {
+  name: string;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  enabled_tools?: string[] | null;
+}
+
 export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId }) => {
-  const [config, setConfig] = useState<MCPConfig>({ mcpServers: {} });
-  const [configPath, setConfigPath] = useState<string>('');
+  const [servers, setServers] = useState<ProjectMCPServer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [isAddingServer, setIsAddingServer] = useState(false);
-  const [editingServer, setEditingServer] = useState<string | null>(null);
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
   const [serverForm, setServerForm] = useState<ServerFormData>(emptyServerForm);
 
-  const loadConfig = useCallback(async () => {
+  // Import modal state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importJsonText, setImportJsonText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Test results for each server
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+  // Expanded tool panels
+  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
+
+  const loadServers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await mcpApi.getConfig(projectId);
-      setConfig(response.config);
-      setConfigPath(response.path);
+      const serverList = await projectConfigApi.listMCPServers(projectId);
+      setServers(serverList);
     } catch (err: any) {
-      setError(err.message || 'Failed to load MCP configuration');
+      setError(err.message || 'Failed to load MCP servers');
     } finally {
       setIsLoading(false);
     }
   }, [projectId]);
 
   useEffect(() => {
-    loadConfig();
-  }, [loadConfig]);
+    loadServers();
+  }, [loadServers]);
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -84,39 +110,48 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
   const handleAddServer = () => {
     setIsAddingServer(true);
-    setEditingServer(null);
+    setEditingServerId(null);
     setServerForm(emptyServerForm);
   };
 
-  const handleEditServer = (name: string) => {
-    const server = config.mcpServers[name];
-    if (!server) return;
-
-    setEditingServer(name);
+  const handleEditServer = (server: ProjectMCPServer) => {
+    setEditingServerId(server.id);
     setIsAddingServer(false);
     setServerForm({
-      name,
+      name: server.name,
       command: server.command,
-      args: server.args.join(' '),
+      args: (server.args || []).join(' '),
       env: envToString(server.env),
     });
   };
 
-  const handleDeleteServer = async (name: string) => {
-    if (!confirm(`Are you sure you want to delete the server "${name}"?`)) {
+  const handleDeleteServer = async (server: ProjectMCPServer) => {
+    if (!confirm(`Are you sure you want to delete the server "${server.name}"?`)) {
       return;
     }
 
     try {
-      const newConfig = { ...config };
-      delete newConfig.mcpServers[name];
-
       setIsSaving(true);
-      await mcpApi.updateConfig(projectId, newConfig);
-      setConfig(newConfig);
-      showSuccess(`Server "${name}" deleted successfully`);
+      await projectConfigApi.deleteMCPServer(projectId, server.id);
+      setServers(prev => prev.filter(s => s.id !== server.id));
+      showSuccess(`Server "${server.name}" deleted successfully`);
     } catch (err: any) {
       setError(err.message || 'Failed to delete server');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleToggleEnabled = async (server: ProjectMCPServer) => {
+    try {
+      setIsSaving(true);
+      const updated = await projectConfigApi.updateMCPServer(projectId, server.id, {
+        enabled: !server.enabled,
+      });
+      setServers(prev => prev.map(s => s.id === server.id ? updated : s));
+      showSuccess(`Server "${server.name}" ${updated.enabled ? 'enabled' : 'disabled'}`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update server');
     } finally {
       setIsSaving(false);
     }
@@ -128,34 +163,41 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       return;
     }
 
-    const serverConfig: MCPServerConfig = {
-      command: serverForm.command.trim(),
-      args: serverForm.args.trim() ? serverForm.args.trim().split(/\s+/) : [],
-    };
-
     const envObj = parseEnvString(serverForm.env);
-    if (Object.keys(envObj).length > 0) {
-      serverConfig.env = envObj;
-    }
-
-    const newConfig = { ...config };
-
-    // If editing and name changed, delete old entry
-    if (editingServer && editingServer !== serverForm.name) {
-      delete newConfig.mcpServers[editingServer];
-    }
-
-    newConfig.mcpServers[serverForm.name.trim()] = serverConfig;
+    const args = serverForm.args.trim() ? serverForm.args.trim().split(/\s+/) : [];
 
     try {
       setIsSaving(true);
       setError(null);
-      await mcpApi.updateConfig(projectId, newConfig);
-      setConfig(newConfig);
+
+      if (editingServerId) {
+        // Update existing server
+        const updateData: UpdateProjectMCPServerRequest = {
+          name: serverForm.name.trim(),
+          command: serverForm.command.trim(),
+          args,
+          env: envObj,
+        };
+        const updated = await projectConfigApi.updateMCPServer(projectId, editingServerId, updateData);
+        setServers(prev => prev.map(s => s.id === editingServerId ? updated : s));
+        showSuccess('Server updated successfully');
+      } else {
+        // Create new server
+        const createData: CreateProjectMCPServerRequest = {
+          name: serverForm.name.trim(),
+          command: serverForm.command.trim(),
+          args,
+          env: Object.keys(envObj).length > 0 ? envObj : undefined,
+          enabled: true,
+        };
+        const created = await projectConfigApi.createMCPServer(projectId, createData);
+        setServers(prev => [...prev, created]);
+        showSuccess('Server added successfully');
+      }
+
       setIsAddingServer(false);
-      setEditingServer(null);
+      setEditingServerId(null);
       setServerForm(emptyServerForm);
-      showSuccess(editingServer ? 'Server updated successfully' : 'Server added successfully');
     } catch (err: any) {
       setError(err.message || 'Failed to save server configuration');
     } finally {
@@ -165,9 +207,245 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
   const handleCancel = () => {
     setIsAddingServer(false);
-    setEditingServer(null);
+    setEditingServerId(null);
     setServerForm(emptyServerForm);
     setError(null);
+  };
+
+  // Parse JSON and extract MCP server configurations
+  const parseImportJson = (jsonText: string): ParsedMCPServer[] => {
+    const parsed = JSON.parse(jsonText);
+    const servers: ParsedMCPServer[] = [];
+
+    // Format 1: mcpServers object (Claude Code format)
+    // { "mcpServers": { "server-name": { "command": "...", "args": [...], "env": {...} } } }
+    if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
+      for (const [name, config] of Object.entries(parsed.mcpServers)) {
+        const serverConfig = config as Record<string, unknown>;
+        if (typeof serverConfig.command === 'string') {
+          servers.push({
+            name,
+            command: serverConfig.command,
+            args: Array.isArray(serverConfig.args) ? serverConfig.args : undefined,
+            env: typeof serverConfig.env === 'object' && serverConfig.env !== null
+              ? serverConfig.env as Record<string, string>
+              : undefined,
+            enabled_tools: Array.isArray(serverConfig.enabled_tools)
+              ? serverConfig.enabled_tools
+              : undefined,
+          });
+        }
+      }
+    }
+    // Format 2: Single server object with name field
+    // { "name": "server-name", "command": "...", "args": [...], "env": {...} }
+    else if (parsed.name && typeof parsed.command === 'string') {
+      servers.push({
+        name: parsed.name,
+        command: parsed.command,
+        args: Array.isArray(parsed.args) ? parsed.args : undefined,
+        env: typeof parsed.env === 'object' && parsed.env !== null
+          ? parsed.env as Record<string, string>
+          : undefined,
+        enabled_tools: Array.isArray(parsed.enabled_tools)
+          ? parsed.enabled_tools
+          : undefined,
+      });
+    }
+    // Format 3: Array of servers
+    // [{ "name": "...", "command": "...", ... }, ...]
+    else if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        if (typeof item.name === 'string' && typeof item.command === 'string') {
+          servers.push({
+            name: item.name,
+            command: item.command,
+            args: Array.isArray(item.args) ? item.args : undefined,
+            env: typeof item.env === 'object' && item.env !== null
+              ? item.env as Record<string, string>
+              : undefined,
+            enabled_tools: Array.isArray(item.enabled_tools)
+              ? item.enabled_tools
+              : undefined,
+          });
+        }
+      }
+    }
+
+    return servers;
+  };
+
+  // Handle import JSON
+  const handleImportJson = async () => {
+    if (!importJsonText.trim()) {
+      setImportError('Please paste JSON content');
+      return;
+    }
+
+    setImportError(null);
+    setIsImporting(true);
+
+    try {
+      const parsedServers = parseImportJson(importJsonText);
+
+      if (parsedServers.length === 0) {
+        setImportError('No valid MCP server configurations found in the JSON. Please check the format.');
+        setIsImporting(false);
+        return;
+      }
+
+      // Create servers one by one
+      const createdServers: ProjectMCPServer[] = [];
+      const errors: string[] = [];
+
+      for (const serverData of parsedServers) {
+        try {
+          const created = await projectConfigApi.createMCPServer(projectId, {
+            name: serverData.name,
+            command: serverData.command,
+            args: serverData.args || [],
+            env: serverData.env || {},
+            enabled: true,
+            enabled_tools: serverData.enabled_tools,
+          });
+          createdServers.push(created);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Unknown error';
+          errors.push(`Failed to create "${serverData.name}": ${message}`);
+        }
+      }
+
+      if (createdServers.length > 0) {
+        setServers(prev => [...prev, ...createdServers]);
+        showSuccess(`Successfully imported ${createdServers.length} server(s)`);
+      }
+
+      if (errors.length > 0) {
+        setImportError(errors.join('\n'));
+      } else {
+        // Close modal on complete success
+        setIsImportModalOpen(false);
+        setImportJsonText('');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setImportError(`Invalid JSON format: ${message}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleCloseImportModal = () => {
+    setIsImportModalOpen(false);
+    setImportJsonText('');
+    setImportError(null);
+  };
+
+  // Test MCP server connection
+  const handleTestConnection = async (server: ProjectMCPServer) => {
+    setTestResults(prev => ({
+      ...prev,
+      [server.id]: { loading: true }
+    }));
+
+    try {
+      const result = await projectConfigApi.testMCPServer(projectId, server.id);
+      setTestResults(prev => ({
+        ...prev,
+        [server.id]: {
+          loading: false,
+          success: result.success,
+          tools: result.tools,
+          error: result.error
+        }
+      }));
+
+      if (result.success) {
+        setExpandedTools(prev => ({ ...prev, [server.id]: true }));
+        showSuccess(`Connection successful - ${result.tools.length} tool(s) available`);
+      } else {
+        setError(result.error || 'Connection test failed');
+      }
+    } catch (err: any) {
+      setTestResults(prev => ({
+        ...prev,
+        [server.id]: {
+          loading: false,
+          success: false,
+          error: err.message || 'Failed to test connection'
+        }
+      }));
+      setError(err.message || 'Failed to test connection');
+    }
+  };
+
+  // Toggle tool panel expansion
+  const handleToggleToolsPanel = (serverId: string) => {
+    setExpandedTools(prev => ({
+      ...prev,
+      [serverId]: !prev[serverId]
+    }));
+  };
+
+  // Toggle individual tool enabled/disabled
+  const handleToolToggle = async (server: ProjectMCPServer, toolName: string, enabled: boolean) => {
+    const currentEnabledTools = server.enabled_tools;
+    let newEnabledTools: string[];
+
+    if (currentEnabledTools === null || currentEnabledTools === undefined) {
+      // If null, all tools are enabled. When disabling one, we need to get all tools first
+      const testResult = testResults[server.id];
+      if (!testResult?.tools) {
+        setError('Please test the connection first to load available tools');
+        return;
+      }
+      // Start with all tools enabled, then remove the one being disabled
+      if (enabled) {
+        // Already enabled (all are enabled), nothing to do
+        return;
+      }
+      newEnabledTools = testResult.tools
+        .map(t => t.name)
+        .filter(name => name !== toolName);
+    } else {
+      if (enabled) {
+        // Add tool to enabled list
+        newEnabledTools = [...currentEnabledTools, toolName];
+      } else {
+        // Remove tool from enabled list
+        newEnabledTools = currentEnabledTools.filter(name => name !== toolName);
+      }
+    }
+
+    try {
+      setIsSaving(true);
+      const updated = await projectConfigApi.updateMCPServer(projectId, server.id, {
+        enabled_tools: newEnabledTools.length > 0 ? newEnabledTools : null
+      });
+      setServers(prev => prev.map(s => s.id === server.id ? updated : s));
+      showSuccess(`Tool "${toolName}" ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update tool settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Check if a tool is enabled for a server
+  const isToolEnabled = (server: ProjectMCPServer, toolName: string): boolean => {
+    // If enabled_tools is null/undefined, all tools are enabled
+    if (server.enabled_tools === null || server.enabled_tools === undefined) {
+      return true;
+    }
+    return server.enabled_tools.includes(toolName);
+  };
+
+  // Get count of enabled tools
+  const getEnabledToolsCount = (server: ProjectMCPServer, totalTools: number): string => {
+    if (server.enabled_tools === null || server.enabled_tools === undefined) {
+      return `${totalTools}/${totalTools}`;
+    }
+    return `${server.enabled_tools.length}/${totalTools}`;
   };
 
   if (isLoading) {
@@ -178,8 +456,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
     );
   }
 
-  const serverNames = Object.keys(config.mcpServers);
-  const isFormOpen = isAddingServer || editingServer !== null;
+  const isFormOpen = isAddingServer || editingServerId !== null;
 
   return (
     <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
@@ -187,30 +464,45 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-text-primary">MCP Settings</h2>
-          <p className="text-xs text-text-tertiary mt-1 font-mono">{configPath}</p>
+          <p className="text-xs text-text-tertiary mt-1">
+            {servers.length} server{servers.length !== 1 ? 's' : ''} configured
+          </p>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleAddServer}
-          disabled={isFormOpen}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Server
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsImportModalOpen(true)}
+            disabled={isFormOpen}
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import JSON
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleAddServer}
+            disabled={isFormOpen}
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Server
+          </Button>
+        </div>
       </div>
 
       {/* Messages */}
       {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
       {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-          <p className="text-sm text-green-600">{successMessage}</p>
+        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
+          <p className="text-sm text-green-400">{successMessage}</p>
         </div>
       )}
 
@@ -220,7 +512,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
         {isFormOpen && (
           <div className="mb-6 p-4 bg-bg-secondary rounded-lg border border-border">
             <h3 className="text-sm font-semibold text-text-primary mb-4">
-              {editingServer ? `Edit Server: ${editingServer}` : 'Add New Server'}
+              {editingServerId ? 'Edit Server' : 'Add New Server'}
             </h3>
 
             <div className="space-y-4">
@@ -287,7 +579,7 @@ SOME_VAR=value"
                   onClick={handleSaveServer}
                   disabled={isSaving}
                 >
-                  {isSaving ? 'Saving...' : (editingServer ? 'Update' : 'Add')}
+                  {isSaving ? 'Saving...' : (editingServerId ? 'Update' : 'Add')}
                 </Button>
               </div>
             </div>
@@ -295,7 +587,7 @@ SOME_VAR=value"
         )}
 
         {/* Server List */}
-        {serverNames.length === 0 && !isFormOpen ? (
+        {servers.length === 0 && !isFormOpen ? (
           <div className="text-center py-12">
             <svg
               className="w-16 h-16 mx-auto mb-4 text-text-tertiary"
@@ -320,85 +612,326 @@ SOME_VAR=value"
           </div>
         ) : (
           <div className="space-y-3">
-            {serverNames.map((name) => {
-              const server = config.mcpServers[name];
-              const isEditing = editingServer === name;
+            {servers.map((server) => {
+              const isEditing = editingServerId === server.id;
+              const testResult = testResults[server.id];
+              const isToolsPanelExpanded = expandedTools[server.id];
 
               return (
                 <div
-                  key={name}
-                  className={`p-4 rounded-lg border transition-colors ${
+                  key={server.id}
+                  className={`rounded-lg border transition-colors ${
                     isEditing
                       ? 'border-primary bg-primary/5'
-                      : 'border-border bg-bg-secondary hover:border-border-hover'
+                      : server.enabled
+                        ? 'border-border bg-bg-secondary hover:border-border-hover'
+                        : 'border-border bg-bg-secondary/50 opacity-60'
                   }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-                          </svg>
+                  {/* Server Header */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-8 h-8 rounded flex items-center justify-center ${
+                            server.enabled ? 'bg-primary/10' : 'bg-bg-tertiary'
+                          }`}>
+                            <svg className={`w-4 h-4 ${server.enabled ? 'text-primary' : 'text-text-tertiary'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
+                            </svg>
+                          </div>
+                          <h4 className="font-medium text-text-primary">{server.name}</h4>
+                          {!server.enabled && (
+                            <span className="text-xs text-text-tertiary bg-bg-tertiary px-2 py-0.5 rounded">
+                              Disabled
+                            </span>
+                          )}
                         </div>
-                        <h4 className="font-medium text-text-primary">{name}</h4>
-                      </div>
 
-                      <div className="space-y-1 text-sm">
-                        <div className="flex items-start gap-2">
-                          <span className="text-text-tertiary w-20 flex-shrink-0">Command:</span>
-                          <code className="text-text-secondary font-mono bg-bg-tertiary px-1 rounded">
-                            {server.command}
-                          </code>
-                        </div>
-                        {server.args.length > 0 && (
+                        <div className="space-y-1 text-sm">
                           <div className="flex items-start gap-2">
-                            <span className="text-text-tertiary w-20 flex-shrink-0">Args:</span>
-                            <code className="text-text-secondary font-mono bg-bg-tertiary px-1 rounded text-xs break-all">
-                              {server.args.join(' ')}
+                            <span className="text-text-tertiary w-20 flex-shrink-0">Command:</span>
+                            <code className="text-text-secondary font-mono bg-bg-tertiary px-1 rounded">
+                              {server.command}
                             </code>
                           </div>
-                        )}
-                        {server.env && Object.keys(server.env).length > 0 && (
-                          <div className="flex items-start gap-2">
-                            <span className="text-text-tertiary w-20 flex-shrink-0">Env vars:</span>
-                            <span className="text-text-secondary">
-                              {Object.keys(server.env).length} variable(s)
-                            </span>
-                          </div>
-                        )}
+                          {server.args && server.args.length > 0 && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-text-tertiary w-20 flex-shrink-0">Args:</span>
+                              <code className="text-text-secondary font-mono bg-bg-tertiary px-1 rounded text-xs break-all">
+                                {server.args.join(' ')}
+                              </code>
+                            </div>
+                          )}
+                          {server.env && Object.keys(server.env).length > 0 && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-text-tertiary w-20 flex-shrink-0">Env vars:</span>
+                              <span className="text-text-secondary">
+                                {Object.keys(server.env).length} variable(s)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 ml-4">
+                        {/* Toggle Switch */}
+                        <button
+                          onClick={() => handleToggleEnabled(server)}
+                          disabled={isSaving}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
+                            server.enabled ? 'bg-primary' : 'bg-bg-tertiary'
+                          }`}
+                          title={server.enabled ? 'Disable server' : 'Enable server'}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              server.enabled ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+
+                        <button
+                          onClick={() => handleEditServer(server)}
+                          disabled={isFormOpen && !isEditing}
+                          className="p-2 text-text-secondary hover:text-primary hover:bg-primary/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Edit"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteServer(server)}
+                          disabled={isSaving}
+                          className="p-2 text-text-secondary hover:text-red-400 hover:bg-red-900/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Delete"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="flex items-center gap-1 ml-4">
+                  {/* Connection Test Section */}
+                  <div className="px-4 pb-3 border-t border-border/50">
+                    <div className="flex items-center gap-3 pt-3">
                       <button
-                        onClick={() => handleEditServer(name)}
-                        disabled={isFormOpen && !isEditing}
-                        className="p-2 text-text-secondary hover:text-primary hover:bg-primary/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Edit"
+                        onClick={() => handleTestConnection(server)}
+                        disabled={testResult?.loading || isSaving || !server.enabled}
+                        className="px-3 py-1.5 text-xs font-medium rounded border border-border bg-bg-tertiary text-text-secondary hover:bg-bg-primary hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
+                        {testResult?.loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+                            Testing...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Test Connection
+                          </>
+                        )}
                       </button>
-                      <button
-                        onClick={() => handleDeleteServer(name)}
-                        disabled={isSaving}
-                        className="p-2 text-text-secondary hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Delete"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+
+                      {/* Test Result Status */}
+                      {testResult && !testResult.loading && (
+                        <div className="flex items-center gap-2">
+                          {testResult.success ? (
+                            <>
+                              <span className="flex items-center gap-1 text-xs text-green-400">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Connected
+                              </span>
+                              {testResult.tools && testResult.tools.length > 0 && (
+                                <button
+                                  onClick={() => handleToggleToolsPanel(server.id)}
+                                  className="flex items-center gap-1 text-xs text-text-secondary hover:text-primary transition-colors"
+                                >
+                                  <span className="text-text-tertiary">
+                                    ({getEnabledToolsCount(server, testResult.tools.length)} tools)
+                                  </span>
+                                  <svg
+                                    className={`w-4 h-4 transition-transform ${isToolsPanelExpanded ? 'rotate-180' : ''}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-red-400">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              {testResult.error || 'Connection failed'}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* Tools Panel */}
+                  {isToolsPanelExpanded && testResult?.tools && testResult.tools.length > 0 && (
+                    <div className="px-4 pb-4 border-t border-border/50">
+                      <div className="pt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-text-secondary">Available Tools</span>
+                          <span className="text-xs text-text-tertiary">
+                            {getEnabledToolsCount(server, testResult.tools.length)} enabled
+                          </span>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {testResult.tools.map((tool) => {
+                            const enabled = isToolEnabled(server, tool.name);
+                            return (
+                              <div
+                                key={tool.name}
+                                className={`flex items-start gap-3 p-2 rounded border transition-colors ${
+                                  enabled
+                                    ? 'border-border/50 bg-bg-primary'
+                                    : 'border-border/30 bg-bg-primary/50 opacity-60'
+                                }`}
+                              >
+                                {/* Tool Toggle */}
+                                <button
+                                  onClick={() => handleToolToggle(server, tool.name, !enabled)}
+                                  disabled={isSaving}
+                                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 mt-0.5 ${
+                                    enabled ? 'bg-primary' : 'bg-bg-tertiary'
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                      enabled ? 'translate-x-5' : 'translate-x-0.5'
+                                    }`}
+                                  />
+                                </button>
+
+                                {/* Tool Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <code className="text-xs font-medium text-text-primary font-mono">
+                                      {tool.name}
+                                    </code>
+                                  </div>
+                                  {tool.description && (
+                                    <p className="text-xs text-text-tertiary mt-0.5 line-clamp-2">
+                                      {tool.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Import JSON Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">Import from JSON</h3>
+                <p className="text-sm text-text-tertiary mt-1">
+                  Paste MCP server configuration in JSON format
+                </p>
+              </div>
+              <button
+                onClick={handleCloseImportModal}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {importError && (
+                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+                  <p className="text-sm text-red-400 whitespace-pre-wrap">{importError}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  JSON Content
+                </label>
+                <textarea
+                  value={importJsonText}
+                  onChange={(e) => setImportJsonText(e.target.value)}
+                  placeholder='Paste your JSON here...'
+                  rows={12}
+                  className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm resize-y"
+                />
+              </div>
+
+              <div className="text-sm text-text-tertiary">
+                <p className="font-medium text-text-secondary mb-2">Supported formats:</p>
+                <div className="bg-bg-secondary rounded-md p-3 font-mono text-xs overflow-x-auto">
+                  <pre>{`// Claude Code format (mcpServers)
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "npx",
+      "args": ["-y", "@package/name"],
+      "env": { "API_KEY": "..." }
+    }
+  }
+}
+
+// Single server format
+{
+  "name": "server-name",
+  "command": "npx",
+  "args": ["-y", "@package/name"],
+  "env": {}
+}`}</pre>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCloseImportModal}
+                disabled={isImporting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleImportJson}
+                disabled={isImporting || !importJsonText.trim()}
+              >
+                {isImporting ? 'Importing...' : 'Import'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

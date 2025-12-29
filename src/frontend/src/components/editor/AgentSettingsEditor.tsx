@@ -1,25 +1,26 @@
 /**
  * Agent Settings Editor Component
- * Allows managing sub-agent configurations per project
+ * Manages sub-agent configurations per project using DB-based API
  */
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/common/Button';
-import { agentsApi } from '@/lib/api';
+import { projectConfigApi } from '@/lib/api';
 import type {
-  AgentDefinition,
-  AgentsConfig,
-  AgentCategory,
-  AgentModel,
-  CreateCustomAgentRequest,
-} from '@/types/agent';
+  ProjectAgent,
+  CreateProjectAgentRequest,
+  UpdateProjectAgentRequest,
+} from '@/types/projectConfig';
 import { AGENT_MODEL_OPTIONS, AGENT_TOOL_OPTIONS } from '@/types/agent';
+import type { AgentModel } from '@/types/agent';
 
 interface AgentSettingsEditorProps {
   projectId: string;
-  onFileCreated?: (relativePath: string) => void;
 }
+
+// Category type for grouping
+type AgentCategory = 'exploration' | 'development' | 'quality' | 'documentation' | 'devops' | 'data' | 'custom';
 
 // Category display configuration
 const CATEGORY_CONFIG: Record<AgentCategory, { label: string; icon: React.ReactNode }> = {
@@ -71,14 +72,77 @@ const CATEGORY_CONFIG: Record<AgentCategory, { label: string; icon: React.ReactN
       </svg>
     ),
   },
+  custom: {
+    label: 'Custom',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+      </svg>
+    ),
+  },
 };
 
-const CATEGORY_ORDER: AgentCategory[] = ['exploration', 'development', 'quality', 'documentation', 'devops', 'data'];
+const CATEGORY_ORDER: AgentCategory[] = ['exploration', 'development', 'quality', 'documentation', 'devops', 'data', 'custom'];
 
-export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projectId, onFileCreated }) => {
-  const [availableAgents, setAvailableAgents] = useState<AgentDefinition[]>([]);
-  const [config, setConfig] = useState<AgentsConfig | null>(null);
-  const [configPath, setConfigPath] = useState<string>('');
+// Default form state for creating/editing agents
+const getDefaultAgentForm = (): CreateProjectAgentRequest => ({
+  name: '',
+  description: '',
+  category: 'development',
+  model: 'sonnet',
+  tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'],
+  system_prompt: '',
+  enabled: true,
+});
+
+// Parse YAML frontmatter from markdown
+interface ParsedMarkdown {
+  meta: Record<string, unknown>;
+  content: string;
+}
+
+const parseMarkdownWithFrontmatter = (markdown: string): ParsedMarkdown | null => {
+  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
+  const match = markdown.match(frontmatterRegex);
+  if (!match) return null;
+
+  const frontmatter = match[1];
+  const content = match[2].trim();
+
+  // Simple YAML parser
+  const meta: Record<string, unknown> = {};
+  const lines = frontmatter.split('\n');
+  let currentKey = '';
+
+  for (const line of lines) {
+    // Array start (e.g., "tools:")
+    if (line.match(/^(\w+):\s*$/)) {
+      currentKey = line.match(/^(\w+):/)?.[1] || '';
+      meta[currentKey] = [];
+    }
+    // Array item
+    else if (line.match(/^\s+-\s+(.+)$/)) {
+      const value = line.match(/^\s+-\s+(.+)$/)?.[1];
+      if (currentKey && Array.isArray(meta[currentKey]) && value) {
+        (meta[currentKey] as string[]).push(value);
+      }
+    }
+    // Key: value
+    else if (line.match(/^(\w+):\s*(.+)$/)) {
+      const matches = line.match(/^(\w+):\s*(.+)$/);
+      if (matches) {
+        const [, key, value] = matches;
+        meta[key] = value === 'true' ? true : value === 'false' ? false : value;
+      }
+      currentKey = '';
+    }
+  }
+
+  return { meta, content };
+};
+
+export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projectId }) => {
+  const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,28 +153,33 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
 
   // Create agent modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newAgentForm, setNewAgentForm] = useState<CreateCustomAgentRequest>({
-    name: '',
-    description: '',
-    category: 'development',
-    model: 'sonnet',
-    tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'],
-  });
+  const [newAgentForm, setNewAgentForm] = useState<CreateProjectAgentRequest>(getDefaultAgentForm());
   const [isCreating, setIsCreating] = useState(false);
+
+  // Edit agent modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<ProjectAgent | null>(null);
+  const [editAgentForm, setEditAgentForm] = useState<UpdateProjectAgentRequest>({});
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Delete confirmation state
+  const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null);
+
+  // Import modal state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importMarkdownText, setImportMarkdownText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [agentsResponse, configResponse] = await Promise.all([
-        agentsApi.getAvailableAgents(),
-        agentsApi.getConfig(projectId),
-      ]);
-      setAvailableAgents(agentsResponse);
-      setConfig(configResponse.config);
-      setConfigPath(configResponse.path);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load agent configuration');
+      const agentsList = await projectConfigApi.listAgents(projectId);
+      setAgents(agentsList);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load agent configuration';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -125,87 +194,25 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleToggleAgent = async (agentName: string, enabled: boolean) => {
-    if (!config) return;
+  const handleToggleAgent = async (agent: ProjectAgent) => {
+    const newEnabled = !agent.enabled;
 
     // Optimistic update
-    const newConfig = { ...config };
-    if (newConfig.agents[agentName]) {
-      newConfig.agents[agentName] = { ...newConfig.agents[agentName], enabled };
-    }
-    setConfig(newConfig);
+    setAgents((prev) =>
+      prev.map((a) => (a.id === agent.id ? { ...a, enabled: newEnabled } : a))
+    );
 
     try {
       setIsSaving(true);
-      await agentsApi.toggleAgent(projectId, agentName, enabled);
-      showSuccess(`${agentName} ${enabled ? 'enabled' : 'disabled'}`);
-    } catch (err: any) {
+      await projectConfigApi.updateAgent(projectId, agent.id, { enabled: newEnabled });
+      showSuccess(`${agent.name} ${newEnabled ? 'enabled' : 'disabled'}`);
+    } catch (err: unknown) {
       // Revert on error
-      loadData();
-      setError(err.message || 'Failed to toggle agent');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleEnableAll = async () => {
-    if (!config) return;
-
-    try {
-      setIsSaving(true);
-      const newConfig: AgentsConfig = {
-        ...config,
-        agents: Object.fromEntries(
-          Object.entries(config.agents).map(([name, agent]) => [
-            name,
-            { ...agent, enabled: true },
-          ])
-        ),
-      };
-      await agentsApi.updateConfig(projectId, newConfig);
-      setConfig(newConfig);
-      showSuccess('All agents enabled');
-    } catch (err: any) {
-      setError(err.message || 'Failed to enable all agents');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDisableAll = async () => {
-    if (!config) return;
-
-    try {
-      setIsSaving(true);
-      const newConfig: AgentsConfig = {
-        ...config,
-        agents: Object.fromEntries(
-          Object.entries(config.agents).map(([name, agent]) => [
-            name,
-            { ...agent, enabled: false },
-          ])
-        ),
-      };
-      await agentsApi.updateConfig(projectId, newConfig);
-      setConfig(newConfig);
-      showSuccess('All agents disabled');
-    } catch (err: any) {
-      setError(err.message || 'Failed to disable all agents');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleResetDefaults = async () => {
-    if (!confirm('Reset all agent settings to defaults?')) return;
-
-    try {
-      setIsSaving(true);
-      const response = await agentsApi.resetConfig(projectId);
-      setConfig(response.config);
-      showSuccess('Settings reset to defaults');
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset settings');
+      setAgents((prev) =>
+        prev.map((a) => (a.id === agent.id ? { ...a, enabled: !newEnabled } : a))
+      );
+      const errorMessage = err instanceof Error ? err.message : 'Failed to toggle agent';
+      setError(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -222,57 +229,175 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
   };
 
   const handleCreateAgent = async () => {
-    if (!newAgentForm.name || !newAgentForm.description) {
-      setError('Name and description are required');
+    if (!newAgentForm.name) {
+      setError('Name is required');
       return;
     }
 
     try {
       setIsCreating(true);
-      const response = await agentsApi.createCustomAgent(projectId, newAgentForm);
-      showSuccess(response.message);
+      const createdAgent = await projectConfigApi.createAgent(projectId, newAgentForm);
+      setAgents((prev) => [...prev, createdAgent]);
+      showSuccess(`Agent "${createdAgent.name}" created successfully`);
       setIsCreateModalOpen(false);
-      setNewAgentForm({
-        name: '',
-        description: '',
-        category: 'development',
-        model: 'sonnet',
-        tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'],
-      });
-      // Notify parent to open the file in VSCode
-      if (onFileCreated) {
-        onFileCreated(response.relative_path);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create custom agent');
+      setNewAgentForm(getDefaultAgentForm());
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create agent';
+      setError(errorMessage);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleToolToggle = (tool: string) => {
-    setNewAgentForm((prev) => ({
-      ...prev,
-      tools: prev.tools.includes(tool)
-        ? prev.tools.filter((t) => t !== tool)
-        : [...prev.tools, tool],
-    }));
+  const handleOpenEditModal = (agent: ProjectAgent) => {
+    setEditingAgent(agent);
+    setEditAgentForm({
+      name: agent.name,
+      description: agent.description || '',
+      category: agent.category,
+      model: agent.model,
+      tools: agent.tools,
+      system_prompt: agent.system_prompt || '',
+      enabled: agent.enabled,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateAgent = async () => {
+    if (!editingAgent) return;
+
+    try {
+      setIsUpdating(true);
+      const updatedAgent = await projectConfigApi.updateAgent(
+        projectId,
+        editingAgent.id,
+        editAgentForm
+      );
+      setAgents((prev) =>
+        prev.map((a) => (a.id === editingAgent.id ? updatedAgent : a))
+      );
+      showSuccess(`Agent "${updatedAgent.name}" updated successfully`);
+      setIsEditModalOpen(false);
+      setEditingAgent(null);
+      setEditAgentForm({});
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update agent';
+      setError(errorMessage);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteAgent = async (agentId: string) => {
+    const agent = agents.find((a) => a.id === agentId);
+    if (!agent) return;
+
+    try {
+      setDeletingAgentId(agentId);
+      await projectConfigApi.deleteAgent(projectId, agentId);
+      setAgents((prev) => prev.filter((a) => a.id !== agentId));
+      showSuccess(`Agent "${agent.name}" deleted successfully`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete agent';
+      setError(errorMessage);
+    } finally {
+      setDeletingAgentId(null);
+    }
+  };
+
+  const handleToolToggle = (
+    tool: string,
+    form: CreateProjectAgentRequest | UpdateProjectAgentRequest,
+    setForm: React.Dispatch<React.SetStateAction<CreateProjectAgentRequest>> | React.Dispatch<React.SetStateAction<UpdateProjectAgentRequest>>
+  ) => {
+    const currentTools = form.tools || [];
+    const newTools = currentTools.includes(tool)
+      ? currentTools.filter((t) => t !== tool)
+      : [...currentTools, tool];
+    (setForm as (value: React.SetStateAction<CreateProjectAgentRequest | UpdateProjectAgentRequest>) => void)((prev) => ({ ...prev, tools: newTools }));
+  };
+
+  // Handle import markdown
+  const handleImportMarkdown = async () => {
+    if (!importMarkdownText.trim()) {
+      setImportError('Please paste Markdown content');
+      return;
+    }
+
+    setImportError(null);
+    setIsImporting(true);
+
+    try {
+      const parsed = parseMarkdownWithFrontmatter(importMarkdownText);
+
+      if (!parsed) {
+        setImportError('Invalid Markdown format. Please include YAML frontmatter with --- delimiters.');
+        setIsImporting(false);
+        return;
+      }
+
+      const { meta, content } = parsed;
+
+      // Validate required fields
+      if (!meta.name || typeof meta.name !== 'string') {
+        setImportError('Missing required field: name');
+        setIsImporting(false);
+        return;
+      }
+
+      // Build agent data
+      const agentData: CreateProjectAgentRequest = {
+        name: meta.name,
+        description: typeof meta.description === 'string' ? meta.description : undefined,
+        category: typeof meta.category === 'string' ? meta.category : 'custom',
+        model: typeof meta.model === 'string' ? meta.model as AgentModel : 'sonnet',
+        tools: Array.isArray(meta.tools) ? meta.tools as string[] : ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'],
+        system_prompt: content || undefined,
+        enabled: typeof meta.enabled === 'boolean' ? meta.enabled : true,
+      };
+
+      // Create the agent
+      const createdAgent = await projectConfigApi.createAgent(projectId, agentData);
+      setAgents((prev) => [...prev, createdAgent]);
+      showSuccess(`Agent "${createdAgent.name}" imported successfully`);
+
+      // Close modal
+      setIsImportModalOpen(false);
+      setImportMarkdownText('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setImportError(`Failed to import: ${message}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleCloseImportModal = () => {
+    setIsImportModalOpen(false);
+    setImportMarkdownText('');
+    setImportError(null);
+  };
+
+  // Normalize category to known categories or 'custom'
+  const normalizeCategory = (category: string): AgentCategory => {
+    if (CATEGORY_ORDER.includes(category as AgentCategory)) {
+      return category as AgentCategory;
+    }
+    return 'custom';
   };
 
   // Group agents by category
   const agentsByCategory = CATEGORY_ORDER.reduce(
     (acc, category) => {
-      acc[category] = availableAgents.filter((a) => a.category === category);
+      acc[category] = agents.filter((a) => normalizeCategory(a.category) === category);
       return acc;
     },
-    {} as Record<AgentCategory, AgentDefinition[]>
+    {} as Record<AgentCategory, ProjectAgent[]>
   );
 
   // Calculate stats
-  const enabledCount = config
-    ? Object.values(config.agents).filter((a) => a.enabled).length
-    : 0;
-  const totalCount = availableAgents.length;
+  const enabledCount = agents.filter((a) => a.enabled).length;
+  const totalCount = agents.length;
 
   if (isLoading) {
     return (
@@ -289,7 +414,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">Agent Settings</h2>
-            <p className="text-xs text-text-tertiary mt-1 font-mono">{configPath}</p>
+            <p className="text-xs text-text-tertiary mt-1">Manage sub-agents for this project</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-text-secondary">
@@ -300,96 +425,105 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 mt-3">
+          <Button variant="secondary" size="sm" onClick={() => setIsImportModalOpen(true)}>
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import Markdown
+          </Button>
           <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Create New Agent
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleEnableAll} disabled={isSaving}>
-            Enable All
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleDisableAll} disabled={isSaving}>
-            Disable All
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleResetDefaults} disabled={isSaving}>
-            Reset to Defaults
-          </Button>
         </div>
       </div>
 
       {/* Messages */}
       {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+          <p className="text-sm text-red-400">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="text-xs text-red-400 hover:text-red-300 mt-1 underline"
+          >
+            Dismiss
+          </button>
         </div>
       )}
       {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-          <p className="text-sm text-green-600">{successMessage}</p>
+        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
+          <p className="text-sm text-green-400">{successMessage}</p>
         </div>
       )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {CATEGORY_ORDER.map((category) => {
-          const agents = agentsByCategory[category];
-          if (agents.length === 0) return null;
+        {agents.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="w-12 h-12 mx-auto text-text-tertiary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <p className="text-text-secondary mb-2">No agents configured</p>
+            <p className="text-text-tertiary text-sm mb-4">Create your first agent to get started</p>
+            <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
+              Create Agent
+            </Button>
+          </div>
+        ) : (
+          CATEGORY_ORDER.map((category) => {
+            const categoryAgents = agentsByCategory[category];
+            if (categoryAgents.length === 0) return null;
 
-          const categoryConfig = CATEGORY_CONFIG[category];
-          const isExpanded = expandedCategories.has(category);
-          const enabledInCategory = agents.filter(
-            (a) => config?.agents[a.name]?.enabled
-          ).length;
+            const categoryConfig = CATEGORY_CONFIG[category];
+            const isExpanded = expandedCategories.has(category);
+            const enabledInCategory = categoryAgents.filter((a) => a.enabled).length;
 
-          return (
-            <div
-              key={category}
-              className="rounded-lg border border-border bg-bg-secondary overflow-hidden"
-            >
-              {/* Category Header */}
-              <button
-                onClick={() => toggleCategory(category)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary transition-colors"
+            return (
+              <div
+                key={category}
+                className="rounded-lg border border-border bg-bg-secondary overflow-hidden"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary">
-                    {categoryConfig.icon}
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-medium text-text-primary">{categoryConfig.label}</h3>
-                    <p className="text-xs text-text-tertiary">
-                      {enabledInCategory} / {agents.length} enabled
-                    </p>
-                  </div>
-                </div>
-                <svg
-                  className={`w-5 h-5 text-text-tertiary transition-transform ${
-                    isExpanded ? 'rotate-180' : ''
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                {/* Category Header */}
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary">
+                      {categoryConfig.icon}
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-medium text-text-primary">{categoryConfig.label}</h3>
+                      <p className="text-xs text-text-tertiary">
+                        {enabledInCategory} / {categoryAgents.length} enabled
+                      </p>
+                    </div>
+                  </div>
+                  <svg
+                    className={`w-5 h-5 text-text-tertiary transition-transform ${
+                      isExpanded ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
 
-              {/* Agent List */}
-              {isExpanded && (
-                <div className="border-t border-border divide-y divide-border">
-                  {agents.map((agent) => {
-                    // No global defaults - if not in config, it's disabled
-                    const isEnabled = config?.agents[agent.name]?.enabled ?? false;
-
-                    return (
+                {/* Agent List */}
+                {isExpanded && (
+                  <div className="border-t border-border divide-y divide-border">
+                    {categoryAgents.map((agent) => (
                       <div
-                        key={agent.name}
+                        key={agent.id}
                         className="px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary/50 transition-colors"
                       >
                         <div className="flex-1 min-w-0 pr-4">
@@ -397,46 +531,79 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
                             <h4 className="font-medium text-text-primary text-sm">
                               {agent.name}
                             </h4>
+                            <span className="text-xs text-text-tertiary px-1.5 py-0.5 bg-bg-tertiary rounded">
+                              {agent.model}
+                            </span>
                           </div>
                           <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">
-                            {agent.description}
+                            {agent.description || 'No description'}
                           </p>
                         </div>
 
-                        {/* Toggle Switch */}
-                        <button
-                          onClick={() => handleToggleAgent(agent.name, !isEnabled)}
-                          disabled={isSaving}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                            isEnabled ? 'bg-primary' : 'bg-gray-200'
-                          }`}
-                          role="switch"
-                          aria-checked={isEnabled}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              isEnabled ? 'translate-x-5' : 'translate-x-0'
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2">
+                          {/* Edit Button */}
+                          <button
+                            onClick={() => handleOpenEditModal(agent)}
+                            className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
+                            title="Edit agent"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDeleteAgent(agent.id)}
+                            disabled={deletingAgentId === agent.id}
+                            className="p-1.5 text-text-tertiary hover:text-red-400 hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
+                            title="Delete agent"
+                          >
+                            {deletingAgentId === agent.id ? (
+                              <div className="w-4 h-4 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )}
+                          </button>
+
+                          {/* Toggle Switch */}
+                          <button
+                            onClick={() => handleToggleAgent(agent)}
+                            disabled={isSaving}
+                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed ${
+                              agent.enabled ? 'bg-primary' : 'bg-gray-600'
                             }`}
-                          />
-                        </button>
+                            role="switch"
+                            aria-checked={agent.enabled}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                agent.enabled ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Create Agent Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border">
               <h3 className="text-lg font-semibold text-text-primary">Create New Agent</h3>
               <p className="text-sm text-text-tertiary mt-1">
-                Create a custom agent definition file
+                Define a new sub-agent for this project
               </p>
             </div>
 
@@ -458,10 +625,10 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description *
+                  Description
                 </label>
                 <textarea
-                  value={newAgentForm.description}
+                  value={newAgentForm.description || ''}
                   onChange={(e) => setNewAgentForm({ ...newAgentForm, description: e.target.value })}
                   placeholder="A specialized agent for..."
                   rows={2}
@@ -475,8 +642,8 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
                   Category
                 </label>
                 <select
-                  value={newAgentForm.category}
-                  onChange={(e) => setNewAgentForm({ ...newAgentForm, category: e.target.value as AgentCategory })}
+                  value={newAgentForm.category || 'development'}
+                  onChange={(e) => setNewAgentForm({ ...newAgentForm, category: e.target.value })}
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {CATEGORY_ORDER.map((cat) => (
@@ -493,7 +660,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
                   Model
                 </label>
                 <select
-                  value={newAgentForm.model}
+                  value={newAgentForm.model || 'sonnet'}
                   onChange={(e) => setNewAgentForm({ ...newAgentForm, model: e.target.value as AgentModel })}
                   className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
@@ -515,9 +682,9 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
                     <button
                       key={tool}
                       type="button"
-                      onClick={() => handleToolToggle(tool)}
+                      onClick={() => handleToolToggle(tool, newAgentForm, setNewAgentForm)}
                       className={`px-3 py-1 text-sm rounded-full border transition-colors ${
-                        newAgentForm.tools.includes(tool)
+                        (newAgentForm.tools || []).includes(tool)
                           ? 'bg-primary text-white border-primary'
                           : 'bg-bg-secondary text-text-secondary border-border hover:border-primary'
                       }`}
@@ -527,12 +694,49 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
                   ))}
                 </div>
               </div>
+
+              {/* System Prompt */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  System Prompt
+                </label>
+                <textarea
+                  value={newAgentForm.system_prompt || ''}
+                  onChange={(e) => setNewAgentForm({ ...newAgentForm, system_prompt: e.target.value })}
+                  placeholder="You are a specialized agent that..."
+                  rows={6}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary resize-y font-mono text-sm"
+                />
+              </div>
+
+              {/* Enabled */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setNewAgentForm({ ...newAgentForm, enabled: !newAgentForm.enabled })}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary ${
+                    newAgentForm.enabled ? 'bg-primary' : 'bg-gray-600'
+                  }`}
+                  role="switch"
+                  aria-checked={newAgentForm.enabled}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      newAgentForm.enabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                <span className="text-sm text-text-secondary">Enable agent after creation</span>
+              </div>
             </div>
 
             <div className="p-4 border-t border-border flex justify-end gap-2">
               <Button
                 variant="secondary"
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setNewAgentForm(getDefaultAgentForm());
+                }}
                 disabled={isCreating}
               >
                 Cancel
@@ -540,9 +744,252 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               <Button
                 variant="primary"
                 onClick={handleCreateAgent}
-                disabled={isCreating || !newAgentForm.name || !newAgentForm.description}
+                disabled={isCreating || !newAgentForm.name}
               >
                 {isCreating ? 'Creating...' : 'Create Agent'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Agent Modal */}
+      {isEditModalOpen && editingAgent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+            <div className="p-4 border-b border-border">
+              <h3 className="text-lg font-semibold text-text-primary">Edit Agent</h3>
+              <p className="text-sm text-text-tertiary mt-1">
+                Modify agent configuration
+              </p>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Agent Name */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Agent Name *
+                </label>
+                <input
+                  type="text"
+                  value={editAgentForm.name || ''}
+                  onChange={(e) => setEditAgentForm({ ...editAgentForm, name: e.target.value })}
+                  placeholder="my-custom-agent"
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={editAgentForm.description || ''}
+                  onChange={(e) => setEditAgentForm({ ...editAgentForm, description: e.target.value })}
+                  placeholder="A specialized agent for..."
+                  rows={2}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Category
+                </label>
+                <select
+                  value={editAgentForm.category || 'development'}
+                  onChange={(e) => setEditAgentForm({ ...editAgentForm, category: e.target.value })}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {CATEGORY_ORDER.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {CATEGORY_CONFIG[cat].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Model */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Model
+                </label>
+                <select
+                  value={editAgentForm.model || 'sonnet'}
+                  onChange={(e) => setEditAgentForm({ ...editAgentForm, model: e.target.value as AgentModel })}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {AGENT_MODEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tools */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Available Tools
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {AGENT_TOOL_OPTIONS.map((tool) => (
+                    <button
+                      key={tool}
+                      type="button"
+                      onClick={() => handleToolToggle(tool, editAgentForm, setEditAgentForm)}
+                      className={`px-3 py-1 text-sm rounded-full border transition-colors ${
+                        (editAgentForm.tools || []).includes(tool)
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-bg-secondary text-text-secondary border-border hover:border-primary'
+                      }`}
+                    >
+                      {tool}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* System Prompt */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  System Prompt
+                </label>
+                <textarea
+                  value={editAgentForm.system_prompt || ''}
+                  onChange={(e) => setEditAgentForm({ ...editAgentForm, system_prompt: e.target.value })}
+                  placeholder="You are a specialized agent that..."
+                  rows={6}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary resize-y font-mono text-sm"
+                />
+              </div>
+
+              {/* Enabled */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditAgentForm({ ...editAgentForm, enabled: !editAgentForm.enabled })}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary ${
+                    editAgentForm.enabled ? 'bg-primary' : 'bg-gray-600'
+                  }`}
+                  role="switch"
+                  aria-checked={editAgentForm.enabled}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      editAgentForm.enabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                <span className="text-sm text-text-secondary">Agent enabled</span>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingAgent(null);
+                  setEditAgentForm({});
+                }}
+                disabled={isUpdating}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleUpdateAgent}
+                disabled={isUpdating || !editAgentForm.name}
+              >
+                {isUpdating ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Markdown Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">Import from Markdown</h3>
+                <p className="text-sm text-text-tertiary mt-1">
+                  Paste agent definition with YAML frontmatter
+                </p>
+              </div>
+              <button
+                onClick={handleCloseImportModal}
+                className="p-2 text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {importError && (
+                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+                  <p className="text-sm text-red-400 whitespace-pre-wrap">{importError}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">
+                  Markdown Content
+                </label>
+                <textarea
+                  value={importMarkdownText}
+                  onChange={(e) => setImportMarkdownText(e.target.value)}
+                  placeholder='Paste your Markdown here...'
+                  rows={14}
+                  className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm resize-y"
+                />
+              </div>
+
+              <div className="text-sm text-text-tertiary">
+                <p className="font-medium text-text-secondary mb-2">Expected format:</p>
+                <div className="bg-bg-secondary rounded-md p-3 font-mono text-xs overflow-x-auto">
+                  <pre>{`---
+name: my-custom-agent
+description: A specialized agent for...
+category: development
+model: sonnet
+tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+enabled: true
+---
+
+You are a specialized agent that...
+(system_prompt content)`}</pre>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCloseImportModal}
+                disabled={isImporting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleImportMarkdown}
+                disabled={isImporting || !importMarkdownText.trim()}
+              >
+                {isImporting ? 'Importing...' : 'Import'}
               </Button>
             </div>
           </div>
