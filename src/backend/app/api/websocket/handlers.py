@@ -19,6 +19,7 @@ from claude_agent_sdk import (
     ClaudeAgentOptions,
     ClaudeSDKClient,
     AssistantMessage,
+    UserMessage,
     TextBlock,
     ToolUseBlock,
     ToolResultBlock,
@@ -610,12 +611,14 @@ async def handle_chat_message(
                 message_text: Optional[str],
                 context: HookContext,
             ):
-                """ツール実行完了時にWebSocketでフロントエンドに通知"""
+                """ツール実行完了時の処理（DB保存用データ蓄積のみ）
+
+                Note: WebSocket通知はUserMessage処理で行うため、ここではDB保存用データのみ蓄積
+                """
                 nonlocal completed_tool_use_ids, hook_tool_results
 
                 try:
                     tool_name = hook_input.tool_name
-                    tool_input = hook_input.tool_input
                     tool_response = hook_input.tool_response
 
                     # tool_use_id_mapから該当するtool_nameの未処理のIDを探す
@@ -636,14 +639,14 @@ async def handle_chat_message(
                             fallback_id=tool_use_id,
                         )
 
-                    logger.info(
+                    logger.debug(
                         "PostToolUse hook triggered",
                         session_id=session_id,
                         tool_name=tool_name,
                         tool_use_id=tool_use_id,
                     )
 
-                    # ツール結果をDB保存用に記録
+                    # ツール結果をDB保存用に記録（WebSocket通知はUserMessage処理で行う）
                     output_str = str(tool_response) if tool_response else ""
                     hook_tool_results[tool_use_id] = {
                         "type": "tool_result",
@@ -652,17 +655,6 @@ async def handle_chat_message(
                         "is_error": False,
                     }
 
-                    # WebSocketでツール結果を通知
-                    await conn_manager.send_message(
-                        session_id,
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": tool_use_id,
-                            "success": True,
-                            "output": output_str,
-                            "timestamp": time.time(),
-                        },
-                    )
                 except Exception as e:
                     logger.error(
                         "Error in PostToolUse hook",
@@ -876,13 +868,39 @@ async def _stream_response(
                             },
                         )
 
+            elif isinstance(sdk_message, UserMessage):
+                # UserMessage内のToolResultBlockを処理
+                for block in sdk_message.content:
+                    if isinstance(block, ToolResultBlock):
+                        # ツール結果を保存
+                        is_error = getattr(block, 'is_error', False) or False
+                        tool_results[block.tool_use_id] = {
+                            "type": "tool_result",
+                            "tool_use_id": block.tool_use_id,
+                            "content": str(block.content),
+                            "is_error": is_error,
+                        }
+
+                        # ツール結果通知
+                        await conn_manager.send_message(
+                            session_id,
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": block.tool_use_id,
+                                "success": not is_error,
+                                "output": str(block.content),
+                                "timestamp": time.time(),
+                            },
+                        )
+
             elif isinstance(sdk_message, ToolResultBlock):
-                # ツール結果を保存
+                # 直接ToolResultBlockが来る場合のフォールバック（通常は発生しない）
+                is_error = getattr(sdk_message, 'is_error', False) or False
                 tool_results[sdk_message.tool_use_id] = {
                     "type": "tool_result",
                     "tool_use_id": sdk_message.tool_use_id,
                     "content": str(sdk_message.content),
-                    "is_error": False,
+                    "is_error": is_error,
                 }
 
                 # ツール結果通知
@@ -891,7 +909,7 @@ async def _stream_response(
                     {
                         "type": "tool_result",
                         "tool_use_id": sdk_message.tool_use_id,
-                        "success": True,
+                        "success": not is_error,
                         "output": str(sdk_message.content),
                         "timestamp": time.time(),
                     },
