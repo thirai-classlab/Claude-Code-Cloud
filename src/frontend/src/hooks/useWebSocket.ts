@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { useSessionStore } from '@/stores/sessionStore';
-import { WSClientMessage, WSServerMessage, ConnectionStatus } from '@/types/websocket';
+import { WSClientMessage, WSServerMessage, ConnectionStatus, WSQuestionAnswerMessage } from '@/types/websocket';
 
 export const useWebSocket = (sessionId: string) => {
   const wsRef = useRef<WebSocket | null>(null);
@@ -20,6 +20,8 @@ export const useWebSocket = (sessionId: string) => {
     updateToolExecution,
     setStreaming,
     setThinking,
+    setPendingQuestion,
+    clearPendingQuestion,
   } = useChatStore();
 
   const sendMessage = useCallback((content: string, files?: any[]) => {
@@ -47,6 +49,46 @@ export const useWebSocket = (sessionId: string) => {
       wsRef.current.send(JSON.stringify({ type: 'interrupt' }));
     }
   }, []);
+
+  // ストリーム再開をリクエスト
+  const requestResume = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WebSocket] Requesting stream resume');
+      wsRef.current.send(JSON.stringify({ type: 'resume' }));
+      setStreaming(true);
+      setThinking(true);
+    }
+  }, [setStreaming, setThinking]);
+
+  // AskUserQuestion への回答を送信
+  const answerQuestion = useCallback((toolUseId: string, answers: Record<string, string>) => {
+    console.log('[WebSocket] answerQuestion called', {
+      toolUseId,
+      answers,
+      wsState: wsRef.current?.readyState,
+      isOpen: wsRef.current?.readyState === WebSocket.OPEN
+    });
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WebSocket] Sending question answer', { toolUseId, answers });
+      const message: WSQuestionAnswerMessage = {
+        type: 'question_answer',
+        tool_use_id: toolUseId,
+        answers,
+      };
+      wsRef.current.send(JSON.stringify(message));
+      console.log('[WebSocket] Question answer sent successfully');
+      clearPendingQuestion();
+    } else {
+      console.error('[WebSocket] Cannot send answer - WebSocket not open', {
+        readyState: wsRef.current?.readyState,
+        CONNECTING: WebSocket.CONNECTING,
+        OPEN: WebSocket.OPEN,
+        CLOSING: WebSocket.CLOSING,
+        CLOSED: WebSocket.CLOSED,
+      });
+    }
+  }, [clearPendingQuestion]);
 
   const handleServerMessage = useCallback((message: WSServerMessage) => {
     switch (message.type) {
@@ -142,6 +184,42 @@ export const useWebSocket = (sessionId: string) => {
         console.log('[Interrupted]', message.message);
         break;
 
+      case 'resume_started':
+        // ストリーム再開開始
+        console.log('[Resume Started]', message);
+        setStreaming(true);
+        setThinking(true);
+        break;
+
+      case 'resume_not_needed':
+        // 再開不要（処理中ではない）
+        console.log('[Resume Not Needed]', message);
+        setStreaming(false);
+        setThinking(false);
+        break;
+
+      case 'resume_failed':
+        // ストリーム再開失敗
+        console.warn('[Resume Failed]', message);
+        setStreaming(false);
+        setThinking(false);
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: [{ type: 'text', text: `Stream resume failed: ${message.error}` }],
+          timestamp: new Date().toISOString(),
+        });
+        break;
+
+      case 'user_question':
+        // AskUserQuestion からの質問
+        console.log('[User Question]', message);
+        setPendingQuestion({
+          toolUseId: message.tool_use_id,
+          questions: message.questions,
+        });
+        break;
+
       default:
         console.warn('[Unknown message type]', message);
     }
@@ -155,6 +233,7 @@ export const useWebSocket = (sessionId: string) => {
     setStreaming,
     setThinking,
     addMessage,
+    setPendingQuestion,
   ]);
 
   const connect = useCallback(() => {
@@ -239,6 +318,8 @@ export const useWebSocket = (sessionId: string) => {
   return {
     sendMessage,
     interrupt,
+    requestResume,
+    answerQuestion,
     connectionStatus,
     reconnect: connect,
   };

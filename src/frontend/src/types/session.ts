@@ -4,7 +4,7 @@ export interface Session {
   id: string;
   project_id: string;
   name: string;
-  status: 'active' | 'expired' | 'terminated';
+  status: 'active' | 'idle' | 'processing' | 'closed' | 'expired' | 'terminated';
   created_at: string;
   updated_at: string;
   last_activity_at?: string;
@@ -13,6 +13,10 @@ export interface Session {
   total_tokens?: number;
   total_cost_usd?: number;
   user_id?: string;
+  // ストリーム再開用
+  is_processing?: boolean;
+  processing_started_at?: string;
+  sdk_session_id?: string;
 }
 
 export interface SessionHistory {

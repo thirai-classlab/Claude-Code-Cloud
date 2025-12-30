@@ -10,6 +10,7 @@ import json
 import os
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional
 
@@ -75,6 +76,13 @@ class SessionState:
     last_activity: float = field(default_factory=time.time)
     message_ack_pending: Dict[str, bool] = field(default_factory=dict)
     reconnect_token: Optional[str] = None
+    # AskUserQuestion 対応
+    pending_question: Optional[dict] = None  # 質問内容
+    pending_tool_use_id: Optional[str] = None  # tool_use_id
+    is_waiting_for_answer: bool = False  # 回答待ちフラグ
+    is_interactive: bool = True  # True=フロントエンド接続、False=Cron実行
+    answer_event: Optional[asyncio.Event] = None  # 回答待ちイベント
+    pending_answer: Optional[dict] = None  # 受信した回答
 
 
 class ConnectionManager:
@@ -392,9 +400,11 @@ async def handle_chat_websocket(
             message_type = message_data.get("type", "chat")
 
             if message_type == "chat":
-                await _handle_chat_type(
+                # チャット処理をバックグラウンドタスクとして実行
+                # これによりメインループはブロックされず、question_answer などのメッセージを受信できる
+                asyncio.create_task(_handle_chat_type(
                     session_id, message_data, workspace_path, project_id
-                )
+                ))
 
             elif message_type == "interrupt":
                 await _handle_interrupt(session_id)
@@ -413,6 +423,14 @@ async def handle_chat_websocket(
             elif message_type == "get_state":
                 # セッション状態取得リクエスト
                 await _handle_get_state(session_id)
+
+            elif message_type == "resume":
+                # ストリーム再開リクエスト
+                await _handle_resume(session_id, workspace_path, project_id)
+
+            elif message_type == "question_answer":
+                # AskUserQuestion への回答
+                await _handle_question_answer(session_id, message_data)
 
             else:
                 await connection_manager.send_error(
@@ -505,6 +523,138 @@ async def _handle_get_state(session_id: str) -> None:
         })
 
 
+async def _handle_resume(session_id: str, workspace_path: str, project_id: str) -> None:
+    """ストリーム再開リクエストを処理"""
+    logger.info("Resume requested", session_id=session_id)
+
+    try:
+        async with get_session_context() as db_session:
+            session_manager = SessionManager(db_session)
+
+            # セッションの処理状態を確認
+            is_processing, processing_started_at = await session_manager.get_processing_state(session_id)
+            sdk_session_id = await session_manager.get_sdk_session_id(session_id)
+
+            if not is_processing:
+                # 処理中ではない場合
+                await connection_manager.send_message(session_id, {
+                    "type": "resume_not_needed",
+                    "message": "No active processing to resume",
+                    "timestamp": time.time(),
+                })
+                return
+
+            if not sdk_session_id:
+                # SDKセッションIDがない場合は再開不可
+                logger.warning("Cannot resume: no SDK session ID", session_id=session_id)
+                await connection_manager.send_message(session_id, {
+                    "type": "resume_failed",
+                    "error": "No SDK session ID available for resume",
+                    "timestamp": time.time(),
+                })
+                # 処理状態をクリア
+                await session_manager.set_processing(session_id, False)
+                return
+
+            # 処理開始時刻からの経過時間をチェック（30分タイムアウト）
+            if processing_started_at:
+                from datetime import timedelta
+                elapsed = datetime.now(timezone.utc) - processing_started_at
+                if elapsed > timedelta(minutes=30):
+                    logger.warning("Resume timeout exceeded", session_id=session_id, elapsed=elapsed)
+                    await connection_manager.send_message(session_id, {
+                        "type": "resume_failed",
+                        "error": "Processing timeout exceeded (30 minutes)",
+                        "timestamp": time.time(),
+                    })
+                    await session_manager.set_processing(session_id, False)
+                    return
+
+            # ストリーム再開を通知
+            await connection_manager.send_message(session_id, {
+                "type": "resume_started",
+                "sdk_session_id": sdk_session_id,
+                "timestamp": time.time(),
+            })
+
+            logger.info(
+                "Stream resume initiated",
+                session_id=session_id,
+                sdk_session_id=sdk_session_id,
+            )
+
+            # Note: 実際のストリーム再開はClaude SDKの機能に依存
+            # 現在のClaude Agent SDKでは、session_idを使用して
+            # 過去のコンテキストを維持したまま新しいクエリを送信可能
+            # 完全なストリーム再開（途中から再開）は将来のSDK機能として検討
+
+    except Exception as e:
+        logger.error("Error handling resume", session_id=session_id, error=str(e), exc_info=True)
+        await connection_manager.send_error(
+            session_id,
+            f"Failed to resume: {str(e)}",
+            ErrorCode.PROCESSING_ERROR
+        )
+
+
+async def _handle_question_answer(session_id: str, message_data: dict) -> None:
+    """AskUserQuestion への回答を処理"""
+    logger.info(
+        "Question answer received",
+        session_id=session_id,
+        message_data=message_data,
+    )
+
+    state = connection_manager.get_session_state(session_id)
+    if not state:
+        logger.warning("Session state not found for question answer", session_id=session_id)
+        return
+
+    logger.info(
+        "Session state for question answer",
+        session_id=session_id,
+        is_waiting_for_answer=state.is_waiting_for_answer,
+        pending_tool_use_id=state.pending_tool_use_id,
+        has_answer_event=state.answer_event is not None,
+    )
+
+    if not state.is_waiting_for_answer:
+        logger.warning("Not waiting for answer", session_id=session_id)
+        await connection_manager.send_error(
+            session_id,
+            "No pending question to answer",
+            ErrorCode.PROCESSING_ERROR
+        )
+        return
+
+    tool_use_id = message_data.get("tool_use_id")
+    answers = message_data.get("answers", {})
+
+    if tool_use_id != state.pending_tool_use_id:
+        logger.warning(
+            "Tool use ID mismatch",
+            session_id=session_id,
+            expected=state.pending_tool_use_id,
+            received=tool_use_id
+        )
+        await connection_manager.send_error(
+            session_id,
+            "Tool use ID mismatch",
+            ErrorCode.PROCESSING_ERROR
+        )
+        return
+
+    # 回答を保存してイベントをセット
+    state.pending_answer = answers
+    if state.answer_event:
+        logger.info("Setting answer event", session_id=session_id)
+        state.answer_event.set()
+    else:
+        logger.warning("No answer event to set!", session_id=session_id)
+
+    logger.info("Question answer processed", session_id=session_id, answers=answers)
+
+
 async def _handle_disconnect(session_id: str) -> None:
     """切断処理"""
     # 処理中だった場合は部分レスポンスを保存
@@ -546,7 +696,7 @@ async def handle_chat_message(
         conn_manager: 接続マネージャー
         project_id: プロジェクトID（DB設定読み込み用）
     """
-    # 処理中フラグをセット
+    # 処理中フラグをセット（メモリ上）
     conn_manager.set_processing(session_id, True)
     conn_manager.clear_partial_response(session_id)
 
@@ -554,6 +704,9 @@ async def handle_chat_message(
         # データベースセッションを使用してメッセージ履歴取得・保存
         async with get_session_context() as db_session:
             session_manager = SessionManager(db_session)
+
+            # 処理状態をDBに永続化（ストリーム再開用）
+            await session_manager.set_processing(session_id, True)
 
             # ChatMessageProcessor で設定読み込み
             processor = ChatMessageProcessor(db_session, project_id)
@@ -598,7 +751,10 @@ async def handle_chat_message(
             # SDK オプション構築（既存のSDKセッションIDがあれば再開）
             options = processor.build_sdk_options(config, resume_session_id=sdk_session_id)
 
-            # PostToolUse フックを追加（ツール実行完了通知用）
+            # セッション状態を取得
+            session_state = conn_manager.get_session_state(session_id)
+
+            # PostToolUse フックとAskUserQuestion用の変数を先に定義
             # tool_use_id -> tool_name のマッピングを保持（順序も重要）
             tool_use_id_map: Dict[str, str] = {}
             # 処理済みtool_use_idを追跡
@@ -606,6 +762,124 @@ async def handle_chat_message(
             # ツール結果を保存（DB保存用）
             hook_tool_results: Dict[str, dict] = {}
 
+            # AskUserQuestion 対応の can_use_tool コールバック
+            async def can_use_tool_callback(
+                tool_name: str,
+                tool_input: dict,
+                context: dict
+            ):
+                """AskUserQuestion ツールを検出し、フロントエンドに質問を送信"""
+                logger.debug(
+                    "can_use_tool_callback called",
+                    session_id=session_id,
+                    tool_name=tool_name,
+                )
+
+                if tool_name != "AskUserQuestion":
+                    # AskUserQuestion 以外はそのまま許可
+                    return {"behavior": "allow", "updatedInput": tool_input}
+
+                # インタラクティブモードでない場合（Cron実行など）はスキップ
+                if session_state and not session_state.is_interactive:
+                    logger.info("Skipping AskUserQuestion in non-interactive mode", session_id=session_id)
+                    # デフォルト回答を生成
+                    return {
+                        "behavior": "allow",
+                        "updatedInput": {**tool_input, "answers": {"0": "0"}}
+                    }
+
+                # 質問データを取得
+                questions = tool_input.get("questions", [])
+
+                if not questions:
+                    logger.warning("AskUserQuestion called with no questions", session_id=session_id)
+                    return {"behavior": "allow", "updatedInput": tool_input}
+
+                # tool_use_id を tool_use_id_map から取得（_stream_responseで登録済み）
+                # 最新のAskUserQuestionのIDを探す
+                tool_use_id = None
+                for uid, name in reversed(list(tool_use_id_map.items())):
+                    if name == "AskUserQuestion" and uid not in completed_tool_use_ids:
+                        tool_use_id = uid
+                        break
+
+                # 見つからない場合はフォールバックIDを生成
+                if not tool_use_id:
+                    tool_use_id = f"ask_{int(time.time() * 1000)}"
+                    logger.warning(
+                        "Could not find tool_use_id for AskUserQuestion, using fallback",
+                        session_id=session_id,
+                        fallback_id=tool_use_id,
+                    )
+
+                logger.info(
+                    "AskUserQuestion detected, sending to frontend",
+                    session_id=session_id,
+                    tool_use_id=tool_use_id,
+                    question_count=len(questions),
+                )
+
+                # セッション状態を更新
+                if session_state:
+                    session_state.pending_question = tool_input
+                    session_state.pending_tool_use_id = tool_use_id
+                    session_state.is_waiting_for_answer = True
+                    session_state.answer_event = asyncio.Event()
+                    session_state.pending_answer = None
+
+                # フロントエンドに質問を送信
+                await conn_manager.send_message(
+                    session_id,
+                    {
+                        "type": "user_question",
+                        "tool_use_id": tool_use_id,
+                        "questions": questions,
+                        "timestamp": time.time(),
+                    }
+                )
+
+                # 回答を待つ（タイムアウト: 5分）
+                try:
+                    await asyncio.wait_for(
+                        session_state.answer_event.wait(),
+                        timeout=300.0
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning("AskUserQuestion timeout", session_id=session_id)
+                    if session_state:
+                        session_state.is_waiting_for_answer = False
+                    return {
+                        "behavior": "deny",
+                        "message": "User did not respond in time",
+                        "interrupt": False
+                    }
+
+                # 回答を取得
+                answers = session_state.pending_answer if session_state else {}
+
+                # 状態をリセット
+                if session_state:
+                    session_state.is_waiting_for_answer = False
+                    session_state.pending_question = None
+                    session_state.pending_tool_use_id = None
+                    session_state.answer_event = None
+
+                logger.info(
+                    "AskUserQuestion answered",
+                    session_id=session_id,
+                    answers=answers,
+                )
+
+                # 回答をツール入力に追加して許可
+                return {
+                    "behavior": "allow",
+                    "updatedInput": {**tool_input, "answers": answers}
+                }
+
+            # can_use_tool コールバックをオプションに設定
+            options.can_use_tool = can_use_tool_callback
+
+            # PostToolUse フックを追加（ツール実行完了通知用）
             async def post_tool_use_hook(
                 hook_input: PostToolUseHookInput,
                 message_text: Optional[str],
@@ -741,14 +1015,24 @@ async def handle_chat_message(
             # アクティビティ更新
             await session_manager.update_activity(session_id)
 
+            # 処理状態をDBでクリア（正常完了）
+            await session_manager.set_processing(session_id, False)
+
     except Exception as e:
         logger.error("Error in chat message handler", error=str(e), exc_info=True)
         await conn_manager.send_error(
             session_id, str(e), ErrorCode.CHAT_ERROR
         )
+        # エラー時も処理状態をクリア
+        try:
+            async with get_session_context() as db_session:
+                session_manager = SessionManager(db_session)
+                await session_manager.set_processing(session_id, False)
+        except Exception as db_error:
+            logger.warning("Failed to clear processing state on error", session_id=session_id, error=str(db_error))
 
     finally:
-        # 処理中フラグをクリア
+        # 処理中フラグをクリア（メモリ上）
         conn_manager.set_processing(session_id, False)
         conn_manager.clear_partial_response(session_id)
 
@@ -843,6 +1127,18 @@ async def _stream_response(
                                 "text": current_text_block,
                             })
                             current_text_block = ""
+
+                        # AskUserQuestion は専用の user_question メッセージで処理するためスキップ
+                        if block.name == "AskUserQuestion":
+                            logger.debug(
+                                "Skipping tool_use_start for AskUserQuestion (handled via user_question message)",
+                                session_id=session_id,
+                                tool_use_id=block.id,
+                            )
+                            # tool_use_id_map には登録（フック用）
+                            if tool_use_id_map is not None:
+                                tool_use_id_map[block.id] = block.name
+                            continue
 
                         # ツール使用をContentBlockに追加
                         content_blocks.append({

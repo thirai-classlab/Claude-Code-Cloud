@@ -44,6 +44,10 @@ class SessionResponse(BaseModel):
     message_count: int
     total_tokens: int
     total_cost_usd: float
+    # 処理状態（ストリーム再開用）
+    is_processing: bool = False
+    processing_started_at: Optional[datetime] = None
+    sdk_session_id: Optional[str] = None  # ストリーム再開に必要
     created_at: datetime
     updated_at: datetime
     last_activity_at: datetime

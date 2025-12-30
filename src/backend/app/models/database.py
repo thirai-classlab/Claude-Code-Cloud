@@ -140,6 +140,9 @@ class SessionModel(Base):
     message_count = Column(Integer, default=0)
     total_tokens = Column(Integer, default=0)
     total_cost_usd = Column(Float, default=0.0)
+    # 処理状態の永続化（ストリーム再開用）
+    is_processing = Column(Boolean, default=False, nullable=False)  # 処理中フラグ
+    processing_started_at = Column(DateTime, nullable=True)  # 処理開始時刻
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     last_activity_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

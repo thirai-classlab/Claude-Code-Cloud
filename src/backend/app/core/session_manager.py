@@ -5,7 +5,7 @@ Session Manager
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select, delete, func, and_
@@ -286,6 +286,93 @@ class SessionManager:
             Optional[Session]: クローズされたセッション
         """
         return await self.update_session(session_id, status=SessionStatus.CLOSED)
+
+    async def set_processing(self, session_id: str, is_processing: bool) -> Optional[Session]:
+        """
+        セッションの処理状態を更新（ストリーム再開用）
+
+        Args:
+            session_id: セッションID
+            is_processing: 処理中フラグ
+
+        Returns:
+            Optional[Session]: 更新されたセッション
+        """
+        stmt = select(SessionModel).where(SessionModel.id == session_id)
+        result = await self.session.execute(stmt)
+        session_model = result.scalar_one_or_none()
+
+        if not session_model:
+            return None
+
+        session_model.is_processing = is_processing
+        if is_processing:
+            session_model.processing_started_at = datetime.now(timezone.utc)
+            session_model.status = "processing"
+        else:
+            session_model.processing_started_at = None
+            session_model.status = "active"
+        session_model.updated_at = datetime.now(timezone.utc)
+
+        await self.session.flush()
+        logger.info("Session processing state updated", session_id=session_id, is_processing=is_processing)
+        return self._model_to_pydantic(session_model)
+
+    async def get_processing_state(self, session_id: str) -> tuple[bool, Optional[datetime]]:
+        """
+        セッションの処理状態を取得
+
+        Args:
+            session_id: セッションID
+
+        Returns:
+            tuple[bool, Optional[datetime]]: (処理中フラグ, 処理開始時刻)
+        """
+        stmt = select(
+            SessionModel.is_processing,
+            SessionModel.processing_started_at
+        ).where(SessionModel.id == session_id)
+        result = await self.session.execute(stmt)
+        row = result.one_or_none()
+
+        if row:
+            return row[0], row[1]
+        return False, None
+
+    async def reset_stale_processing_sessions(self, timeout_minutes: int = 30) -> int:
+        """
+        タイムアウトした処理中セッションをリセット
+
+        Args:
+            timeout_minutes: タイムアウト時間（分）
+
+        Returns:
+            int: リセットしたセッション数
+        """
+        from sqlalchemy import update
+
+        timeout_threshold = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+
+        stmt = (
+            update(SessionModel)
+            .where(
+                SessionModel.is_processing == True,
+                SessionModel.processing_started_at < timeout_threshold
+            )
+            .values(
+                is_processing=False,
+                processing_started_at=None,
+                status="active",
+                updated_at=datetime.now(timezone.utc)
+            )
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+
+        reset_count = result.rowcount
+        if reset_count > 0:
+            logger.info("Reset stale processing sessions", count=reset_count, timeout_minutes=timeout_minutes)
+        return reset_count
 
     async def delete_session(self, session_id: str) -> None:
         """

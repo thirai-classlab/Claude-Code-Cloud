@@ -15,20 +15,51 @@ export type HistoryLoadError = {
   retryable: boolean;
 };
 
+// ContentBlockの妥当性をチェック
+const isValidContentBlock = (block: unknown): block is ContentBlock => {
+  if (!block || typeof block !== 'object') return false;
+  const b = block as Record<string, unknown>;
+  if (b.type === 'text' && typeof b.text === 'string') return true;
+  if (b.type === 'thinking' && typeof b.content === 'string') return true;
+  if (b.type === 'tool_use' && typeof b.id === 'string' && typeof b.name === 'string') return true;
+  if (b.type === 'tool_result' && typeof b.tool_use_id === 'string') return true;
+  return false;
+};
+
 // APIメッセージをフロントエンドのMessage形式に変換
 const transformApiMessage = (apiMsg: ApiChatMessage): Message => {
   // contentがJSON形式の場合はパース、そうでなければテキストブロックとして扱う
   let contentBlocks: ContentBlock[];
 
   try {
-    const parsed = JSON.parse(apiMsg.content);
-    if (Array.isArray(parsed)) {
-      contentBlocks = parsed;
+    // contentが空またはnullの場合
+    if (!apiMsg.content || apiMsg.content.trim() === '') {
+      contentBlocks = [{ type: 'text', text: '' }];
+    }
+    // JSONとして解析を試みる
+    else if (apiMsg.content.startsWith('[') || apiMsg.content.startsWith('{')) {
+      const parsed = JSON.parse(apiMsg.content);
+      if (Array.isArray(parsed)) {
+        // 配列の各要素がContentBlockとして妥当かチェック
+        contentBlocks = parsed.filter(isValidContentBlock);
+        if (contentBlocks.length === 0) {
+          // 有効なブロックがなければ元のテキストを表示
+          contentBlocks = [{ type: 'text', text: apiMsg.content }];
+        }
+      } else if (isValidContentBlock(parsed)) {
+        // 単一のContentBlockオブジェクト
+        contentBlocks = [parsed];
+      } else {
+        // パースできたがContentBlockではない場合
+        contentBlocks = [{ type: 'text', text: apiMsg.content }];
+      }
     } else {
+      // JSONではないプレーンテキスト
       contentBlocks = [{ type: 'text', text: apiMsg.content }];
     }
-  } catch {
+  } catch (e) {
     // JSON解析失敗時はプレーンテキストとして扱う
+    console.warn('Failed to parse message content as JSON:', e);
     contentBlocks = [{ type: 'text', text: apiMsg.content }];
   }
 
@@ -96,9 +127,11 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     clearDraftMessage,
     // ストリーミング中断
     savePartialStreamingMessage,
+    // AskUserQuestion 関連
+    pendingQuestion,
   } = useChatStore();
 
-  const { sendMessage, interrupt, connectionStatus, reconnect } = useWebSocket(sessionId);
+  const { sendMessage, interrupt, requestResume, answerQuestion, connectionStatus, reconnect } = useWebSocket(sessionId);
 
   // 状態
   const [historyError, setHistoryError] = useState<HistoryLoadError | null>(null);
@@ -108,6 +141,9 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
   // 前回のsessionIdを追跡
   const prevSessionIdRef = useRef<string | null>(null);
   const isLoadingRef = useRef(false);
+
+  // 処理中セッションの再開フラグ
+  const [shouldResume, setShouldResume] = useState(false);
 
   // セッション変更時にメッセージ履歴を読み込む
   useEffect(() => {
@@ -124,6 +160,18 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
       // 現在のセッションIDを設定
       setCurrentSessionId(sessionId);
       setHistoryError(null);
+      setShouldResume(false);
+
+      // セッション情報を取得して処理中かどうかをチェック
+      try {
+        const session = await sessionsApi.get(sessionId);
+        if (session.is_processing) {
+          console.log('[useChat] Session is processing, will request resume after connection');
+          setShouldResume(true);
+        }
+      } catch (error) {
+        console.warn('Failed to check session state:', error);
+      }
 
       // キャッシュが有効な場合はキャッシュから読み込む
       if (isCacheValid(sessionId)) {
@@ -175,6 +223,15 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     getCachedMessages,
     isCacheValid,
   ]);
+
+  // WebSocket接続後に処理中セッションの再開をリクエスト
+  useEffect(() => {
+    if (shouldResume && connectionStatus === 'connected') {
+      console.log('[useChat] Connection established, requesting resume');
+      requestResume();
+      setShouldResume(false);
+    }
+  }, [shouldResume, connectionStatus, requestResume]);
 
   // ページ離脱時の状態保存
   useEffect(() => {
@@ -283,5 +340,10 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     interrupt: handleInterrupt,
     clearMessages: handleClearMessages,
     reconnect,
+    requestResume,
+    answerQuestion,
+
+    // AskUserQuestion
+    pendingQuestion,
   };
 };

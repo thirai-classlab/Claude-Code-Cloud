@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { devtools, persist, createJSONStorage } from 'zustand/middleware';
 import { Message, ContentBlock, ToolUseBlock, ToolResultBlock } from '@/types/message';
 import { ToolExecution } from '@/types/tool';
+import { Question } from '@/types/websocket';
+
+// 質問待ち状態
+export interface PendingQuestion {
+  toolUseId: string;
+  questions: Question[];
+}
 
 // メッセージキャッシュの有効期限（1時間）
 const MESSAGE_CACHE_EXPIRY_MS = 60 * 60 * 1000;
@@ -32,6 +39,8 @@ interface ChatState {
   draftMessages: Record<string, string>;
   // 現在のセッションID
   currentSessionId: string | null;
+  // AskUserQuestion の質問待ち状態
+  pendingQuestion: PendingQuestion | null;
 
   addMessage: (message: Message) => void;
   loadMessages: (messages: Message[]) => void;
@@ -61,6 +70,9 @@ interface ChatState {
   clearDraftMessage: (sessionId: string) => void;
   // ストリーミング中断時の保存
   savePartialStreamingMessage: (sessionId: string) => void;
+  // AskUserQuestion 関連
+  setPendingQuestion: (question: PendingQuestion | null) => void;
+  clearPendingQuestion: () => void;
 }
 
 // メッセージキャッシュとドラフトは永続化
@@ -80,6 +92,7 @@ export const useChatStore = create<ChatState>()(
         messageCache: {},
         draftMessages: {},
         currentSessionId: null,
+        pendingQuestion: null,
 
         addMessage: (message) => {
           const { currentSessionId } = get();
@@ -422,6 +435,13 @@ export const useChatStore = create<ChatState>()(
           // キャッシュにも追加
           get().appendToCache(sessionId, partialMessage);
         },
+
+        // AskUserQuestion 関連
+        setPendingQuestion: (question) =>
+          set({ pendingQuestion: question }),
+
+        clearPendingQuestion: () =>
+          set({ pendingQuestion: null }),
       }),
       { name: 'chat-storage' }
     ),

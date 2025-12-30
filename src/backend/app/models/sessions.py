@@ -44,6 +44,9 @@ class Session(BaseModel):
     message_count: int = Field(default=0, description="メッセージ数")
     total_tokens: int = Field(default=0, description="累計トークン数")
     total_cost_usd: float = Field(default=0.0, description="累計コスト (USD)")
+    # 処理状態（ストリーム再開用）
+    is_processing: bool = Field(default=False, description="処理中フラグ")
+    processing_started_at: Optional[datetime] = Field(default=None, description="処理開始時刻")
     created_at: datetime = Field(default_factory=_utc_now, description="作成日時")
     updated_at: datetime = Field(default_factory=_utc_now, description="更新日時")
     last_activity_at: datetime = Field(

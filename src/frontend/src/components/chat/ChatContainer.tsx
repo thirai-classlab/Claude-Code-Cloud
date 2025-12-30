@@ -7,6 +7,7 @@ import { ThinkingIndicator } from './ThinkingIndicator';
 import { StreamingText } from './StreamingText';
 import { ToolUseWithResultCard } from './ToolUseWithResultCard';
 import { MarkdownContent } from './MarkdownContent';
+import { QuestionCard } from './QuestionCard';
 import { useChat } from '@/hooks/useChat';
 import { projectsApi } from '@/lib/api';
 import { ToolUseBlock, ToolResultBlock } from '@/types/message';
@@ -28,6 +29,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
     connectionStatus,
     sendMessage,
     interrupt,
+    answerQuestion,
+    pendingQuestion,
   } = useChat({ sessionId });
 
   const [costLimitError, setCostLimitError] = useState<string | null>(null);
@@ -169,7 +172,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
               </div>
 
               {/* Thinking Indicator - コンテンツがまだない場合のみ表示 */}
-              {isThinking && streamingContentBlocks.length === 0 && (
+              {isThinking && streamingContentBlocks.length === 0 && !pendingQuestion && (
                 <ThinkingIndicator />
               )}
 
@@ -190,9 +193,13 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
                     );
                   }
 
-                  // ツール使用ブロック
+                  // ツール使用ブロック（AskUserQuestion 以外）
                   if (block.type === 'tool_use') {
                     const toolUse = block as ToolUseBlock;
+                    // AskUserQuestion は専用UIで表示するのでスキップ
+                    if (toolUse.name === 'AskUserQuestion') {
+                      return null;
+                    }
                     const toolResult = getToolResultForToolUse(toolUse.id);
                     const executing = isToolExecuting(toolUse.id);
                     return (
@@ -209,6 +216,18 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
                   return null;
                 })}
               </div>
+
+              {/* AskUserQuestion の質問カード */}
+              {pendingQuestion && (
+                <div className="mt-3">
+                  <QuestionCard
+                    toolUseId={pendingQuestion.toolUseId}
+                    questions={pendingQuestion.questions}
+                    onAnswer={answerQuestion}
+                    disabled={connectionStatus !== 'connected'}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}

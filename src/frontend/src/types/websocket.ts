@@ -14,7 +14,14 @@ export interface WSInterruptMessage {
   type: 'interrupt';
 }
 
-export type WSClientMessage = WSChatMessage | WSInterruptMessage;
+// AskUserQuestion への回答
+export interface WSQuestionAnswerMessage {
+  type: 'question_answer';
+  tool_use_id: string;
+  answers: Record<string, string>; // questionIndex -> selectedOptionIndex or "other:text"
+}
+
+export type WSClientMessage = WSChatMessage | WSInterruptMessage | WSQuestionAnswerMessage;
 
 // Server -> Client
 export interface WSTextMessage {
@@ -68,6 +75,45 @@ export interface WSInterruptedMessage {
   message: string;
 }
 
+// ストリーム再開関連
+export interface WSResumeStartedMessage {
+  type: 'resume_started';
+  sdk_session_id: string;
+  timestamp: number;
+}
+
+export interface WSResumeNotNeededMessage {
+  type: 'resume_not_needed';
+  message: string;
+  timestamp: number;
+}
+
+export interface WSResumeFailedMessage {
+  type: 'resume_failed';
+  error: string;
+  timestamp: number;
+}
+
+// AskUserQuestion 質問メッセージ
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface Question {
+  question: string;
+  header: string;
+  options: QuestionOption[];
+  multiSelect: boolean;
+}
+
+export interface WSUserQuestionMessage {
+  type: 'user_question';
+  tool_use_id: string;
+  questions: Question[];
+  timestamp: number;
+}
+
 export type WSServerMessage =
   | WSTextMessage
   | WSThinkingMessage
@@ -76,4 +122,8 @@ export type WSServerMessage =
   | WSToolResultMessage
   | WSResultMessage
   | WSErrorMessage
-  | WSInterruptedMessage;
+  | WSInterruptedMessage
+  | WSResumeStartedMessage
+  | WSResumeNotNeededMessage
+  | WSResumeFailedMessage
+  | WSUserQuestionMessage;
