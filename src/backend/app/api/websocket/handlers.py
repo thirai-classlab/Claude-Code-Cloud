@@ -23,6 +23,9 @@ from claude_agent_sdk import (
     ToolUseBlock,
     ToolResultBlock,
     ResultMessage,
+    HookMatcher,
+    PostToolUseHookInput,
+    HookContext,
 )
 
 from app.config import settings
@@ -594,6 +597,94 @@ async def handle_chat_message(
             # SDK オプション構築（既存のSDKセッションIDがあれば再開）
             options = processor.build_sdk_options(config, resume_session_id=sdk_session_id)
 
+            # PostToolUse フックを追加（ツール実行完了通知用）
+            # tool_use_id -> tool_name のマッピングを保持（順序も重要）
+            tool_use_id_map: Dict[str, str] = {}
+            # 処理済みtool_use_idを追跡
+            completed_tool_use_ids: set = set()
+            # ツール結果を保存（DB保存用）
+            hook_tool_results: Dict[str, dict] = {}
+
+            async def post_tool_use_hook(
+                hook_input: PostToolUseHookInput,
+                message_text: Optional[str],
+                context: HookContext,
+            ):
+                """ツール実行完了時にWebSocketでフロントエンドに通知"""
+                nonlocal completed_tool_use_ids, hook_tool_results
+
+                try:
+                    tool_name = hook_input.tool_name
+                    tool_input = hook_input.tool_input
+                    tool_response = hook_input.tool_response
+
+                    # tool_use_id_mapから該当するtool_nameの未処理のIDを探す
+                    tool_use_id = None
+                    for uid, name in tool_use_id_map.items():
+                        if name == tool_name and uid not in completed_tool_use_ids:
+                            tool_use_id = uid
+                            completed_tool_use_ids.add(uid)
+                            break
+
+                    # 見つからない場合はフォールバック（通常は発生しない）
+                    if tool_use_id is None:
+                        tool_use_id = f"{tool_name}_{int(time.time() * 1000)}"
+                        logger.warning(
+                            "Could not find tool_use_id for tool, using fallback",
+                            session_id=session_id,
+                            tool_name=tool_name,
+                            fallback_id=tool_use_id,
+                        )
+
+                    logger.info(
+                        "PostToolUse hook triggered",
+                        session_id=session_id,
+                        tool_name=tool_name,
+                        tool_use_id=tool_use_id,
+                    )
+
+                    # ツール結果をDB保存用に記録
+                    output_str = str(tool_response) if tool_response else ""
+                    hook_tool_results[tool_use_id] = {
+                        "type": "tool_result",
+                        "tool_use_id": tool_use_id,
+                        "content": output_str,
+                        "is_error": False,
+                    }
+
+                    # WebSocketでツール結果を通知
+                    await conn_manager.send_message(
+                        session_id,
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "success": True,
+                            "output": output_str,
+                            "timestamp": time.time(),
+                        },
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Error in PostToolUse hook",
+                        session_id=session_id,
+                        error=str(e),
+                        exc_info=True,
+                    )
+
+                # フックは継続を許可（continue_はPythonの予約語を避けるための名前）
+                return {"continue_": True}
+
+            # フックをオプションに追加
+            options.hooks = {
+                "PostToolUse": [
+                    HookMatcher(
+                        matcher=None,  # 全てのツールにマッチ
+                        hooks=[post_tool_use_hook],
+                        timeout=30.0,
+                    )
+                ]
+            }
+
             logger.info(
                 "Starting Claude Agent SDK session",
                 session_id=session_id,
@@ -601,8 +692,8 @@ async def handle_chat_message(
             )
 
             # ストリーミング処理
-            full_response_text, usage_info, was_interrupted, new_sdk_session_id = await _stream_response(
-                session_id, options, message, conn_manager
+            full_response_text, content_blocks, usage_info, was_interrupted, new_sdk_session_id = await _stream_response(
+                session_id, options, message, conn_manager, tool_use_id_map, hook_tool_results
             )
 
             # SDKセッションIDをDBに保存（初回または変更があった場合）
@@ -628,8 +719,14 @@ async def handle_chat_message(
                 },
             )
 
-            # アシスタントメッセージを履歴に追加
-            if full_response_text:
+            # アシスタントメッセージを履歴に追加（ContentBlocks形式で保存）
+            if content_blocks:
+                message_history.append({
+                    "role": "assistant",
+                    "content": content_blocks,
+                })
+            elif full_response_text:
+                # フォールバック：テキストのみの場合
                 message_history.append({
                     "role": "assistant",
                     "content": [{"type": "text", "text": full_response_text}],
@@ -669,7 +766,9 @@ async def _stream_response(
     options: ClaudeAgentOptions,
     message: WSChatMessage,
     conn_manager: ConnectionManager,
-) -> tuple[str, dict, bool, Optional[str]]:
+    tool_use_id_map: Optional[Dict[str, str]] = None,
+    hook_tool_results: Optional[Dict[str, dict]] = None,
+) -> tuple[str, List[dict], dict, bool, Optional[str]]:
     """
     Claude Agent SDK でストリーミングレスポンスを処理
 
@@ -682,9 +781,14 @@ async def _stream_response(
         conn_manager: 接続マネージャー
 
     Returns:
-        tuple[str, dict, bool, Optional[str]]: (応答テキスト, 使用量情報, 中断されたか, SDKセッションID)
+        tuple[str, List[dict], dict, bool, Optional[str]]:
+            (応答テキスト, ContentBlocks配列, 使用量情報, 中断されたか, SDKセッションID)
     """
     full_response_text = ""
+    content_blocks: List[dict] = []  # 時系列順のContentBlock配列
+    current_text_block = ""  # 現在のテキストブロックを蓄積
+    tool_results: Dict[str, dict] = {}  # tool_use_id -> tool_result mapping
+
     usage_info = {
         "input_tokens": 0,
         "output_tokens": 0,
@@ -704,6 +808,14 @@ async def _stream_response(
 
         # ストリーミングレスポンス処理
         async for sdk_message in client.receive_response():
+            # デバッグログ: 受信したメッセージタイプを記録
+            logger.info(
+                "SDK message received",
+                session_id=session_id,
+                message_type=type(sdk_message).__name__,
+                message_str=str(sdk_message)[:200],
+            )
+
             # 接続が切れていないか確認
             if session_id not in conn_manager.active_connections:
                 logger.warning("Connection lost during streaming", session_id=session_id)
@@ -721,6 +833,7 @@ async def _stream_response(
                     if isinstance(block, TextBlock):
                         # テキストストリーミング
                         full_response_text += block.text
+                        current_text_block += block.text
                         # 部分レスポンスを更新（中断時の保存用）
                         conn_manager.update_partial_response(session_id, block.text)
                         await conn_manager.send_message(
@@ -731,6 +844,26 @@ async def _stream_response(
                             }
                         )
                     elif isinstance(block, ToolUseBlock):
+                        # テキストが蓄積されていれば先にContentBlockに追加
+                        if current_text_block:
+                            content_blocks.append({
+                                "type": "text",
+                                "text": current_text_block,
+                            })
+                            current_text_block = ""
+
+                        # ツール使用をContentBlockに追加
+                        content_blocks.append({
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
+                        })
+
+                        # tool_use_id -> tool_name のマッピングを保存（PostToolUseフック用）
+                        if tool_use_id_map is not None:
+                            tool_use_id_map[block.id] = block.name
+
                         # ツール使用開始通知
                         await conn_manager.send_message(
                             session_id,
@@ -744,6 +877,14 @@ async def _stream_response(
                         )
 
             elif isinstance(sdk_message, ToolResultBlock):
+                # ツール結果を保存
+                tool_results[sdk_message.tool_use_id] = {
+                    "type": "tool_result",
+                    "tool_use_id": sdk_message.tool_use_id,
+                    "content": str(sdk_message.content),
+                    "is_error": False,
+                }
+
                 # ツール結果通知
                 await conn_manager.send_message(
                     session_id,
@@ -785,11 +926,32 @@ async def _stream_response(
         # エラー発生時でもこれまでのレスポンスは保持
         raise
 
+    # 残りのテキストをContentBlockに追加
+    if current_text_block:
+        content_blocks.append({
+            "type": "text",
+            "text": current_text_block,
+        })
+
+    # hook_tool_resultsとtool_resultsをマージ（hook優先）
+    all_tool_results = {**tool_results}
+    if hook_tool_results:
+        all_tool_results.update(hook_tool_results)
+
+    # tool_use の後に対応する tool_result を挿入
+    final_content_blocks = []
+    for block in content_blocks:
+        final_content_blocks.append(block)
+        if block.get("type") == "tool_use":
+            tool_use_id = block.get("id")
+            if tool_use_id and tool_use_id in all_tool_results:
+                final_content_blocks.append(all_tool_results[tool_use_id])
+
     # 実際の処理時間を計算（SDK から取得できない場合）
     if usage_info["duration_ms"] == 0:
         usage_info["duration_ms"] = int((time.time() - start_time) * 1000)
 
-    return full_response_text, usage_info, was_interrupted, sdk_session_id
+    return full_response_text, final_content_blocks, usage_info, was_interrupted, sdk_session_id
 
 
 def get_default_tools() -> List[str]:

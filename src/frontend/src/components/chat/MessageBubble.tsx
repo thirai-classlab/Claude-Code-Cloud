@@ -1,14 +1,51 @@
 'use client';
 
-import React, { memo } from 'react';
-import { Message, ContentBlock } from '@/types/message';
+import React, { memo, useMemo } from 'react';
+import { Message, ContentBlock, ToolUseBlock, ToolResultBlock } from '@/types/message';
 import { StreamingText } from './StreamingText';
-import { ToolUseCard } from './ToolUseCard';
+import { ToolUseWithResultCard } from './ToolUseWithResultCard';
+import { MarkdownContent } from './MarkdownContent';
 
 interface MessageBubbleProps {
   message: Message;
   isStreaming?: boolean;
 }
+
+// Process content blocks to pair tool_use with tool_result
+interface ProcessedBlock {
+  type: 'text' | 'thinking' | 'tool_use_with_result';
+  textBlock?: ContentBlock & { type: 'text' };
+  thinkingBlock?: ContentBlock & { type: 'thinking' };
+  toolUse?: ToolUseBlock;
+  toolResult?: ToolResultBlock;
+}
+
+const processContentBlocks = (blocks: ContentBlock[]): ProcessedBlock[] => {
+  const result: ProcessedBlock[] = [];
+  const toolResults = new Map<string, ToolResultBlock>();
+
+  // First pass: collect all tool_results by tool_use_id
+  for (const block of blocks) {
+    if (block.type === 'tool_result') {
+      toolResults.set(block.tool_use_id, block);
+    }
+  }
+
+  // Second pass: create processed blocks
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      result.push({ type: 'text', textBlock: block });
+    } else if (block.type === 'thinking') {
+      result.push({ type: 'thinking', thinkingBlock: block });
+    } else if (block.type === 'tool_use') {
+      const toolResult = toolResults.get(block.id);
+      result.push({ type: 'tool_use_with_result', toolUse: block, toolResult });
+    }
+    // Skip tool_result blocks as they're already paired with tool_use
+  }
+
+  return result;
+};
 
 // Custom comparison function for React.memo
 const areMessageBubblePropsEqual = (
@@ -45,35 +82,46 @@ const areMessageBubblePropsEqual = (
     if (prevBlock.type === 'tool_use' && nextBlock.type === 'tool_use') {
       if (prevBlock.id !== nextBlock.id) return false;
     }
+
+    if (prevBlock.type === 'tool_result' && nextBlock.type === 'tool_result') {
+      if (prevBlock.tool_use_id !== nextBlock.tool_use_id) return false;
+      if (prevBlock.content !== nextBlock.content) return false;
+    }
   }
 
   return true;
 };
 
-// ContentBlockRenderer component
-const ContentBlockRenderer: React.FC<{
-  block: ContentBlock;
+// ProcessedBlockRenderer component
+const ProcessedBlockRenderer: React.FC<{
+  block: ProcessedBlock;
   isStreaming: boolean;
   isUser: boolean;
 }> = ({ block, isStreaming, isUser }) => {
-  if (block.type === 'text') {
+  if (block.type === 'text' && block.textBlock) {
     return isStreaming ? (
-      <StreamingText text={block.text} />
+      <StreamingText text={block.textBlock.text} />
     ) : (
-      <div className="whitespace-pre-wrap text-md leading-relaxed">{block.text}</div>
+      <MarkdownContent content={block.textBlock.text} />
     );
   }
 
-  if (block.type === 'tool_use') {
-    return <ToolUseCard toolUse={block} />;
+  if (block.type === 'tool_use_with_result' && block.toolUse) {
+    return (
+      <ToolUseWithResultCard
+        toolUse={block.toolUse}
+        toolResult={block.toolResult}
+        isExecuting={false}
+      />
+    );
   }
 
-  if (block.type === 'thinking') {
+  if (block.type === 'thinking' && block.thinkingBlock) {
     return (
       <div className={`italic text-sm opacity-70 border-l-2 pl-3 ${
         isUser ? 'border-white/50' : 'border-border'
       }`}>
-        {block.content}
+        {block.thinkingBlock.content}
       </div>
     );
   }
@@ -81,8 +129,8 @@ const ContentBlockRenderer: React.FC<{
   return null;
 };
 
-// Memoized ContentBlockRenderer
-const MemoizedContentBlockRenderer = memo(ContentBlockRenderer);
+// Memoized ProcessedBlockRenderer
+const MemoizedProcessedBlockRenderer = memo(ProcessedBlockRenderer);
 
 // MessageBubble component
 const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
@@ -90,6 +138,12 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   isStreaming = false,
 }) => {
   const isUser = message.role === 'user';
+
+  // Process content blocks to pair tool_use with tool_result
+  const processedBlocks = useMemo(
+    () => processContentBlocks(message.content),
+    [message.content]
+  );
 
   return (
     <div className={`message ${isUser ? 'flex justify-end' : ''}`}>
@@ -110,11 +164,11 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
         )}
 
         <div className="space-y-3">
-          {message.content.map((block, index) => (
-            <MemoizedContentBlockRenderer
+          {processedBlocks.map((block, index) => (
+            <MemoizedProcessedBlockRenderer
               key={`${message.id}-${index}-${block.type}`}
               block={block}
-              isStreaming={isStreaming && index === message.content.length - 1}
+              isStreaming={isStreaming && index === processedBlocks.length - 1}
               isUser={isUser}
             />
           ))}

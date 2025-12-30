@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist, createJSONStorage } from 'zustand/middleware';
-import { Message, ContentBlock } from '@/types/message';
+import { Message, ContentBlock, ToolUseBlock, ToolResultBlock } from '@/types/message';
 import { ToolExecution } from '@/types/tool';
 
 // メッセージキャッシュの有効期限（1時間）
@@ -21,6 +21,10 @@ interface ChatState {
   isLoadingHistory: boolean;
   currentStreamingMessage: string;
   currentStreamingId: string | null;
+  // ストリーミング中のコンテンツブロック（時系列順）
+  streamingContentBlocks: ContentBlock[];
+  // 現在蓄積中のテキスト（次のツール実行までのテキスト）
+  currentTextBuffer: string;
   toolExecutions: Record<string, ToolExecution>;
   // セッションごとのメッセージキャッシュ
   messageCache: Record<string, CachedMessages>;
@@ -34,6 +38,11 @@ interface ChatState {
   setLoadingHistory: (loading: boolean) => void;
   updateStreamingMessage: (text: string) => void;
   finalizeStreamingMessage: () => void;
+  // ストリーミング中のコンテンツブロック操作
+  appendTextToStream: (text: string) => void;
+  appendToolUseToStream: (toolUse: ToolUseBlock) => void;
+  appendToolResultToStream: (toolResult: ToolResultBlock) => void;
+  getStreamingContentBlocks: () => ContentBlock[];
   startToolExecution: (toolExecution: Omit<ToolExecution, 'id' | 'startTime' | 'status'>) => void;
   updateToolExecution: (tool_use_id: string, updates: Partial<ToolExecution>) => void;
   setStreaming: (isStreaming: boolean) => void;
@@ -65,6 +74,8 @@ export const useChatStore = create<ChatState>()(
         isLoadingHistory: false,
         currentStreamingMessage: '',
         currentStreamingId: null,
+        streamingContentBlocks: [],
+        currentTextBuffer: '',
         toolExecutions: {},
         messageCache: {},
         draftMessages: {},
@@ -96,19 +107,32 @@ export const useChatStore = create<ChatState>()(
           })),
 
         finalizeStreamingMessage: () => {
-          const { currentStreamingMessage, currentStreamingId, messages, currentSessionId } = get();
+          const {
+            streamingContentBlocks,
+            currentTextBuffer,
+            currentStreamingId,
+            messages,
+            currentSessionId
+          } = get();
 
-          if (!currentStreamingMessage) return;
+          // 最終的なコンテンツブロックを構築
+          const finalBlocks: ContentBlock[] = [...streamingContentBlocks];
+
+          // 残りのテキストバッファがあれば追加
+          if (currentTextBuffer.trim()) {
+            finalBlocks.push({
+              type: 'text',
+              text: currentTextBuffer,
+            });
+          }
+
+          // コンテンツがなければ何もしない
+          if (finalBlocks.length === 0) return;
 
           const newMessage: Message = {
             id: currentStreamingId || crypto.randomUUID(),
             role: 'assistant',
-            content: [
-              {
-                type: 'text',
-                text: currentStreamingMessage,
-              } as ContentBlock,
-            ],
+            content: finalBlocks,
             timestamp: new Date().toISOString(),
           };
 
@@ -116,12 +140,69 @@ export const useChatStore = create<ChatState>()(
             messages: [...messages, newMessage],
             currentStreamingMessage: '',
             currentStreamingId: null,
+            streamingContentBlocks: [],
+            currentTextBuffer: '',
           });
 
           // キャッシュにも追加
           if (currentSessionId) {
             get().appendToCache(currentSessionId, newMessage);
           }
+        },
+
+        // ストリーミング中のテキストを追加
+        appendTextToStream: (text) => {
+          set((state) => ({
+            currentTextBuffer: state.currentTextBuffer + text,
+            // 互換性のため currentStreamingMessage も更新
+            currentStreamingMessage: state.currentStreamingMessage + text,
+          }));
+        },
+
+        // ストリーミング中にツール使用を追加（テキストを先にフラッシュ）
+        appendToolUseToStream: (toolUse) => {
+          set((state) => {
+            const newBlocks = [...state.streamingContentBlocks];
+
+            // 蓄積されたテキストがあれば先に追加
+            if (state.currentTextBuffer.trim()) {
+              newBlocks.push({
+                type: 'text',
+                text: state.currentTextBuffer,
+              });
+            }
+
+            // ツール使用を追加
+            newBlocks.push(toolUse);
+
+            return {
+              streamingContentBlocks: newBlocks,
+              currentTextBuffer: '',
+            };
+          });
+        },
+
+        // ストリーミング中にツール結果を追加
+        appendToolResultToStream: (toolResult) => {
+          set((state) => ({
+            streamingContentBlocks: [...state.streamingContentBlocks, toolResult],
+          }));
+        },
+
+        // ストリーミング中のコンテンツブロックを取得（現在のテキストバッファを含む）
+        getStreamingContentBlocks: () => {
+          const { streamingContentBlocks, currentTextBuffer } = get();
+          const blocks = [...streamingContentBlocks];
+
+          // 現在蓄積中のテキストがあれば追加
+          if (currentTextBuffer) {
+            blocks.push({
+              type: 'text',
+              text: currentTextBuffer,
+            });
+          }
+
+          return blocks;
         },
 
         startToolExecution: (toolExecution) => {
@@ -143,12 +224,48 @@ export const useChatStore = create<ChatState>()(
         updateToolExecution: (tool_use_id, updates) => {
           set((state) => {
             const existing = state.toolExecutions[tool_use_id];
-            if (!existing) return state;
 
+            console.log('[chatStore] updateToolExecution:', {
+              tool_use_id,
+              updates,
+              existingStatus: existing?.status,
+              existingName: existing?.name,
+            });
+
+            // If the tool execution doesn't exist yet, create a placeholder
+            // This handles race conditions where tool_result arrives before tool_use_start
+            if (!existing) {
+              // Only create if we have meaningful updates (status change)
+              if (updates.status) {
+                const newExecution: ToolExecution = {
+                  id: crypto.randomUUID(),
+                  tool_use_id,
+                  name: updates.name || 'Unknown',
+                  input: updates.input || {},
+                  status: updates.status,
+                  output: updates.output,
+                  error: updates.error,
+                  startTime: updates.startTime || Date.now(),
+                  endTime: updates.endTime,
+                };
+                console.log('[chatStore] Created new execution:', newExecution);
+                return {
+                  toolExecutions: {
+                    ...state.toolExecutions,
+                    [tool_use_id]: newExecution,
+                  },
+                };
+              }
+              console.log('[chatStore] No existing execution and no status update, skipping');
+              return state;
+            }
+
+            const updated = { ...existing, ...updates };
+            console.log('[chatStore] Updated execution:', updated);
             return {
               toolExecutions: {
                 ...state.toolExecutions,
-                [tool_use_id]: { ...existing, ...updates },
+                [tool_use_id]: updated,
               },
             };
           });
@@ -159,6 +276,8 @@ export const useChatStore = create<ChatState>()(
           if (isStreaming) {
             set({
               currentStreamingId: crypto.randomUUID(),
+              streamingContentBlocks: [],
+              currentTextBuffer: '',
               toolExecutions: {},
             });
           }
@@ -172,6 +291,8 @@ export const useChatStore = create<ChatState>()(
             messages: [],
             currentStreamingMessage: '',
             currentStreamingId: null,
+            streamingContentBlocks: [],
+            currentTextBuffer: '',
             toolExecutions: {},
           }),
 

@@ -5,9 +5,11 @@ import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { StreamingText } from './StreamingText';
-import { ToolExecutionGroup } from './ToolExecutionGroup';
+import { ToolUseWithResultCard } from './ToolUseWithResultCard';
+import { MarkdownContent } from './MarkdownContent';
 import { useChat } from '@/hooks/useChat';
 import { projectsApi } from '@/lib/api';
+import { ToolUseBlock, ToolResultBlock } from '@/types/message';
 
 interface ChatContainerProps {
   sessionId: string;
@@ -19,6 +21,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
     messages,
     currentStreamingMessage,
     toolExecutions,
+    streamingContentBlocks,
     isStreaming,
     isThinking,
     isLoadingHistory,
@@ -86,7 +89,21 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
     if (shouldAutoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [messages, currentStreamingMessage, toolExecutions, shouldAutoScroll]);
+  }, [messages, currentStreamingMessage, streamingContentBlocks, shouldAutoScroll]);
+
+  // ツール使用とツール結果をペアリングするヘルパー関数
+  const getToolResultForToolUse = (toolUseId: string): ToolResultBlock | undefined => {
+    return streamingContentBlocks.find(
+      (block): block is ToolResultBlock =>
+        block.type === 'tool_result' && block.tool_use_id === toolUseId
+    );
+  };
+
+  // ツール実行状態を取得するヘルパー関数
+  const isToolExecuting = (toolUseId: string): boolean => {
+    const execution = toolExecutions.find(e => e.tool_use_id === toolUseId);
+    return execution?.status === 'executing' || execution?.status === 'pending';
+  };
 
   return (
     <div className="flex flex-col h-full bg-bg-primary">
@@ -140,8 +157,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
 
         <MessageList messages={messages} />
 
-        {/* Streaming Message */}
-        {currentStreamingMessage && (
+        {/* Streaming Response - テキストとツールを時系列順に交互表示 */}
+        {(streamingContentBlocks.length > 0 || isThinking) && (
           <div className="message">
             <div className="max-w-[80%] rounded-lg px-4 py-3 bg-bg-secondary text-text-primary border border-border">
               <div className="flex items-center gap-2.5 mb-2">
@@ -150,20 +167,51 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
                 </div>
                 <span className="text-base font-semibold text-text-primary">Claude</span>
               </div>
-              <StreamingText text={currentStreamingMessage} />
+
+              {/* Thinking Indicator - コンテンツがまだない場合のみ表示 */}
+              {isThinking && streamingContentBlocks.length === 0 && (
+                <ThinkingIndicator />
+              )}
+
+              {/* コンテンツブロックを時系列順に表示 */}
+              <div className="space-y-3">
+                {streamingContentBlocks.map((block, index) => {
+                  // テキストブロック
+                  if (block.type === 'text') {
+                    const isLastBlock = index === streamingContentBlocks.length - 1;
+                    return (
+                      <div key={`text-${index}`}>
+                        {isLastBlock && isStreaming ? (
+                          <StreamingText text={block.text} />
+                        ) : (
+                          <MarkdownContent content={block.text} />
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // ツール使用ブロック
+                  if (block.type === 'tool_use') {
+                    const toolUse = block as ToolUseBlock;
+                    const toolResult = getToolResultForToolUse(toolUse.id);
+                    const executing = isToolExecuting(toolUse.id);
+                    return (
+                      <ToolUseWithResultCard
+                        key={`tool-${toolUse.id}`}
+                        toolUse={toolUse}
+                        toolResult={toolResult}
+                        isExecuting={executing && !toolResult}
+                      />
+                    );
+                  }
+
+                  // tool_resultはtool_useと一緒に表示されるのでスキップ
+                  return null;
+                })}
+              </div>
             </div>
           </div>
         )}
-
-        {/* Tool Executions */}
-        {toolExecutions.length > 0 && (
-          <div className="mb-4">
-            <ToolExecutionGroup executions={toolExecutions} />
-          </div>
-        )}
-
-        {/* Thinking Indicator */}
-        {isThinking && <ThinkingIndicator />}
       </div>
 
       {/* Cost Limit Error */}

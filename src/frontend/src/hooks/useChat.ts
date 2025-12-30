@@ -81,6 +81,7 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     isLoadingHistory,
     currentStreamingMessage,
     toolExecutions,
+    getStreamingContentBlocks,
     clearMessages,
     loadMessages,
     setLoadingHistory,
@@ -258,6 +259,8 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     messages,
     currentStreamingMessage,
     toolExecutions: Object.values(toolExecutions),
+    // ストリーミング中のコンテンツブロック（時系列順）
+    streamingContentBlocks: getStreamingContentBlocks(),
 
     // Status
     isStreaming,

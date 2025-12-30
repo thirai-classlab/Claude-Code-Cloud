@@ -12,8 +12,10 @@ export const useWebSocket = (sessionId: string) => {
 
   const {
     addMessage,
-    updateStreamingMessage,
     finalizeStreamingMessage,
+    appendTextToStream,
+    appendToolUseToStream,
+    appendToolResultToStream,
     startToolExecution,
     updateToolExecution,
     setStreaming,
@@ -53,12 +55,19 @@ export const useWebSocket = (sessionId: string) => {
         break;
 
       case 'text':
-        // ストリーミングテキストを蓄積
-        updateStreamingMessage(message.content);
+        // ストリーミングテキストを蓄積（時系列対応）
+        // appendTextToStreamは内部でcurrentStreamingMessageも更新する
+        appendTextToStream(message.content);
         break;
 
       case 'tool_use_start':
-        // ツール実行開始
+        // ツール実行開始（時系列対応：テキストをフラッシュしてツールを追加）
+        appendToolUseToStream({
+          type: 'tool_use',
+          id: message.tool_use_id,
+          name: message.tool,
+          input: message.input || {},
+        });
         startToolExecution({
           tool_use_id: message.tool_use_id,
           name: message.tool,
@@ -75,7 +84,18 @@ export const useWebSocket = (sessionId: string) => {
         break;
 
       case 'tool_result':
-        // ツール実行結果
+        // ツール実行結果（時系列対応）
+        console.log('[tool_result] Received:', {
+          tool_use_id: message.tool_use_id,
+          success: message.success,
+          outputLength: message.output?.length,
+        });
+        appendToolResultToStream({
+          type: 'tool_result',
+          tool_use_id: message.tool_use_id,
+          content: message.output || '',
+          is_error: !message.success,
+        });
         updateToolExecution(message.tool_use_id, {
           status: message.success ? 'success' : 'error',
           output: message.output,
@@ -126,8 +146,10 @@ export const useWebSocket = (sessionId: string) => {
         console.warn('[Unknown message type]', message);
     }
   }, [
-    updateStreamingMessage,
     finalizeStreamingMessage,
+    appendTextToStream,
+    appendToolUseToStream,
+    appendToolResultToStream,
     startToolExecution,
     updateToolExecution,
     setStreaming,

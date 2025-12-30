@@ -128,18 +128,21 @@ const ToolExecutionGroupComponent: React.FC<ToolExecutionGroupProps> = ({ execut
 
   if (executions.length === 0) return null;
 
+  // Sort executions by start time for proper display order
+  const sortedExecutions = [...executions].sort((a, b) => a.startTime - b.startTime);
+
   // If only one execution, show it directly
-  if (executions.length === 1) {
-    return <ToolExecutionDisplay execution={executions[0]} />;
+  if (sortedExecutions.length === 1) {
+    return <ToolExecutionDisplay execution={sortedExecutions[0]} />;
   }
 
-  const summary = generateGroupSummary(executions);
-  const toolCounts = getToolTypeCounts(executions);
-  const hasRunning = executions.some(e => e.status === 'executing' || e.status === 'pending');
-  const hasErrors = executions.some(e => e.status === 'error');
+  const summary = generateGroupSummary(sortedExecutions);
+  const toolCounts = getToolTypeCounts(sortedExecutions);
+  const hasRunning = sortedExecutions.some(e => e.status === 'executing' || e.status === 'pending');
+  const hasErrors = sortedExecutions.some(e => e.status === 'error');
 
   // Get latest running or last execution
-  const latestExecution = executions.find(e => e.status === 'executing') || executions[executions.length - 1];
+  const latestExecution = sortedExecutions.find(e => e.status === 'executing') || sortedExecutions[sortedExecutions.length - 1];
 
   // Status-based styles
   const getGroupStyles = () => {
@@ -171,7 +174,7 @@ const ToolExecutionGroupComponent: React.FC<ToolExecutionGroupProps> = ({ execut
             )}
           </div>
           <span className="font-medium text-sm">
-            {executions.length} tool executions
+            {sortedExecutions.length} tool executions
           </span>
           <span className="text-xs opacity-60">
             ({summary})
@@ -207,7 +210,7 @@ const ToolExecutionGroupComponent: React.FC<ToolExecutionGroupProps> = ({ execut
       {/* All Executions (when expanded) */}
       {isExpanded && (
         <div className="border-t border-current/10 p-3 space-y-2 bg-bg-secondary/50">
-          {executions.map((execution) => (
+          {sortedExecutions.map((execution) => (
             <ToolExecutionDisplay key={execution.id || execution.tool_use_id} execution={execution} />
           ))}
         </div>
