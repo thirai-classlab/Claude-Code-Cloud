@@ -10,6 +10,7 @@ import { cronApi } from '@/lib/api/cron';
 import {
   CronScheduleResponse,
   CronScheduleCreateRequest,
+  CronExecutionLog,
   CRON_PRESETS,
   TIMEZONES,
 } from '@/types/cron';
