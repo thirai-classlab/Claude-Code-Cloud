@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ProjectListNav } from '@/components/project/ProjectListNav';
 import { SearchInput } from '@/components/molecules';
 import { Button } from '@/components/atoms';
@@ -39,6 +40,7 @@ export interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -81,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       {/* Fixed header area - does not scroll */}
       <div className="flex-shrink-0 px-2 pt-2 pb-2 space-y-2">
         {/* Projects section label */}
-        <NavLabel>Projects</NavLabel>
+        <NavLabel>{t('project.projects')}</NavLabel>
 
         {/* New project button */}
         <Button
@@ -90,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           onClick={() => setIsCreateModalOpen(true)}
           className="w-full"
         >
-          + New Project
+          {t('project.newProject')}
         </Button>
 
         {/* Search input - Press Enter to search */}
@@ -98,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           value={searchInput}
           onChange={handleSearchChange}
           onKeyDown={handleSearchKeyDown}
-          placeholder="Search..."
+          placeholder={t('project.search')}
           size="sm"
         />
       </div>

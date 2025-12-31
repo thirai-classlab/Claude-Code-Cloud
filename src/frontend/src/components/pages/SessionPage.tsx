@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
@@ -19,6 +20,7 @@ export const SessionPage: React.FC<SessionPageProps> = ({
   projectId,
   sessionId,
 }) => {
+  const { t } = useTranslation();
   const { projects, loadProjects } = useProjects();
   const { loadSessions } = useSessions(projectId);
 
@@ -37,7 +39,7 @@ export const SessionPage: React.FC<SessionPageProps> = ({
       <div className="h-full flex items-center justify-center bg-bg-primary">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-          <p className="text-text-secondary">Loading session...</p>
+          <p className="text-text-secondary">{t('sessionPage.loading')}</p>
         </div>
       </div>
     );

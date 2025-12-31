@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
@@ -12,6 +13,7 @@ import { CreateProjectModal } from '@/components/project/CreateProjectModal';
 import { CreateSessionModal } from '@/components/session/CreateSessionModal';
 
 export const WelcomePanel: React.FC = () => {
+  const { t } = useTranslation();
   const {
     projects,
     currentProjectId,
@@ -68,7 +70,7 @@ export const WelcomePanel: React.FC = () => {
       {/* Header */}
       <div className="p-6 border-b border-border">
         <h1 className="text-2xl font-bold text-text-primary mb-2">
-          Welcome to Claude Code
+          {t('welcome.title')}
         </h1>
         <p className="text-text-secondary">
           Select a project and session to start coding with AI assistance
@@ -79,7 +81,7 @@ export const WelcomePanel: React.FC = () => {
         {/* Project Selection */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-text-primary">Projects</h2>
+            <h2 className="text-lg font-semibold text-text-primary">{t('welcome.projects')}</h2>
             <Button
               variant="primary"
               size="sm"
@@ -88,7 +90,7 @@ export const WelcomePanel: React.FC = () => {
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              New Project
+              {t('welcome.newProject')}
             </Button>
           </div>
 
@@ -101,7 +103,7 @@ export const WelcomePanel: React.FC = () => {
               <svg className="w-12 h-12 mx-auto mb-3 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <p className="text-text-secondary mb-2">No projects yet</p>
+              <p className="text-text-secondary mb-2">{t('welcome.noProjects')}</p>
               <p className="text-text-tertiary text-sm">Create your first project to get started</p>
             </div>
           ) : (
@@ -147,7 +149,7 @@ export const WelcomePanel: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-text-primary">
-                Sessions
+                {t('welcome.sessions')}
                 {currentProject && (
                   <span className="text-text-tertiary font-normal ml-2">
                     in {currentProject.name}
@@ -162,7 +164,7 @@ export const WelcomePanel: React.FC = () => {
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                New Session
+                {t('welcome.newSession')}
               </Button>
             </div>
 
@@ -175,7 +177,7 @@ export const WelcomePanel: React.FC = () => {
                 <svg className="w-12 h-12 mx-auto mb-3 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                <p className="text-text-secondary mb-2">No sessions yet</p>
+                <p className="text-text-secondary mb-2">{t('welcome.noSessions')}</p>
                 <p className="text-text-tertiary text-sm">Create a session to start chatting with Claude</p>
               </div>
             ) : (

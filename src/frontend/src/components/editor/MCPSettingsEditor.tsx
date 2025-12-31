@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
 import type { ProjectMCPServer, CreateProjectMCPServerRequest, UpdateProjectMCPServerRequest, MCPTool } from '@/types';
@@ -45,6 +46,7 @@ interface ParsedMCPServer {
 }
 
 export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId }) => {
+  const { t } = useTranslation();
   const [servers, setServers] = useState<ProjectMCPServer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -465,9 +467,9 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-text-primary">MCP Settings</h2>
+          <h2 className="text-lg font-semibold text-text-primary">{t('editor.mcp.title')}</h2>
           <p className="text-xs text-text-tertiary mt-1">
-            {servers.length} server{servers.length !== 1 ? 's' : ''} configured
+            {t('editor.mcp.serversConfigured', { count: servers.length })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -491,7 +493,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Add Server
+            {t('editor.mcp.addServer')}
           </Button>
         </div>
       </div>
@@ -514,13 +516,13 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
         {isFormOpen && (
           <div className="mb-6 p-4 bg-bg-secondary rounded-lg border border-border">
             <h3 className="text-sm font-semibold text-text-primary mb-4">
-              {editingServerId ? 'Edit Server' : 'Add New Server'}
+              {editingServerId ? t('common.edit') : t('editor.mcp.addServer')}
             </h3>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Server Name *
+                  {t('editor.mcp.serverName')} *
                 </label>
                 <input
                   type="text"
@@ -533,7 +535,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Command *
+                  {t('editor.mcp.command')} *
                 </label>
                 <input
                   type="text"
@@ -546,7 +548,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Arguments (space-separated)
+                  {t('editor.mcp.args')}
                 </label>
                 <input
                   type="text"
@@ -559,7 +561,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Environment Variables (KEY=VALUE, one per line)
+                  {t('editor.mcp.env')}
                 </label>
                 <textarea
                   value={serverForm.env}
@@ -604,12 +606,12 @@ SOME_VAR=value"
                 d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
               />
             </svg>
-            <h3 className="text-lg font-medium text-text-secondary mb-2">No MCP Servers Configured</h3>
+            <h3 className="text-lg font-medium text-text-secondary mb-2">{t('editor.mcp.noServers')}</h3>
             <p className="text-text-tertiary mb-4">
-              Add MCP servers to extend Claude&apos;s capabilities with external tools and data sources.
+              {t('editor.mcp.addFirstServer')}
             </p>
             <Button variant="primary" onClick={handleAddServer}>
-              Add Your First Server
+              {t('editor.mcp.addServer')}
             </Button>
           </div>
         ) : (
@@ -652,14 +654,14 @@ SOME_VAR=value"
 
                         <div className="space-y-1 text-sm">
                           <div className="flex items-start gap-2">
-                            <span className="text-text-tertiary w-20 flex-shrink-0">Command:</span>
+                            <span className="text-text-tertiary w-20 flex-shrink-0">{t('editor.mcp.command')}:</span>
                             <code className="text-text-secondary font-mono bg-bg-tertiary px-1 rounded">
                               {server.command}
                             </code>
                           </div>
                           {server.args && server.args.length > 0 && (
                             <div className="flex items-start gap-2">
-                              <span className="text-text-tertiary w-20 flex-shrink-0">Args:</span>
+                              <span className="text-text-tertiary w-20 flex-shrink-0">{t('editor.mcp.args')}:</span>
                               <code className="text-text-secondary font-mono bg-bg-tertiary px-1 rounded text-xs break-all">
                                 {server.args.join(' ')}
                               </code>
@@ -667,7 +669,7 @@ SOME_VAR=value"
                           )}
                           {server.env && Object.keys(server.env).length > 0 && (
                             <div className="flex items-start gap-2">
-                              <span className="text-text-tertiary w-20 flex-shrink-0">Env vars:</span>
+                              <span className="text-text-tertiary w-20 flex-shrink-0">{t('editor.mcp.env')}:</span>
                               <span className="text-text-secondary">
                                 {Object.keys(server.env).length} variable(s)
                               </span>

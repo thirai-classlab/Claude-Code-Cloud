@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/atoms';
 import { modelsApi, ModelInfo } from '@/lib/api';
@@ -26,6 +27,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [models, setModels] = useState<ModelInfo[]>(FALLBACK_MODELS);
   const [model, setModel] = useState(FALLBACK_MODELS[0].id);
@@ -91,7 +93,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="New Session" size="sm">
+    <Modal isOpen={isOpen} onClose={handleClose} title={t('createSession.title')} size="sm">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Session Title */}
         <div>
@@ -99,14 +101,14 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             htmlFor="session-title"
             className="block text-sm font-medium text-text-secondary mb-1"
           >
-            Session Title (Optional)
+            {t('createSession.sessionTitleOptional')}
           </label>
           <input
             id="session-title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Untitled Session"
+            placeholder={t('createSession.sessionTitlePlaceholder')}
             className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
             autoFocus
             disabled={isSubmitting}
@@ -122,7 +124,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             htmlFor="session-model"
             className="block text-sm font-medium text-text-secondary mb-1"
           >
-            Claude Model
+            {t('createSession.claudeModel')}
             {isLoadingModels && (
               <span className="ml-2 text-xs text-text-tertiary">(loading...)</span>
             )}
@@ -160,10 +162,10 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             onClick={handleClose}
             disabled={isSubmitting}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant="primary" isLoading={isSubmitting}>
-            Create Session
+            {t('createSession.create')}
           </Button>
         </div>
       </form>

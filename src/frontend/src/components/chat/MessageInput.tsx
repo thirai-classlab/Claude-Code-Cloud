@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CommandSuggest, SuggestItem } from './CommandSuggest';
 import { commandsApi, skillsApi, projectConfigApi } from '@/lib/api';
 
@@ -15,6 +16,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   projectId,
 }) => {
+  const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const [showSuggest, setShowSuggest] = useState(false);
   const [suggestItems, setSuggestItems] = useState<SuggestItem[]>([]);
@@ -247,9 +249,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onKeyDown={handleKeyDown}
           onClick={handleClick}
           disabled={disabled}
-          placeholder="Type a message... (/ for commands, Shift+Enter to send)"
+          placeholder={t('chat.placeholder')}
           className="flex-1 resize-none bg-transparent text-text-primary placeholder-text-tertiary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed text-md"
-          aria-label="Message input"
+          aria-label={t('chat.placeholder')}
           rows={1}
           style={{ maxHeight: '200px' }}
         />
@@ -257,7 +259,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onClick={handleSend}
           disabled={disabled || !message.trim()}
           className="btn btn-primary px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="Send message"
+          aria-label={t('chat.send')}
         >
           <svg
             className="w-5 h-5"

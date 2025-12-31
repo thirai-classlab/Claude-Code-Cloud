@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useTranslation } from 'react-i18next';
 import { MCPSettingsEditor } from './MCPSettingsEditor';
 import { AgentSettingsEditor } from './AgentSettingsEditor';
 import { CommandSettingsEditor } from './CommandSettingsEditor';
@@ -18,11 +19,11 @@ const CodeServerEditor = dynamic(
 
 type EditorTab = 'vscode' | 'mcp' | 'agents' | 'commands' | 'skills' | 'cron' | 'settings' | 'pricing';
 
-// Tab configuration with icons
-const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
+// Tab configuration with icons and translation keys
+const EDITOR_TAB_CONFIG: { id: EditorTab; labelKey: string; icon: React.ReactNode }[] = [
   {
     id: 'vscode',
-    label: 'VSCode',
+    labelKey: 'editor.tabs.vscode',
     icon: (
       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
         <path d="M17.583 2L6.75 11.667l-3.75-3v6.666l3.75-3L17.583 22 22 19.75V4.25L17.583 2zm-1.583 14.5L9.5 12l6.5-4.5v9z"/>
@@ -31,7 +32,7 @@ const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'mcp',
-    label: 'MCP',
+    labelKey: 'editor.tabs.mcp',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
@@ -40,7 +41,7 @@ const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'agents',
-    label: 'サブエージェント',
+    labelKey: 'editor.tabs.subAgents',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -49,7 +50,7 @@ const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'commands',
-    label: 'コマンド',
+    labelKey: 'editor.tabs.commands',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -58,7 +59,7 @@ const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'skills',
-    label: 'スキル',
+    labelKey: 'editor.tabs.skills',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -67,7 +68,7 @@ const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'cron',
-    label: 'スケジュール',
+    labelKey: 'editor.tabs.schedules',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -76,7 +77,7 @@ const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'pricing',
-    label: '料金',
+    labelKey: 'editor.tabs.pricing',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -85,7 +86,7 @@ const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'settings',
-    label: '設定',
+    labelKey: 'editor.tabs.settings',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -104,6 +105,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   projectId,
   workspacePath,
 }) => {
+  const { t } = useTranslation();
   const { isEditorPanelOpen, activeEditorTab, setActiveEditorTab, openEditorTab, toggleEditorPanel } = useUIStore();
   const [pendingFile, setPendingFile] = useState<string | null>(null);
 
@@ -111,7 +113,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   if (!isEditorPanelOpen) {
     return (
       <div className="h-full flex flex-col items-center bg-bg-secondary border-l border-border-subtle py-2 w-12">
-        {EDITOR_TABS.map((tab) => (
+        {EDITOR_TAB_CONFIG.map((tab) => (
           <button
             key={tab.id}
             onClick={() => openEditorTab(tab.id)}
@@ -120,7 +122,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
                 ? 'text-accent bg-bg-tertiary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
             }`}
-            title={tab.label}
+            title={t(tab.labelKey)}
           >
             {tab.icon}
           </button>
@@ -137,7 +139,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
         <button
           onClick={toggleEditorPanel}
           className="px-2 py-2 text-text-secondary hover:text-text-primary transition-colors"
-          title="パネルを折りたたむ"
+          title={t('editor.collapsePanel')}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -145,7 +147,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
         </button>
 
         {/* Tab buttons */}
-        {EDITOR_TABS.map((tab) => (
+        {EDITOR_TAB_CONFIG.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveEditorTab(tab.id)}
@@ -156,7 +158,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
             }`}
           >
             <span className="w-4 h-4">{tab.icon}</span>
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>

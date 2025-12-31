@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
 import type {
@@ -36,6 +37,7 @@ const getDefaultCommandForm = (): CreateProjectCommandRequest => ({
 });
 
 export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ projectId }) => {
+  const { t } = useTranslation();
   const [commands, setCommands] = useState<ProjectCommand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -282,12 +284,12 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="text-lg font-semibold text-text-primary">Command Settings</h2>
-            <p className="text-xs text-text-tertiary mt-1">Manage slash commands for this project</p>
+            <h2 className="text-lg font-semibold text-text-primary">{t('editor.commands.title')}</h2>
+            <p className="text-xs text-text-tertiary mt-1">{t('editor.commands.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-text-secondary">
-              {enabledCount} / {totalCount} enabled
+              {enabledCount} / {totalCount} {t('editor.commands.enabled')}
             </span>
           </div>
         </div>
@@ -298,13 +300,13 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            Import Markdown
+            {t('editor.commands.importMarkdown')}
           </Button>
           <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Create New Command
+            {t('editor.commands.createCommand')}
           </Button>
         </div>
       </div>
@@ -334,10 +336,10 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
             <svg className="w-12 h-12 mx-auto text-text-tertiary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <p className="text-text-secondary mb-2">No commands configured</p>
-            <p className="text-text-tertiary text-sm mb-4">Create your first command to get started</p>
+            <p className="text-text-secondary mb-2">{t('editor.commands.noCommands')}</p>
+            <p className="text-text-tertiary text-sm mb-4">{t('editor.commands.createFirst')}</p>
             <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
-              Create Command
+              {t('editor.commands.createCommand')}
             </Button>
           </div>
         ) : (
@@ -457,7 +459,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-text-primary">Create New Command</h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t('editor.commands.createCommand')}</h3>
               <p className="text-sm text-text-tertiary mt-1">
                 Define a new slash command for this project
               </p>
@@ -467,7 +469,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               {/* Command Name */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Command Name *
+                  {t('editor.commands.commandName')} *
                 </label>
                 <input
                   type="text"
@@ -482,7 +484,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description
+                  {t('editor.commands.description')}
                 </label>
                 <textarea
                   value={newCommandForm.description || ''}
@@ -496,7 +498,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               {/* Category */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Category
+                  {t('editor.commands.category')}
                 </label>
                 <select
                   value={newCommandForm.category || 'custom'}
@@ -514,7 +516,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               {/* Content */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Command Content
+                  {t('editor.commands.content')}
                 </label>
                 <textarea
                   value={newCommandForm.content || ''}
@@ -530,7 +532,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               <ToggleSwitch
                 checked={newCommandForm.enabled ?? true}
                 onChange={(checked) => setNewCommandForm({ ...newCommandForm, enabled: checked })}
-                label="Enable command after creation"
+                label={t('editor.commands.enabled')}
               />
             </div>
 
@@ -543,14 +545,14 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
                 }}
                 disabled={isCreating}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="primary"
                 onClick={handleCreateCommand}
                 disabled={isCreating || !newCommandForm.name}
               >
-                {isCreating ? 'Creating...' : 'Create Command'}
+                {isCreating ? t('common.loading') : t('editor.commands.createCommand')}
               </Button>
             </div>
           </div>
@@ -562,7 +564,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-text-primary">Edit Command</h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t('editor.commands.editCommand')}</h3>
               <p className="text-sm text-text-tertiary mt-1">
                 Modify command configuration
               </p>
@@ -572,7 +574,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               {/* Command Name */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Command Name *
+                  {t('editor.commands.commandName')} *
                 </label>
                 <input
                   type="text"
@@ -587,7 +589,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description
+                  {t('editor.commands.description')}
                 </label>
                 <textarea
                   value={editCommandForm.description || ''}
@@ -601,7 +603,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               {/* Category */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Category
+                  {t('editor.commands.category')}
                 </label>
                 <select
                   value={editCommandForm.category || 'custom'}
@@ -619,7 +621,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               {/* Content */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Command Content
+                  {t('editor.commands.content')}
                 </label>
                 <textarea
                   value={editCommandForm.content || ''}
@@ -635,7 +637,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
               <ToggleSwitch
                 checked={editCommandForm.enabled ?? true}
                 onChange={(checked) => setEditCommandForm({ ...editCommandForm, enabled: checked })}
-                label="Command enabled"
+                label={t('editor.commands.enabled')}
               />
             </div>
 
@@ -649,14 +651,14 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
                 }}
                 disabled={isUpdating}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="primary"
                 onClick={handleUpdateCommand}
                 disabled={isUpdating || !editCommandForm.name}
               >
-                {isUpdating ? 'Saving...' : 'Save Changes'}
+                {isUpdating ? t('common.loading') : t('common.save')}
               </Button>
             </div>
           </div>
@@ -669,7 +671,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
           <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-text-primary">Import from Markdown</h3>
+                <h3 className="text-lg font-semibold text-text-primary">{t('editor.commands.importMarkdown')}</h3>
                 <p className="text-sm text-text-tertiary mt-1">
                   Paste command definition with YAML frontmatter
                 </p>
@@ -726,7 +728,7 @@ Command content/script here...`}</pre>
                 onClick={handleCloseImportModal}
                 disabled={isImporting}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="primary"
@@ -734,7 +736,7 @@ Command content/script here...`}</pre>
                 onClick={handleImportMarkdown}
                 disabled={isImporting || !importMarkdownText.trim()}
               >
-                {isImporting ? 'Importing...' : 'Import'}
+                {isImporting ? t('common.loading') : t('editor.commands.importMarkdown')}
               </Button>
             </div>
           </div>

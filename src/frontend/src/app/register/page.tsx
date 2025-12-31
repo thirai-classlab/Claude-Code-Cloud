@@ -3,10 +3,12 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { register, isAuthenticated, isLoading, error, clearError } = useAuthStore();
 
@@ -34,29 +36,29 @@ export default function RegisterPage() {
 
     // Basic validation
     if (!email.trim()) {
-      setLocalError('Please enter your email address');
+      setLocalError(t('validation.emailRequired'));
       return;
     }
 
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setLocalError('Please enter a valid email address');
+      setLocalError(t('validation.emailInvalid'));
       return;
     }
 
     if (!password) {
-      setLocalError('Please enter a password');
+      setLocalError(t('validation.passwordRequired'));
       return;
     }
 
     if (password.length < 8) {
-      setLocalError('Password must be at least 8 characters long');
+      setLocalError(t('validation.passwordMinLength'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setLocalError('Passwords do not match');
+      setLocalError(t('validation.passwordMismatch'));
       return;
     }
 
@@ -76,13 +78,13 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple-500" />
-          <h1 className="text-2xl font-semibold text-text-primary">Claude Code</h1>
+          <h1 className="text-2xl font-semibold text-text-primary">{t('app.title')}</h1>
         </div>
 
         {/* Register Form */}
         <div className="bg-bg-secondary border border-border-subtle rounded-xl p-6">
           <h2 className="text-lg font-medium text-text-primary mb-6 text-center">
-            Create your account
+            {t('auth.createAccount')}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -92,15 +94,16 @@ export default function RegisterPage() {
                 htmlFor="email"
                 className="block text-sm font-medium text-text-secondary"
               >
-                Email
+                {t('auth.email')}
               </label>
               <input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={t('auth.emailPlaceholder')}
                 autoComplete="email"
+                aria-label={t('auth.email')}
                 disabled={isLoading}
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg',
@@ -119,16 +122,17 @@ export default function RegisterPage() {
                 htmlFor="displayName"
                 className="block text-sm font-medium text-text-secondary"
               >
-                Display Name
-                <span className="text-text-tertiary ml-1">(optional)</span>
+                {t('auth.displayName')}
+                <span className="text-text-tertiary ml-1">({t('auth.optional')})</span>
               </label>
               <input
                 id="displayName"
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="How should we call you?"
+                placeholder={t('auth.displayNamePlaceholder')}
                 autoComplete="name"
+                aria-label={t('auth.displayName')}
                 disabled={isLoading}
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg',
@@ -147,15 +151,16 @@ export default function RegisterPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-text-secondary"
               >
-                Password
+                {t('auth.password')}
               </label>
               <input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
+                placeholder={t('auth.passwordMinLength')}
                 autoComplete="new-password"
+                aria-label={t('auth.password')}
                 disabled={isLoading}
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg',
@@ -174,15 +179,16 @@ export default function RegisterPage() {
                 htmlFor="confirmPassword"
                 className="block text-sm font-medium text-text-secondary"
               >
-                Confirm Password
+                {t('auth.confirmPassword')}
               </label>
               <input
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
+                placeholder={t('auth.confirmPasswordPlaceholder')}
                 autoComplete="new-password"
+                aria-label={t('auth.confirmPassword')}
                 disabled={isLoading}
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg',
@@ -215,19 +221,19 @@ export default function RegisterPage() {
                 'transition-all duration-fast'
               )}
             >
-              {isLoading ? 'Creating account...' : 'Create account'}
+              {isLoading ? t('auth.creatingAccount') : t('auth.createAccount')}
             </button>
           </form>
 
           {/* Login Link */}
           <div className="mt-6 pt-6 border-t border-border-subtle text-center">
             <p className="text-sm text-text-secondary">
-              Already have an account?{' '}
+              {t('auth.hasAccount')}{' '}
               <Link
                 href="/login"
                 className="text-accent hover:text-accent-hover transition-colors duration-fast"
               >
-                Sign in
+                {t('auth.signIn')}
               </Link>
             </p>
           </div>
@@ -235,7 +241,7 @@ export default function RegisterPage() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-text-tertiary">
-          Web-based coding assistant powered by Claude
+          {t('app.description')}
         </p>
       </div>
     </div>

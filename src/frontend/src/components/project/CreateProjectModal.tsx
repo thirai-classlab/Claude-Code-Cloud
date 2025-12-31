@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/atoms';
 import { templatesApi } from '@/lib/api/templates';
@@ -25,6 +26,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onProjectCreated,
   selectedTemplateId,
 }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -70,7 +72,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setError(null);
 
     if (!name.trim()) {
-      setError('Project name is required');
+      setError(t('modal.projectNameRequired'));
       return;
     }
 
@@ -129,12 +131,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="New Project" size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title={t('modal.newProject')} size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Project Type Selection (Radio Button Style) */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-text-secondary">
-            Project Type
+            {t('modal.projectType')}
           </label>
           <div className="flex flex-col gap-2">
             {/* Blank Project Option */}
@@ -169,10 +171,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               </span>
               <div className="flex-1">
                 <span className="font-medium text-text-primary text-sm">
-                  Blank Project
+                  {t('modal.blankProject')}
                 </span>
                 <p className="text-xs text-text-tertiary mt-0.5">
-                  Start with an empty project
+                  {t('modal.blankProjectDesc')}
                 </p>
               </div>
             </label>
@@ -206,10 +208,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               </span>
               <div className="flex-1">
                 <span className="font-medium text-text-primary text-sm">
-                  From Template
+                  {t('modal.fromTemplate')}
                 </span>
                 <p className="text-xs text-text-tertiary mt-0.5">
-                  Start with pre-configured settings
+                  {t('modal.fromTemplateDesc')}
                 </p>
               </div>
             </label>
@@ -220,7 +222,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         {projectType === 'template' && (
           <div className="space-y-2">
             <label className="block text-sm font-medium text-text-secondary">
-              Select Template
+              {t('modal.selectTemplate')}
             </label>
             {isLoadingTemplates ? (
               <div className="flex items-center justify-center py-4">
@@ -228,7 +230,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               </div>
             ) : templates.length === 0 ? (
               <div className="p-4 text-center text-text-tertiary text-sm border border-border rounded-md">
-                No templates available. Create one from an existing project first.
+                {t('modal.noTemplates')}
               </div>
             ) : (
               <div className="grid gap-2 max-h-48 overflow-y-auto p-1">
@@ -259,7 +261,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                           {template.name}
                         </span>
                         {template.is_public && (
-                          <span className="text-xs text-accent">Public</span>
+                          <span className="text-xs text-accent">{t('modal.public')}</span>
                         )}
                       </div>
                       {template.description && (
@@ -268,11 +270,11 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                         </p>
                       )}
                       <div className="flex gap-2 text-xs text-text-tertiary mt-1">
-                        {template.file_count > 0 && <span>{template.file_count} files</span>}
+                        {template.file_count > 0 && <span>{template.file_count} {t('modal.files')}</span>}
                         {template.mcp_server_count > 0 && (
                           <span>{template.mcp_server_count} MCP</span>
                         )}
-                        {template.agent_count > 0 && <span>{template.agent_count} agents</span>}
+                        {template.agent_count > 0 && <span>{template.agent_count} {t('modal.agents')}</span>}
                       </div>
                     </div>
                     {selectedTemplate?.id === template.id && (
@@ -297,14 +299,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             htmlFor="project-name"
             className="block text-sm font-medium text-text-secondary mb-1"
           >
-            Project Name *
+            {t('modal.projectName')} *
           </label>
           <input
             id="project-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="My Awesome Project"
+            placeholder={t('modal.projectNamePlaceholder')}
             className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
             autoFocus
             disabled={isSubmitting}
@@ -317,13 +319,13 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             htmlFor="project-description"
             className="block text-sm font-medium text-text-secondary mb-1"
           >
-            Description (Optional)
+            {t('modal.descriptionOptional')}
           </label>
           <textarea
             id="project-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe your project..."
+            placeholder={t('modal.descriptionPlaceholder')}
             rows={3}
             className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none"
             disabled={isSubmitting}
@@ -336,7 +338,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             htmlFor="project-api-key"
             className="block text-sm font-medium text-text-secondary mb-1"
           >
-            Anthropic API Key (Optional)
+            {t('modal.apiKeyOptional')}
           </label>
           <div className="relative">
             <input
@@ -344,7 +346,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               type={showApiKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-ant-api03-..."
+              placeholder={t('modal.apiKeyPlaceholder')}
               className="w-full px-3 py-2 pr-10 bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors font-mono text-sm"
               disabled={isSubmitting}
               autoComplete="off"
@@ -368,7 +370,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </button>
           </div>
           <p className="text-xs text-text-tertiary mt-1">
-            You can also set this later in project settings
+            {t('modal.apiKeyHint')}
           </p>
         </div>
 
@@ -387,10 +389,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             onClick={handleClose}
             disabled={isSubmitting}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" variant="primary" isLoading={isSubmitting}>
-            {projectType === 'template' && selectedTemplate ? 'Create from Template' : 'Create Project'}
+            {projectType === 'template' && selectedTemplate ? t('modal.createFromTemplate') : t('project.createProject')}
           </Button>
         </div>
       </form>

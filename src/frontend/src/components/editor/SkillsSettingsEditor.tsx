@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
 import type { ProjectSkill, CreateProjectSkillRequest, UpdateProjectSkillRequest } from '@/types';
@@ -38,6 +39,7 @@ const emptySkillForm: SkillFormData = {
 };
 
 export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ projectId }) => {
+  const { t } = useTranslation();
   const [skills, setSkills] = useState<ProjectSkill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -266,9 +268,9 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-text-primary">Skills Settings</h2>
+          <h2 className="text-lg font-semibold text-text-primary">{t('editor.skills.title')}</h2>
           <p className="text-xs text-text-tertiary mt-1">
-            {enabledCount} / {totalCount} enabled
+            {enabledCount} / {totalCount} {t('editor.skills.enabled')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -280,7 +282,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            Import Markdown
+            {t('editor.skills.importMarkdown')}
           </Button>
           <Button
             variant="primary"
@@ -290,7 +292,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Create Skill
+            {t('editor.skills.createSkill')}
           </Button>
         </div>
       </div>
@@ -324,12 +326,12 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                 d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            <h3 className="text-lg font-medium text-text-secondary mb-2">No Skills Configured</h3>
+            <h3 className="text-lg font-medium text-text-secondary mb-2">{t('editor.skills.noSkills')}</h3>
             <p className="text-text-tertiary mb-4">
-              Create skills to define specialized prompts and behaviors for Claude.
+              {t('editor.skills.subtitle')}
             </p>
             <Button variant="primary" onClick={handleOpenCreateModal}>
-              Create Your First Skill
+              {t('editor.skills.createFirst')}
             </Button>
           </div>
         ) : (
@@ -505,7 +507,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
           <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border">
               <h3 className="text-lg font-semibold text-text-primary">
-                {editingSkillId ? 'Edit Skill' : 'Create New Skill'}
+                {editingSkillId ? t('editor.skills.editSkill') : t('editor.skills.createNew')}
               </h3>
               <p className="text-sm text-text-tertiary mt-1">
                 {editingSkillId ? 'Update skill configuration' : 'Define a new skill for Claude'}
@@ -522,7 +524,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
               {/* Skill Name */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Skill Name *
+                  {t('editor.skills.skillName')} *
                 </label>
                 <input
                   type="text"
@@ -536,7 +538,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description
+                  {t('editor.skills.description')}
                 </label>
                 <input
                   type="text"
@@ -550,7 +552,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
               {/* Category */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Category
+                  {t('editor.skills.category')}
                 </label>
                 <select
                   value={skillForm.category}
@@ -568,7 +570,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
               {/* Content */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Skill Content (Prompt)
+                  {t('editor.skills.content')}
                 </label>
                 <textarea
                   value={skillForm.content}
@@ -586,7 +588,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
               <ToggleSwitch
                 checked={skillForm.enabled}
                 onChange={(checked) => setSkillForm({ ...skillForm, enabled: checked })}
-                label={skillForm.enabled ? 'Enabled' : 'Disabled'}
+                label={t('editor.skills.enabled')}
               />
             </div>
 
@@ -596,14 +598,14 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                 onClick={handleCloseModal}
                 disabled={isSaving}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="primary"
                 onClick={handleSaveSkill}
                 disabled={isSaving || !skillForm.name.trim()}
               >
-                {isSaving ? 'Saving...' : (editingSkillId ? 'Update Skill' : 'Create Skill')}
+                {isSaving ? t('common.loading') : (editingSkillId ? t('common.save') : t('editor.skills.createSkill'))}
               </Button>
             </div>
           </div>
@@ -615,12 +617,12 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-md mx-4 border border-border">
             <div className="p-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-text-primary">Delete Skill</h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t('editor.skills.deleteSkill')}</h3>
             </div>
 
             <div className="p-4">
               <p className="text-text-secondary">
-                Are you sure you want to delete the skill &quot;{deletingSkill.name}&quot;? This action cannot be undone.
+                {t('editor.skills.confirmDelete')}
               </p>
             </div>
 
@@ -630,14 +632,14 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
                 onClick={() => setDeletingSkill(null)}
                 disabled={isSaving}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="danger"
                 onClick={handleDeleteSkill}
                 disabled={isSaving}
               >
-                {isSaving ? 'Deleting...' : 'Delete'}
+                {isSaving ? t('common.loading') : t('common.delete')}
               </Button>
             </div>
           </div>
@@ -650,7 +652,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
           <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-text-primary">Import from Markdown</h3>
+                <h3 className="text-lg font-semibold text-text-primary">{t('editor.skills.importMarkdown')}</h3>
                 <p className="text-sm text-text-tertiary mt-1">
                   Paste skill definition with YAML frontmatter
                 </p>
@@ -707,7 +709,7 @@ Skill prompt content here...`}</pre>
                 onClick={handleCloseImportModal}
                 disabled={isImporting}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="primary"
@@ -715,7 +717,7 @@ Skill prompt content here...`}</pre>
                 onClick={handleImportMarkdown}
                 disabled={isImporting || !importMarkdownText.trim()}
               >
-                {isImporting ? 'Importing...' : 'Import'}
+                {isImporting ? t('common.loading') : t('editor.skills.importMarkdown')}
               </Button>
             </div>
           </div>

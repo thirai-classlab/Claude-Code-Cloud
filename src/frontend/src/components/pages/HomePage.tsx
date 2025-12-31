@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { SearchInput } from '@/components/molecules';
 import { CreateProjectModal } from '@/components/project/CreateProjectModal';
@@ -16,6 +17,7 @@ import { Project } from '@/types/project';
 import type { TemplateListItem } from '@/types/template';
 
 export const HomePage: React.FC = () => {
+  const { t } = useTranslation();
   const {
     projects,
     isLoading,
@@ -68,10 +70,10 @@ export const HomePage: React.FC = () => {
       <div className="flex-shrink-0 px-6 py-6 border-b border-border-subtle">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-2xl font-bold text-text-primary mb-2">
-            Projects
+            {t('project.projects')}
           </h1>
           <p className="text-text-secondary mb-6">
-            Select a project to start coding with AI assistance
+            {t('project.selectProject')}
           </p>
 
           {/* Actions */}
@@ -81,7 +83,7 @@ export const HomePage: React.FC = () => {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Search projects..."
+                placeholder={t('project.searchProjects')}
                 size="md"
               />
             </div>
@@ -90,7 +92,7 @@ export const HomePage: React.FC = () => {
               size="md"
               onClick={() => setIsCreateModalOpen(true)}
             >
-              + New Project
+              {t('project.newProject')}
             </Button>
           </div>
         </div>
@@ -104,7 +106,7 @@ export const HomePage: React.FC = () => {
 
           {/* Projects Header */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-text-primary">Projects</h2>
+            <h2 className="text-lg font-semibold text-text-primary">{t('project.projects')}</h2>
           </div>
 
           {/* Loading State */}
@@ -122,14 +124,14 @@ export const HomePage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               </div>
-              <h2 className="text-lg font-semibold text-text-primary mb-2">No projects yet</h2>
-              <p className="text-text-secondary mb-6">Create your first project to get started</p>
+              <h2 className="text-lg font-semibold text-text-primary mb-2">{t('project.noProjects')}</h2>
+              <p className="text-text-secondary mb-6">{t('project.createFirst')}</p>
               <Button
                 variant="primary"
                 size="md"
                 onClick={() => setIsCreateModalOpen(true)}
               >
-                Create Project
+                {t('project.createProject')}
               </Button>
             </div>
           )}
@@ -168,7 +170,9 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
-  const formattedDate = new Date(project.updated_at).toLocaleDateString('en-US', {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'ja' ? 'ja-JP' : 'en-US';
+  const formattedDate = new Date(project.updated_at).toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -198,8 +202,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
             </p>
           )}
           <div className="flex items-center gap-3 text-xs text-text-tertiary">
-            <span>{project.session_count} sessions</span>
-            <span>Updated {formattedDate}</span>
+            <span>{project.session_count} {t('project.sessions')}</span>
+            <span>{t('project.updated')} {formattedDate}</span>
           </div>
         </div>
 

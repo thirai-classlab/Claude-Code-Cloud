@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectsApi } from '@/lib/api';
 import { useProjects } from '@/hooks/useProjects';
@@ -14,6 +15,7 @@ interface ProjectSettingsEditorProps {
 }
 
 export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ projectId }) => {
+  const { t } = useTranslation();
   const { updateProject: updateProjectInStore } = useProjects();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -62,7 +64,7 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError('プロジェクト名は必須です');
+      setError(t('editor.projectSettings.projectNameRequired'));
       return;
     }
 
@@ -84,9 +86,9 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
       setOriginalDescription(description.trim());
       setOriginalApiKey(apiKey.trim());
 
-      showSuccess('設定を保存しました');
+      showSuccess(t('editor.projectSettings.saveSuccess'));
     } catch (err: any) {
-      setError(err.message || 'Failed to save settings');
+      setError(err.message || t('editor.projectSettings.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -111,8 +113,8 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
     <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border">
-        <h2 className="text-lg font-semibold text-text-primary">プロジェクト設定</h2>
-        <p className="text-xs text-text-tertiary mt-1">プロジェクトの基本情報とAPIキーを管理します</p>
+        <h2 className="text-lg font-semibold text-text-primary">{t('editor.projectSettings.title')}</h2>
+        <p className="text-xs text-text-tertiary mt-1">{t('editor.projectSettings.subtitle')}</p>
       </div>
 
       {/* Messages */}
@@ -133,7 +135,7 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
           {/* Project Name */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              プロジェクト名 <span className="text-red-400">*</span>
+              {t('editor.projectSettings.projectName')} <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -149,14 +151,14 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              説明
+              {t('editor.projectSettings.description')}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               className="w-full px-3 py-2 bg-bg-secondary border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent resize-none"
-              placeholder="プロジェクトの説明を入力してください..."
+              placeholder={t('editor.projectSettings.descriptionPlaceholder')}
               maxLength={500}
             />
             <p className="text-xs text-text-tertiary mt-1">{description.length}/500</p>
@@ -165,7 +167,7 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
           {/* API Key */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              APIキー
+              {t('editor.projectSettings.apiKey')}
             </label>
             <div className="relative">
               <input
@@ -173,14 +175,14 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="w-full px-3 py-2 pr-12 bg-bg-secondary border border-border rounded-md text-text-primary font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
-                placeholder="sk-ant-api..."
+                placeholder={t('editor.projectSettings.apiKeyPlaceholder')}
                 maxLength={500}
               />
               <button
                 type="button"
                 onClick={() => setShowApiKey(!showApiKey)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-text-tertiary hover:text-text-primary transition-colors"
-                title={showApiKey ? '非表示' : '表示'}
+                title={showApiKey ? t('editor.projectSettings.hide') : t('editor.projectSettings.show')}
               >
                 {showApiKey ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,8 +197,7 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
               </button>
             </div>
             <p className="text-xs text-text-tertiary mt-1">
-              このプロジェクトで使用するAnthropic APIキーを設定してください。
-              チャット機能を使用するにはAPIキーの設定が必要です。
+              {t('editor.projectSettings.apiKeyHint')}
             </p>
           </div>
 
@@ -208,7 +209,7 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
               onClick={handleReset}
               disabled={!isDirty || isSaving}
             >
-              リセット
+              {t('editor.projectSettings.reset')}
             </Button>
             <Button
               variant="primary"
@@ -216,7 +217,7 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
               onClick={handleSave}
               disabled={!isDirty || isSaving}
             >
-              {isSaving ? '保存中...' : '保存'}
+              {isSaving ? t('editor.projectSettings.saving') : t('editor.projectSettings.save')}
             </Button>
           </div>
         </div>

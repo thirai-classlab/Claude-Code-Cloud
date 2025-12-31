@@ -3,13 +3,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { useUIStore } from '@/stores/uiStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/atoms';
 import { ThemeSelector } from '@/components/common/ThemeSelector';
+import { LanguageSelector } from '@/components/common/LanguageSelector';
 export const Header: React.FC = () => {
+  const { t } = useTranslation();
   const params = useParams();
   const { toggleSidebar, isSidebarOpen } = useUIStore();
   const { getCurrentProject, projects } = useProjectStore();
@@ -40,7 +43,7 @@ export const Header: React.FC = () => {
           variant="default"
           size="sm"
           onClick={toggleSidebar}
-          aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+          aria-label={isSidebarOpen ? t('sidebar.closeSidebar') : t('sidebar.openSidebar')}
           aria-expanded={isSidebarOpen}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,7 +74,7 @@ export const Header: React.FC = () => {
               <>
                 <span className="text-text-tertiary">/</span>
                 <span className="text-text-primary">
-                  {currentSession.name || 'Session'}
+                  {currentSession.name || t('session.session')}
                 </span>
               </>
             )}
@@ -86,12 +89,13 @@ export const Header: React.FC = () => {
             <Button
               variant="default"
               size="sm"
-              title="Back to home"
+              title={t('nav.backToHome')}
             >
-              Home
+              {t('nav.home')}
             </Button>
           </Link>
         )}
+        <LanguageSelector />
         <ThemeSelector />
 
         {/* User info and logout */}
@@ -105,9 +109,9 @@ export const Header: React.FC = () => {
               size="sm"
               onClick={handleLogout}
               disabled={isAuthLoading}
-              title="Logout"
+              title={t('auth.logout')}
             >
-              {isAuthLoading ? 'Logging out...' : 'Logout'}
+              {isAuthLoading ? t('auth.loggingOut') : t('auth.logout')}
             </Button>
           </div>
         )}

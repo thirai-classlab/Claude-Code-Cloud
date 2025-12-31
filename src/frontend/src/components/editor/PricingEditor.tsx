@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { projectsApi } from '@/lib/api';
 import { UsageStats, CostLimitCheck, CostLimitUpdateRequest } from '@/types/project';
 
@@ -32,6 +33,7 @@ const PRICING = {
 };
 
 export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [stats, setStats] = useState<UsageStats | null>(null);
@@ -61,7 +63,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       setLimitMonthly(costCheck.limit_monthly !== null ? costCheck.limit_monthly.toString() : '');
     } catch (err) {
       console.error('Failed to load usage data:', err);
-      setError('使用量データの取得に失敗しました');
+      setError(t('editor.pricing.loadError'));
     } finally {
       setIsLoading(false);
     }
@@ -84,20 +86,20 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       };
 
       await projectsApi.updateCostLimits(projectId, request);
-      setSuccessMessage('利用制限を更新しました');
+      setSuccessMessage(t('editor.pricing.limitUpdated'));
 
       // 再読み込み
       await loadData();
     } catch (err) {
       console.error('Failed to update cost limits:', err);
-      setError('利用制限の更新に失敗しました');
+      setError(t('editor.pricing.limitUpdateError'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleClearLimits = async () => {
-    if (!confirm('すべての利用制限を解除しますか？')) return;
+    if (!confirm(t('editor.pricing.confirmClearAll'))) return;
 
     setIsSaving(true);
     setError(null);
@@ -105,7 +107,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
 
     try {
       await projectsApi.clearCostLimits(projectId);
-      setSuccessMessage('利用制限を解除しました');
+      setSuccessMessage(t('editor.pricing.limitCleared'));
       setLimitDaily('');
       setLimitWeekly('');
       setLimitMonthly('');
@@ -114,7 +116,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       await loadData();
     } catch (err) {
       console.error('Failed to clear cost limits:', err);
-      setError('利用制限の解除に失敗しました');
+      setError(t('editor.pricing.limitClearError'));
     } finally {
       setIsSaving(false);
     }
@@ -166,8 +168,8 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
     <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border">
-        <h2 className="text-lg font-semibold text-text-primary">料金・使用量</h2>
-        <p className="text-xs text-text-tertiary mt-1">プロジェクトのAPI使用量と利用制限を管理します</p>
+        <h2 className="text-lg font-semibold text-text-primary">{t('editor.pricing.title')}</h2>
+        <p className="text-xs text-text-tertiary mt-1">{t('editor.pricing.description')}</p>
       </div>
 
       {/* Content */}
@@ -193,16 +195,16 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <div>
-                  <h4 className="text-sm font-medium text-red-400 mb-1">利用制限に達しました</h4>
+                  <h4 className="text-sm font-medium text-red-400 mb-1">{t('editor.pricing.limitReached')}</h4>
                   <p className="text-xs text-red-300">
                     {limitCheck.exceeded_limits.map(limit => {
                       switch (limit) {
-                        case 'daily': return '1日';
-                        case 'weekly': return '7日';
-                        case 'monthly': return '30日';
+                        case 'daily': return t('editor.pricing.past1Day');
+                        case 'weekly': return t('editor.pricing.past7Days');
+                        case 'monthly': return t('editor.pricing.past30Days');
                         default: return limit;
                       }
-                    }).join('、')}の利用制限を超過しています。制限値を変更するか、時間が経過するまでお待ちください。
+                    }).join(', ')}{t('editor.pricing.limitExceeded')}
                   </p>
                 </div>
               </div>
@@ -213,19 +215,19 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="p-4 bg-bg-secondary rounded-lg border border-border">
-                <div className="text-xs text-text-tertiary uppercase tracking-wider mb-1">総トークン数</div>
+                <div className="text-xs text-text-tertiary uppercase tracking-wider mb-1">{t('editor.pricing.totalTokens')}</div>
                 <div className="text-2xl font-semibold text-text-primary">{formatNumber(stats.total_tokens)}</div>
               </div>
               <div className="p-4 bg-bg-secondary rounded-lg border border-border">
-                <div className="text-xs text-text-tertiary uppercase tracking-wider mb-1">総コスト</div>
+                <div className="text-xs text-text-tertiary uppercase tracking-wider mb-1">{t('editor.pricing.totalCost')}</div>
                 <div className="text-2xl font-semibold text-accent">{formatCurrency(stats.total_cost)}</div>
               </div>
               <div className="p-4 bg-bg-secondary rounded-lg border border-border">
-                <div className="text-xs text-text-tertiary uppercase tracking-wider mb-1">セッション数</div>
+                <div className="text-xs text-text-tertiary uppercase tracking-wider mb-1">{t('editor.pricing.sessionCount')}</div>
                 <div className="text-2xl font-semibold text-text-primary">{formatNumber(stats.session_count)}</div>
               </div>
               <div className="p-4 bg-bg-secondary rounded-lg border border-border">
-                <div className="text-xs text-text-tertiary uppercase tracking-wider mb-1">メッセージ数</div>
+                <div className="text-xs text-text-tertiary uppercase tracking-wider mb-1">{t('editor.pricing.messageCount')}</div>
                 <div className="text-xl font-medium text-text-primary">{formatNumber(stats.message_count)}</div>
               </div>
             </div>
@@ -234,12 +236,12 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
           {/* Period-based Usage with Progress Bars */}
           {limitCheck && (
             <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-3">期間別使用量</h3>
+              <h3 className="text-sm font-semibold text-text-primary mb-3">{t('editor.pricing.periodUsage')}</h3>
               <div className="space-y-4">
                 {/* Daily */}
                 <div className="p-4 bg-bg-secondary rounded-lg border border-border">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-text-primary">過去1日</span>
+                    <span className="text-sm text-text-primary">{t('editor.pricing.past1Day')}</span>
                     <span className="text-sm font-medium text-text-primary">
                       {formatCurrencyShort(limitCheck.cost_daily)}
                       {limitCheck.limit_daily !== null && (
@@ -260,7 +262,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
                 {/* Weekly */}
                 <div className="p-4 bg-bg-secondary rounded-lg border border-border">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-text-primary">過去7日</span>
+                    <span className="text-sm text-text-primary">{t('editor.pricing.past7Days')}</span>
                     <span className="text-sm font-medium text-text-primary">
                       {formatCurrencyShort(limitCheck.cost_weekly)}
                       {limitCheck.limit_weekly !== null && (
@@ -281,7 +283,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
                 {/* Monthly */}
                 <div className="p-4 bg-bg-secondary rounded-lg border border-border">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-text-primary">過去30日</span>
+                    <span className="text-sm text-text-primary">{t('editor.pricing.past30Days')}</span>
                     <span className="text-sm font-medium text-text-primary">
                       {formatCurrencyShort(limitCheck.cost_monthly)}
                       {limitCheck.limit_monthly !== null && (
@@ -304,51 +306,51 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
 
           {/* Cost Limit Settings */}
           <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">利用制限設定</h3>
+            <h3 className="text-sm font-semibold text-text-primary mb-3">{t('editor.pricing.limitSettings')}</h3>
             <div className="p-4 bg-bg-secondary rounded-lg border border-border space-y-4">
               <p className="text-xs text-text-tertiary">
-                各期間の利用上限（USD）を設定できます。空欄にすると無制限になります。
+                {t('editor.pricing.limitNote')}
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Daily Limit */}
                 <div>
-                  <label className="block text-xs text-text-secondary mb-1">1日の上限 (USD)</label>
+                  <label className="block text-xs text-text-secondary mb-1">{t('editor.pricing.dailyLimitLabel')}</label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={limitDaily}
                     onChange={(e) => setLimitDaily(e.target.value)}
-                    placeholder="無制限"
+                    placeholder={t('editor.pricing.unlimited')}
                     className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
 
                 {/* Weekly Limit */}
                 <div>
-                  <label className="block text-xs text-text-secondary mb-1">7日の上限 (USD)</label>
+                  <label className="block text-xs text-text-secondary mb-1">{t('editor.pricing.weeklyLimitLabel')}</label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={limitWeekly}
                     onChange={(e) => setLimitWeekly(e.target.value)}
-                    placeholder="無制限"
+                    placeholder={t('editor.pricing.unlimited')}
                     className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
 
                 {/* Monthly Limit */}
                 <div>
-                  <label className="block text-xs text-text-secondary mb-1">30日の上限 (USD)</label>
+                  <label className="block text-xs text-text-secondary mb-1">{t('editor.pricing.monthlyLimitLabel')}</label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={limitMonthly}
                     onChange={(e) => setLimitMonthly(e.target.value)}
-                    placeholder="無制限"
+                    placeholder={t('editor.pricing.unlimited')}
                     className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
@@ -360,14 +362,14 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
                   disabled={isSaving}
                   className="px-4 py-2 bg-accent text-white text-sm rounded-md hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSaving ? '保存中...' : '保存'}
+                  {isSaving ? t('editor.pricing.saving') : t('editor.pricing.save')}
                 </button>
                 <button
                   onClick={handleClearLimits}
                   disabled={isSaving}
                   className="px-4 py-2 bg-bg-tertiary text-text-secondary text-sm rounded-md hover:bg-bg-tertiary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  すべて解除
+                  {t('editor.pricing.clearAll')}
                 </button>
               </div>
             </div>
@@ -375,14 +377,14 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
 
           {/* Pricing Table */}
           <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">料金表（100万トークンあたり）</h3>
+            <h3 className="text-sm font-semibold text-text-primary mb-3">{t('editor.pricing.pricingTable')}</h3>
             <div className="bg-bg-secondary rounded-lg border border-border overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider">モデル</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider">入力</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider">出力</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider">{t('editor.pricing.model')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider">{t('editor.pricing.input')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider">{t('editor.pricing.output')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -397,7 +399,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
               </table>
             </div>
             <p className="text-xs text-text-tertiary mt-2">
-              ※ 料金はAnthropicの公式価格に基づいています。詳細は
+              {t('editor.pricing.pricingNote')}
               <a
                 href="https://www.anthropic.com/pricing"
                 target="_blank"
@@ -406,7 +408,6 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
               >
                 Anthropic Pricing
               </a>
-              をご確認ください。
             </p>
           </div>
 
@@ -417,11 +418,9 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <h4 className="text-sm font-medium text-accent mb-1">使用量について</h4>
+                <h4 className="text-sm font-medium text-accent mb-1">{t('editor.pricing.usageNote')}</h4>
                 <p className="text-xs text-text-secondary">
-                  使用量はセッションごとに集計されます。プロジェクトに独自のAPIキーが設定されている場合、
-                  そのAPIキーに対する課金が発生します。設定されていない場合は、システムのデフォルトAPIキーに課金されます。
-                  利用制限に達すると、新しいメッセージを送信できなくなります。
+                  {t('editor.pricing.usageNoteText')}
                 </p>
               </div>
             </div>

@@ -7,6 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { SessionItemNav } from './SessionItemNav';
 import { CreateSessionModal } from './CreateSessionModal';
 import { Button } from '@/components/atoms';
@@ -18,6 +19,7 @@ export interface SessionListNavProps {
 }
 
 export const SessionListNav: React.FC<SessionListNavProps> = ({ projectId }) => {
+  const { t } = useTranslation();
   const params = useParams();
   const currentSessionId = params?.sessionId as string | undefined;
   const { navigateToSession } = useNavigation();
@@ -51,7 +53,7 @@ export const SessionListNav: React.FC<SessionListNavProps> = ({ projectId }) => 
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (confirm('Are you sure you want to delete this session?')) {
+    if (confirm(t('session.confirmDelete'))) {
       try {
         await deleteSession(sessionId);
         setContextMenu(null);
@@ -84,14 +86,14 @@ export const SessionListNav: React.FC<SessionListNavProps> = ({ projectId }) => 
         onClick={() => setIsCreateModalOpen(true)}
         className="w-full justify-start"
       >
-        + New Session
+        {t('session.newSession')}
       </Button>
 
       {/* Session Items */}
       {sessions.length === 0 ? (
         <div className="py-4 text-center">
           <p className="text-xs text-text-tertiary">
-            No sessions yet
+            {t('session.noSessions')}
           </p>
         </div>
       ) : (

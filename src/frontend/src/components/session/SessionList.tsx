@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SessionItem } from './SessionItem';
 import { CreateSessionModal } from './CreateSessionModal';
 import { Button } from '@/components/atoms';
@@ -14,6 +15,7 @@ export interface SessionListProps {
 }
 
 export const SessionList: React.FC<SessionListProps> = ({ projectId }) => {
+  const { t } = useTranslation();
   const {
     sessions,
     currentSessionId,
@@ -49,7 +51,7 @@ export const SessionList: React.FC<SessionListProps> = ({ projectId }) => {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (confirm('Are you sure you want to delete this session?')) {
+    if (confirm(t('session.confirmDelete'))) {
       try {
         await deleteSession(sessionId);
         setContextMenu(null);
@@ -80,14 +82,14 @@ export const SessionList: React.FC<SessionListProps> = ({ projectId }) => {
         onClick={() => setIsCreateModalOpen(true)}
         className="w-full justify-start"
       >
-        + New Session
+        {t('session.newSession')}
       </Button>
 
       {/* Session Items */}
       {sessions.length === 0 ? (
         <div className="py-4 text-center">
           <p className="text-xs text-text-tertiary">
-            No sessions yet
+            {t('session.noSessions')}
           </p>
         </div>
       ) : (

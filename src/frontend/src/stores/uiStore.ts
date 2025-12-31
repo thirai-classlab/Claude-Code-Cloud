@@ -3,9 +3,11 @@ import { persist } from 'zustand/middleware';
 
 type Theme = 'light' | 'dark' | 'claude' | 'linear';
 type EditorTab = 'vscode' | 'mcp' | 'agents' | 'commands' | 'skills' | 'cron' | 'settings' | 'pricing';
+type Language = 'ja' | 'en';
 
 interface UIState {
   theme: Theme;
+  language: Language;
   isSidebarOpen: boolean;
   isFileTreeOpen: boolean;
   isEditorPanelOpen: boolean;
@@ -14,6 +16,7 @@ interface UIState {
   fontSize: number;
 
   setTheme: (theme: Theme) => void;
+  setLanguage: (language: Language) => void;
   toggleSidebar: () => void;
   toggleFileTree: () => void;
   toggleEditorPanel: () => void;
@@ -27,6 +30,7 @@ export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
       theme: 'linear',
+      language: 'ja',
       isSidebarOpen: true,
       isFileTreeOpen: true,
       isEditorPanelOpen: true,
@@ -37,6 +41,11 @@ export const useUIStore = create<UIState>()(
       setTheme: (theme) => {
         set({ theme });
         document.documentElement.setAttribute('data-theme', theme);
+      },
+
+      setLanguage: (language) => {
+        set({ language });
+        localStorage.setItem('language', language);
       },
 
       toggleSidebar: () =>

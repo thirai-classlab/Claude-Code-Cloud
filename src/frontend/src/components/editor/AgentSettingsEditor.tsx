@@ -5,6 +5,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
 import type {
@@ -40,6 +41,7 @@ const getDefaultAgentForm = (): CreateProjectAgentRequest => ({
 });
 
 export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projectId }) => {
+  const { t } = useTranslation();
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -298,13 +300,8 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="text-lg font-semibold text-text-primary">Agent Settings</h2>
-            <p className="text-xs text-text-tertiary mt-1">Manage sub-agents for this project</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-text-secondary">
-              {enabledCount} / {totalCount} enabled
-            </span>
+            <h2 className="text-lg font-semibold text-text-primary">{t('editor.agents.title')}</h2>
+            <p className="text-xs text-text-tertiary mt-1">{enabledCount} / {totalCount} {t('editor.agents.enabled')}</p>
           </div>
         </div>
 
@@ -320,7 +317,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Create New Agent
+            {t('editor.agents.addAgent')}
           </Button>
         </div>
       </div>
@@ -350,10 +347,10 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
             <svg className="w-12 h-12 mx-auto text-text-tertiary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            <p className="text-text-secondary mb-2">No agents configured</p>
-            <p className="text-text-tertiary text-sm mb-4">Create your first agent to get started</p>
+            <p className="text-text-secondary mb-2">{t('editor.agents.noAgents')}</p>
+            <p className="text-text-tertiary text-sm mb-4">{t('editor.agents.addFirstAgent')}</p>
             <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
-              Create Agent
+              {t('editor.agents.addAgent')}
             </Button>
           </div>
         ) : (
@@ -476,9 +473,9 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-text-primary">Create New Agent</h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t('editor.agents.addAgent')}</h3>
               <p className="text-sm text-text-tertiary mt-1">
-                Define a new sub-agent for this project
+                {t('editor.agents.addFirstAgent')}
               </p>
             </div>
 
@@ -486,7 +483,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Agent Name */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Agent Name *
+                  {t('editor.agents.agentName')} *
                 </label>
                 <input
                   type="text"
@@ -500,7 +497,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description
+                  {t('editor.agents.description')}
                 </label>
                 <textarea
                   value={newAgentForm.description || ''}
@@ -514,7 +511,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Category */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Category
+                  {t('editor.agents.category')}
                 </label>
                 <select
                   value={newAgentForm.category || 'development'}
@@ -532,7 +529,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Model */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Model
+                  {t('editor.agents.model')}
                 </label>
                 <select
                   value={newAgentForm.model || 'sonnet'}
@@ -550,7 +547,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Tools */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Available Tools
+                  {t('editor.agents.tools')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {AGENT_TOOL_OPTIONS.map((tool) => (
@@ -573,7 +570,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* System Prompt */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  System Prompt
+                  {t('editor.agents.systemPrompt')}
                 </label>
                 <textarea
                   value={newAgentForm.system_prompt || ''}
@@ -620,9 +617,9 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
             <div className="p-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-text-primary">Edit Agent</h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t('common.edit')}</h3>
               <p className="text-sm text-text-tertiary mt-1">
-                Modify agent configuration
+                {t('editor.agents.description')}
               </p>
             </div>
 
@@ -630,7 +627,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Agent Name */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Agent Name *
+                  {t('editor.agents.agentName')} *
                 </label>
                 <input
                   type="text"
@@ -644,7 +641,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Description
+                  {t('editor.agents.description')}
                 </label>
                 <textarea
                   value={editAgentForm.description || ''}
@@ -658,7 +655,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Category */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Category
+                  {t('editor.agents.category')}
                 </label>
                 <select
                   value={editAgentForm.category || 'development'}
@@ -676,7 +673,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Model */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Model
+                  {t('editor.agents.model')}
                 </label>
                 <select
                   value={editAgentForm.model || 'sonnet'}
@@ -694,7 +691,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* Tools */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Available Tools
+                  {t('editor.agents.tools')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {AGENT_TOOL_OPTIONS.map((tool) => (
@@ -717,7 +714,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
               {/* System Prompt */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  System Prompt
+                  {t('editor.agents.systemPrompt')}
                 </label>
                 <textarea
                   value={editAgentForm.system_prompt || ''}

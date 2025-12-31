@@ -3,10 +3,12 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { login, isAuthenticated, isLoading, error, clearError } = useAuthStore();
 
@@ -32,11 +34,11 @@ export default function LoginPage() {
 
     // Basic validation
     if (!email.trim()) {
-      setLocalError('Please enter your email address');
+      setLocalError(t('validation.emailRequired'));
       return;
     }
     if (!password) {
-      setLocalError('Please enter your password');
+      setLocalError(t('validation.passwordRequired'));
       return;
     }
 
@@ -56,13 +58,13 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple-500" />
-          <h1 className="text-2xl font-semibold text-text-primary">Claude Code</h1>
+          <h1 className="text-2xl font-semibold text-text-primary">{t('app.title')}</h1>
         </div>
 
         {/* Login Form */}
         <div className="bg-bg-secondary border border-border-subtle rounded-xl p-6">
           <h2 className="text-lg font-medium text-text-primary mb-6 text-center">
-            Sign in to your account
+            {t('auth.signInToAccount')}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -72,15 +74,16 @@ export default function LoginPage() {
                 htmlFor="email"
                 className="block text-sm font-medium text-text-secondary"
               >
-                Email
+                {t('auth.email')}
               </label>
               <input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={t('auth.emailPlaceholder')}
                 autoComplete="email"
+                aria-label={t('auth.email')}
                 disabled={isLoading}
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg',
@@ -99,15 +102,16 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-text-secondary"
               >
-                Password
+                {t('auth.password')}
               </label>
               <input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder={t('auth.passwordPlaceholder')}
                 autoComplete="current-password"
+                aria-label={t('auth.password')}
                 disabled={isLoading}
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg',
@@ -140,19 +144,19 @@ export default function LoginPage() {
                 'transition-all duration-fast'
               )}
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? t('auth.signingIn') : t('auth.signIn')}
             </button>
           </form>
 
           {/* Register Link */}
           <div className="mt-6 pt-6 border-t border-border-subtle text-center">
             <p className="text-sm text-text-secondary">
-              Don&apos;t have an account?{' '}
+              {t('auth.noAccount')}{' '}
               <Link
                 href="/register"
                 className="text-accent hover:text-accent-hover transition-colors duration-fast"
               >
-                Create an account
+                {t('auth.createAccount')}
               </Link>
             </p>
           </div>
@@ -160,7 +164,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-text-tertiary">
-          Web-based coding assistant powered by Claude
+          {t('app.description')}
         </p>
       </div>
     </div>
