@@ -47,7 +47,6 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
   const [activeTab, setActiveTab] = useState<TabType>('schedules');
   const [schedules, setSchedules] = useState<CronScheduleResponse[]>([]);
   const [executionLogs, setExecutionLogs] = useState<CronExecutionLog[]>([]);
-  const [configPath, setConfigPath] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -64,7 +63,6 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
     try {
       const response = await cronApi.getSchedules(projectId);
       setSchedules(response.schedules);
-      setConfigPath(response.path);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load cron schedules';
       setError(errorMessage);
@@ -248,40 +246,31 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
     <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">{t('editor.cron.title')}</h2>
-            <p className="text-xs text-text-tertiary mt-1 font-mono">{configPath}</p>
+            <p className="text-xs text-text-tertiary mt-1">{t('editor.cron.subtitle')}</p>
           </div>
-          {activeTab === 'schedules' && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleAddSchedule}
-              disabled={isFormOpen}
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              {t('editor.cron.addSchedule')}
-            </Button>
-          )}
-          {activeTab === 'history' && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={loadExecutionLogs}
-              disabled={isLoadingLogs}
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {t('editor.cron.refresh')}
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-text-secondary">
+              {schedules.filter(s => s.enabled).length} / {schedules.length} {t('editor.cron.enabled')}
+            </span>
+            <div className="flex items-center gap-2">
+              {activeTab === 'schedules' && (
+                <Button variant="primary" size="sm" onClick={handleAddSchedule} disabled={isFormOpen}>
+                  {t('editor.cron.addSchedule')}
+                </Button>
+              )}
+              {activeTab === 'history' && (
+                <Button variant="secondary" size="sm" onClick={loadExecutionLogs} disabled={isLoadingLogs}>
+                  {t('editor.cron.refresh')}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
         {/* Tabs */}
-        <div className="flex gap-1">
+        <div className="flex gap-1 mt-3">
           <button
             onClick={() => setActiveTab('schedules')}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${

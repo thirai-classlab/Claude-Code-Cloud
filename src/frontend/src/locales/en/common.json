@@ -137,6 +137,7 @@
     },
     "mcp": {
       "title": "MCP Settings",
+      "subtitle": "Configure Model Context Protocol servers for this project",
       "addServer": "Add Server",
       "serverName": "Server Name",
       "command": "Command",
@@ -150,6 +151,7 @@
     },
     "agents": {
       "title": "Sub-agents Settings",
+      "subtitle": "Configure specialized agents for task delegation",
       "addAgent": "Add Agent",
       "agentName": "Agent Name",
       "description": "Description",
@@ -196,6 +198,7 @@
     },
     "cron": {
       "title": "Cron Schedules",
+      "subtitle": "Automate command execution on a schedule",
       "addSchedule": "Add Schedule",
       "schedules": "Schedules",
       "executionHistory": "Execution History",

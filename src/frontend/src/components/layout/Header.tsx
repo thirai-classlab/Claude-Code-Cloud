@@ -9,7 +9,6 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/atoms';
-import { ThemeSelector } from '@/components/common/ThemeSelector';
 import { LanguageSelector } from '@/components/common/LanguageSelector';
 export const Header: React.FC = () => {
   const { t } = useTranslation();
@@ -83,20 +82,37 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Home button */}
-        {(projectIdFromUrl || sessionIdFromUrl) && (
+        {/* Back button - show on session page to go back to project */}
+        {sessionIdFromUrl && projectIdFromUrl && (
+          <Link href={`/projects/${projectIdFromUrl}`}>
+            <Button
+              variant="default"
+              size="sm"
+              title={t('sessionPage.backToProject')}
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              {t('sessionPage.backToProject')}
+            </Button>
+          </Link>
+        )}
+        {/* Home button - show on project page (not session page) */}
+        {projectIdFromUrl && !sessionIdFromUrl && (
           <Link href="/">
             <Button
               variant="default"
               size="sm"
               title={t('nav.backToHome')}
             >
-              {t('nav.home')}
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              {t('nav.backToHome')}
             </Button>
           </Link>
         )}
         <LanguageSelector />
-        <ThemeSelector />
 
         {/* User info and logout */}
         {user && (

@@ -266,34 +266,25 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
   return (
     <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">{t('editor.skills.title')}</h2>
-          <p className="text-xs text-text-tertiary mt-1">
-            {enabledCount} / {totalCount} {t('editor.skills.enabled')}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsImportModalOpen(true)}
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            {t('editor.skills.importMarkdown')}
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleOpenCreateModal}
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            {t('editor.skills.createSkill')}
-          </Button>
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">{t('editor.skills.title')}</h2>
+            <p className="text-xs text-text-tertiary mt-1">{t('editor.skills.subtitle')}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-text-secondary">
+              {enabledCount} / {totalCount} {t('editor.skills.enabled')}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setIsImportModalOpen(true)}>
+                {t('editor.skills.importMarkdown')}
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleOpenCreateModal}>
+                {t('editor.skills.createSkill')}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 

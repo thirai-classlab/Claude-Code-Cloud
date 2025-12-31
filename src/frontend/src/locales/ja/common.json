@@ -137,6 +137,7 @@
     },
     "mcp": {
       "title": "MCP設定",
+      "subtitle": "このプロジェクトのModel Context Protocolサーバーを設定します",
       "addServer": "サーバー追加",
       "serverName": "サーバー名",
       "command": "コマンド",
@@ -149,6 +150,7 @@
     },
     "agents": {
       "title": "サブエージェント設定",
+      "subtitle": "タスク委任用の専門エージェントを設定します",
       "addAgent": "エージェント追加",
       "agentName": "エージェント名",
       "description": "説明",
@@ -195,6 +197,7 @@
     },
     "cron": {
       "title": "スケジュール設定",
+      "subtitle": "コマンドを定期的に自動実行します",
       "addSchedule": "スケジュール追加",
       "schedules": "スケジュール",
       "executionHistory": "実行履歴",
