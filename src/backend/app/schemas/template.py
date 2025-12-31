@@ -110,6 +110,7 @@ class CreateProjectFromTemplateRequest(BaseModel):
     template_id: str = Field(..., description="テンプレートID")
     project_name: str = Field(..., min_length=1, max_length=100, description="プロジェクト名")
     project_description: Optional[str] = Field(None, max_length=500, description="プロジェクト説明")
+    api_key: Optional[str] = Field(None, max_length=500, description="プロジェクト固有のAPIキー")
 
 
 class CreateTemplateFromProjectRequest(BaseModel):

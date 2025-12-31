@@ -4,6 +4,7 @@
  */
 
 export type CommandCategory =
+  | 'system'
   | 'core'
   | 'planning'
   | 'development'
@@ -12,7 +13,8 @@ export type CommandCategory =
   | 'git'
   | 'session'
   | 'specialized'
-  | 'help';
+  | 'help'
+  | 'custom';
 
 export interface CommandConfig {
   enabled: boolean;
@@ -51,6 +53,7 @@ export interface ToggleCommandResponse {
 
 // Category display names for UI
 export const COMMAND_CATEGORY_LABELS: Record<CommandCategory, string> = {
+  system: 'System',
   core: 'Core',
   planning: 'Planning & Design',
   development: 'Development',
@@ -60,6 +63,7 @@ export const COMMAND_CATEGORY_LABELS: Record<CommandCategory, string> = {
   session: 'Session Management',
   specialized: 'Specialized',
   help: 'Help',
+  custom: 'Custom',
 };
 
 // Create custom command request/response types

@@ -44,7 +44,7 @@ export const WelcomePanel: React.FC = () => {
     }
   }, [currentProjectId, loadSessions]);
 
-  const handleCreateProject = async (data: { name: string; description?: string }) => {
+  const handleCreateProject = async (data: { name: string; description?: string; api_key?: string }) => {
     const project = await createProject(data);
     selectProject(project.id);
     setIsCreateProjectModalOpen(false);

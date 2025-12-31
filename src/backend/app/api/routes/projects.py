@@ -73,6 +73,7 @@ async def create_project(
         name=request.name,
         user_id=current_user.id,
         description=request.description,
+        api_key=request.api_key,
     )
 
     return ProjectResponse(**project.model_dump())

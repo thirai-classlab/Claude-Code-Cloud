@@ -62,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
     }
   }, [executeSearch]);
 
-  const handleCreateProject = useCallback(async (data: { name: string; description?: string }) => {
+  const handleCreateProject = useCallback(async (data: { name: string; description?: string; api_key?: string }) => {
     const project = await createProject(data);
     // Navigate to the new project page
     navigateToProject(project.id);

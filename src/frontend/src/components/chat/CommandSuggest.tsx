@@ -56,6 +56,7 @@ export const CommandSuggest: React.FC<CommandSuggestProps> = ({
 
   const getCategoryColor = (category: string): string => {
     const colors: Record<string, string> = {
+      system: 'bg-blue-500/15 text-blue-400',
       core: 'bg-accent-muted text-accent',
       planning: 'bg-purple-500/15 text-purple-400',
       development: 'bg-emerald-500/15 text-emerald-400',
@@ -66,6 +67,7 @@ export const CommandSuggest: React.FC<CommandSuggestProps> = ({
       specialized: 'bg-pink-500/15 text-pink-400',
       help: 'bg-bg-tertiary text-text-secondary',
       skill: 'bg-indigo-500/15 text-indigo-400',
+      custom: 'bg-teal-500/15 text-teal-400',
     };
     return colors[category] || 'bg-bg-tertiary text-text-secondary';
   };

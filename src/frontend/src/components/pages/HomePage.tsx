@@ -46,7 +46,7 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  const handleCreateProject = async (data: { name: string; description?: string }) => {
+  const handleCreateProject = async (data: { name: string; description?: string; api_key?: string }) => {
     const project = await createProject(data);
     navigateToProject(project.id);
     setIsCreateModalOpen(false);

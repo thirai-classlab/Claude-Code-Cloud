@@ -10,6 +10,7 @@ import { Session } from '@/types/session';
 export interface CreateProjectRequest {
   name: string;
   description?: string;
+  api_key?: string;
 }
 
 export interface UpdateProjectRequest {

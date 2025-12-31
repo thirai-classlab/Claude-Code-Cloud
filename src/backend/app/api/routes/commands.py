@@ -14,7 +14,29 @@ from app.config import settings
 router = APIRouter(prefix="/commands", tags=["commands"])
 
 
-# Available command definitions
+# Built-in CLI commands (system commands)
+BUILTIN_COMMANDS: List[Dict[str, Any]] = [
+    {"name": "clear", "description": "Clear conversation history", "category": "system", "defaultEnabled": True},
+    {"name": "help", "description": "Show available commands and shortcuts", "category": "system", "defaultEnabled": True},
+    {"name": "exit", "description": "Exit the current session", "category": "system", "defaultEnabled": True},
+    {"name": "compact", "description": "Compact conversation to save context", "category": "system", "defaultEnabled": True},
+    {"name": "config", "description": "View or modify configuration", "category": "system", "defaultEnabled": True},
+    {"name": "cost", "description": "Show token usage and cost", "category": "system", "defaultEnabled": True},
+    {"name": "doctor", "description": "Run diagnostics and health checks", "category": "system", "defaultEnabled": True},
+    {"name": "init", "description": "Initialize project configuration", "category": "system", "defaultEnabled": True},
+    {"name": "login", "description": "Authenticate with Anthropic", "category": "system", "defaultEnabled": True},
+    {"name": "logout", "description": "Log out from current session", "category": "system", "defaultEnabled": True},
+    {"name": "memory", "description": "Manage conversation memory", "category": "system", "defaultEnabled": True},
+    {"name": "model", "description": "Switch AI model", "category": "system", "defaultEnabled": True},
+    {"name": "permissions", "description": "Manage tool permissions", "category": "system", "defaultEnabled": True},
+    {"name": "resume", "description": "Resume previous conversation", "category": "system", "defaultEnabled": True},
+    {"name": "review", "description": "Review recent changes", "category": "system", "defaultEnabled": True},
+    {"name": "status", "description": "Show current session status", "category": "system", "defaultEnabled": True},
+    {"name": "terminal-setup", "description": "Configure terminal settings", "category": "system", "defaultEnabled": True},
+    {"name": "vim", "description": "Toggle vim mode", "category": "system", "defaultEnabled": True},
+]
+
+# Available command definitions (SuperClaude commands)
 AVAILABLE_COMMANDS: List[Dict[str, Any]] = [
     # Core Commands
     {"name": "sc:pm", "description": "Project Manager - orchestrates sub-agents and manages workflows", "category": "core", "defaultEnabled": True},
@@ -160,9 +182,10 @@ def get_default_config() -> CommandsConfig:
 @router.get("/available", response_model=List[CommandDefinition])
 async def get_available_commands() -> List[CommandDefinition]:
     """
-    Get list of all available commands
+    Get list of all available commands including built-in CLI commands
     """
-    return [CommandDefinition(**cmd) for cmd in AVAILABLE_COMMANDS]
+    all_commands = BUILTIN_COMMANDS + AVAILABLE_COMMANDS
+    return [CommandDefinition(**cmd) for cmd in all_commands]
 
 
 @router.get("/projects/{project_id}/config", response_model=CommandsConfigResponse)

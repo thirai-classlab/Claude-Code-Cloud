@@ -83,6 +83,7 @@ export interface CreateProjectFromTemplateRequest {
   template_id: string;
   project_name: string;
   project_description?: string;
+  api_key?: string;
 }
 
 export interface CreateTemplateFromProjectRequest {

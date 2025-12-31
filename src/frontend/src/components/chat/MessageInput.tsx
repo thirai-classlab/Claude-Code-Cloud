@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
 import { CommandSuggest, SuggestItem } from './CommandSuggest';
-import { commandsApi, skillsApi } from '@/lib/api';
+import { commandsApi, skillsApi, projectConfigApi } from '@/lib/api';
 
 interface MessageInputProps {
   onSend: (message: string) => void;
@@ -24,10 +24,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Load commands and skills
+  // Load commands and skills (including project-specific custom items)
   useEffect(() => {
     const loadItems = async () => {
       try {
+        // Load built-in commands and available skills
         const [commands, skills] = await Promise.all([
           commandsApi.getAvailableCommands(),
           skillsApi.getAvailable(),
@@ -47,7 +48,44 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           type: 'skill' as const,
         }));
 
-        setSuggestItems([...commandItems, ...skillItems]);
+        let allItems = [...commandItems, ...skillItems];
+
+        // Load project-specific custom commands and skills if projectId is provided
+        if (projectId) {
+          try {
+            const [projectCommands, projectSkills] = await Promise.all([
+              projectConfigApi.listCommands(projectId),
+              projectConfigApi.listSkills(projectId),
+            ]);
+
+            // Add project-specific commands with 'custom' category
+            const customCommandItems: SuggestItem[] = projectCommands
+              .filter(cmd => cmd.enabled)
+              .map(cmd => ({
+                name: cmd.name,
+                description: cmd.description || 'Custom command',
+                category: 'custom',
+                type: 'command' as const,
+              }));
+
+            // Add project-specific skills
+            const customSkillItems: SuggestItem[] = projectSkills
+              .filter(skill => skill.enabled)
+              .map(skill => ({
+                name: skill.name,
+                description: skill.description || 'Custom skill',
+                category: 'custom',
+                type: 'skill' as const,
+              }));
+
+            allItems = [...allItems, ...customCommandItems, ...customSkillItems];
+          } catch (projectError) {
+            // Project-specific items may fail if not authenticated - ignore
+            console.debug('プロジェクト固有の設定読み込みをスキップ:', projectError);
+          }
+        }
+
+        setSuggestItems(allItems);
       } catch (error) {
         console.error('コマンド/スキルの読み込みに失敗:', error);
       }

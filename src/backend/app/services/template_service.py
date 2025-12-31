@@ -490,6 +490,7 @@ class TemplateService:
             id=project_id,
             name=data.project_name,
             description=data.project_description,
+            api_key=data.api_key,
             user_id=user_id,
             status="active",
             workspace_path=str(self._get_workspace_path(project_id)),

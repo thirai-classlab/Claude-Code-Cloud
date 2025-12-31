@@ -53,6 +53,7 @@ class ProjectManager:
         name: str,
         user_id: Optional[str] = None,
         description: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Project:
         """
         新規プロジェクト作成
@@ -61,6 +62,7 @@ class ProjectManager:
             name: プロジェクト名
             user_id: ユーザー識別子 (オプション)
             description: プロジェクト説明 (オプション)
+            api_key: プロジェクト固有のAPIキー (オプション)
 
         Returns:
             Project: 作成されたプロジェクト
@@ -83,6 +85,7 @@ class ProjectManager:
             name=name,
             user_id=user_id,
             description=description,
+            api_key=api_key,
             status="active",
             workspace_path=workspace_path,
             session_count=0,
