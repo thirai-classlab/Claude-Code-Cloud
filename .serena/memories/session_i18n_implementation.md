@@ -67,6 +67,51 @@ const MyComponent = () => {
 };
 ```
 
+## 追加実装（2026-01-01）
+
+### エディター関連コンポーネントの翻訳
+
+前回の実装では基本的なUIコンポーネントのみ翻訳適用していたが、右側のエディタータブや設定パネルに翻訳漏れがあったため追加対応。
+
+#### 翻訳を適用したファイル
+| ファイル | 翻訳内容 |
+|---------|---------|
+| EditorContainer.tsx | タブラベル（VSCode, MCP, サブエージェント, コマンド, スキル, スケジュール, 料金, 設定） |
+| ProjectSettingsEditor.tsx | プロジェクト設定フォームラベル |
+| MCPSettingsEditor.tsx | MCPサーバー設定ラベル、「X個のサーバーが設定済み」 |
+| AgentSettingsEditor.tsx | サブエージェント設定ラベル |
+| SkillsSettingsEditor.tsx | スキル設定・モーダルテキスト、サブタイトル |
+| CommandSettingsEditor.tsx | コマンド設定・モーダルテキスト、サブタイトル |
+| CronSettingsEditor.tsx | スケジュール設定・実行履歴 |
+| PricingEditor.tsx | 料金・使用量・利用制限 |
+| CreateSessionModal.tsx | セッション作成モーダル |
+| WelcomePanel.tsx | ウェルカムパネル |
+| ProjectPage.tsx | プロジェクトページ |
+| SessionPage.tsx | セッションページ |
+| SessionListNav.tsx | サイドバーのセッションリスト |
+| SessionList.tsx | 同上 |
+
+#### 追加した翻訳キー（主要なもの）
+```json
+{
+  "editor": {
+    "tabs": { "vscode", "mcp", "subAgents", "commands", "skills", "schedules", "pricing", "settings" },
+    "projectSettings": { "title", "subtitle", "projectName", "description", "apiKey", ... },
+    "mcp": { "title", "serversConfigured", "addServer", ... },
+    "agents": { "title", "addAgent", ... },
+    "skills": { "title", "subtitle", "createSkill", ... },
+    "commands": { "title", "subtitle", "createCommand", ... },
+    "cron": { "title", "addSchedule", "schedules", "executionHistory", ... },
+    "pricing": { "title", "usageLimits", "currentUsage", ... }
+  },
+  "welcome": { "title", "projects", "newProject", "noProjects", ... },
+  "projectPage": { "loading", "saveAsTemplate", "newSession", ... },
+  "sessionPage": { "loading", ... },
+  "createSession": { "title", "sessionTitle", "claudeModel", ... },
+  "session": { "newSession", "noSessions", "confirmDelete" }
+}
+```
+
 ## ビルド・テスト結果
 - TypeScript型チェック: Pass
 - Next.js ビルド: Pass
