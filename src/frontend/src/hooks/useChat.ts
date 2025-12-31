@@ -9,57 +9,65 @@ export interface UseChatOptions {
 }
 
 // 履歴読み込みのエラータイプ
-export type HistoryLoadError = {
+export interface HistoryLoadError {
   type: 'network' | 'server' | 'unknown';
   message: string;
   retryable: boolean;
-};
+}
+
+// 設定
+const CONFIG = {
+  MAX_RETRIES: 3,
+} as const;
 
 // ContentBlockの妥当性をチェック
 const isValidContentBlock = (block: unknown): block is ContentBlock => {
   if (!block || typeof block !== 'object') return false;
   const b = block as Record<string, unknown>;
-  if (b.type === 'text' && typeof b.text === 'string') return true;
-  if (b.type === 'thinking' && typeof b.content === 'string') return true;
-  if (b.type === 'tool_use' && typeof b.id === 'string' && typeof b.name === 'string') return true;
-  if (b.type === 'tool_result' && typeof b.tool_use_id === 'string') return true;
-  return false;
+
+  switch (b.type) {
+    case 'text':
+      return typeof b.text === 'string';
+    case 'thinking':
+      return typeof b.content === 'string';
+    case 'tool_use':
+      return typeof b.id === 'string' && typeof b.name === 'string';
+    case 'tool_result':
+      return typeof b.tool_use_id === 'string';
+    default:
+      return false;
+  }
+};
+
+// JSONコンテンツをパース
+const parseJsonContent = (content: string): ContentBlock[] => {
+  try {
+    const parsed = JSON.parse(content);
+
+    if (Array.isArray(parsed)) {
+      const validBlocks = parsed.filter(isValidContentBlock);
+      return validBlocks.length > 0 ? validBlocks : [{ type: 'text', text: content }];
+    }
+
+    if (isValidContentBlock(parsed)) {
+      return [parsed];
+    }
+
+    return [{ type: 'text', text: content }];
+  } catch {
+    return [{ type: 'text', text: content }];
+  }
 };
 
 // APIメッセージをフロントエンドのMessage形式に変換
 const transformApiMessage = (apiMsg: ApiChatMessage): Message => {
-  // contentがJSON形式の場合はパース、そうでなければテキストブロックとして扱う
   let contentBlocks: ContentBlock[];
 
-  try {
-    // contentが空またはnullの場合
-    if (!apiMsg.content || apiMsg.content.trim() === '') {
-      contentBlocks = [{ type: 'text', text: '' }];
-    }
-    // JSONとして解析を試みる
-    else if (apiMsg.content.startsWith('[') || apiMsg.content.startsWith('{')) {
-      const parsed = JSON.parse(apiMsg.content);
-      if (Array.isArray(parsed)) {
-        // 配列の各要素がContentBlockとして妥当かチェック
-        contentBlocks = parsed.filter(isValidContentBlock);
-        if (contentBlocks.length === 0) {
-          // 有効なブロックがなければ元のテキストを表示
-          contentBlocks = [{ type: 'text', text: apiMsg.content }];
-        }
-      } else if (isValidContentBlock(parsed)) {
-        // 単一のContentBlockオブジェクト
-        contentBlocks = [parsed];
-      } else {
-        // パースできたがContentBlockではない場合
-        contentBlocks = [{ type: 'text', text: apiMsg.content }];
-      }
-    } else {
-      // JSONではないプレーンテキスト
-      contentBlocks = [{ type: 'text', text: apiMsg.content }];
-    }
-  } catch (e) {
-    // JSON解析失敗時はプレーンテキストとして扱う
-    console.warn('Failed to parse message content as JSON:', e);
+  if (!apiMsg.content || apiMsg.content.trim() === '') {
+    contentBlocks = [{ type: 'text', text: '' }];
+  } else if (apiMsg.content.startsWith('[') || apiMsg.content.startsWith('{')) {
+    contentBlocks = parseJsonContent(apiMsg.content);
+  } else {
     contentBlocks = [{ type: 'text', text: apiMsg.content }];
   }
 
@@ -81,8 +89,8 @@ const classifyError = (error: unknown): HistoryLoadError => {
     };
   }
 
-  if (error instanceof Response || (error as any)?.status) {
-    const status = (error as any).status;
+  const status = (error as { status?: number })?.status;
+  if (status) {
     if (status >= 500) {
       return {
         type: 'server',
@@ -105,59 +113,56 @@ const classifyError = (error: unknown): HistoryLoadError => {
 };
 
 export const useChat = ({ sessionId }: UseChatOptions) => {
+  // Store state
+  const messages = useChatStore((state) => state.messages);
+  const isStreaming = useChatStore((state) => state.isStreaming);
+  const isThinking = useChatStore((state) => state.isThinking);
+  const isLoadingHistory = useChatStore((state) => state.isLoadingHistory);
+  const currentStreamingMessage = useChatStore((state) => state.currentStreamingMessage);
+  const toolExecutions = useChatStore((state) => state.toolExecutions);
+  const pendingQuestion = useChatStore((state) => state.pendingQuestion);
+
+  // Store actions
+  const getStreamingContentBlocks = useChatStore((state) => state.getStreamingContentBlocks);
+  const clearMessages = useChatStore((state) => state.clearMessages);
+  const loadMessages = useChatStore((state) => state.loadMessages);
+  const setLoadingHistory = useChatStore((state) => state.setLoadingHistory);
+  const setCurrentSessionId = useChatStore((state) => state.setCurrentSessionId);
+  const cacheMessages = useChatStore((state) => state.cacheMessages);
+  const getCachedMessages = useChatStore((state) => state.getCachedMessages);
+  const isCacheValid = useChatStore((state) => state.isCacheValid);
+  const getDraftMessage = useChatStore((state) => state.getDraftMessage);
+  const setDraftMessage = useChatStore((state) => state.setDraftMessage);
+  const clearDraftMessage = useChatStore((state) => state.clearDraftMessage);
+  const savePartialStreamingMessage = useChatStore((state) => state.savePartialStreamingMessage);
+
+  // WebSocket
   const {
-    messages,
-    isStreaming,
-    isThinking,
-    isLoadingHistory,
-    currentStreamingMessage,
-    toolExecutions,
-    getStreamingContentBlocks,
-    clearMessages,
-    loadMessages,
-    setLoadingHistory,
-    // キャッシュ関連
-    setCurrentSessionId,
-    cacheMessages,
-    getCachedMessages,
-    isCacheValid,
-    // ドラフト関連
-    getDraftMessage,
-    setDraftMessage,
-    clearDraftMessage,
-    // ストリーミング中断
-    savePartialStreamingMessage,
-    // AskUserQuestion 関連
-    pendingQuestion,
-  } = useChatStore();
+    sendMessage,
+    interrupt,
+    requestResume,
+    answerQuestion,
+    connectionStatus,
+    reconnect,
+  } = useWebSocket(sessionId);
 
-  const { sendMessage, interrupt, requestResume, answerQuestion, connectionStatus, reconnect } = useWebSocket(sessionId);
-
-  // 状態
+  // Local state
   const [historyError, setHistoryError] = useState<HistoryLoadError | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRIES = 3;
+  const [shouldResume, setShouldResume] = useState(false);
 
-  // 前回のsessionIdを追跡
+  // Refs
   const prevSessionIdRef = useRef<string | null>(null);
   const isLoadingRef = useRef(false);
-
-  // 処理中セッションの再開フラグ
-  const [shouldResume, setShouldResume] = useState(false);
 
   // セッション変更時にメッセージ履歴を読み込む
   useEffect(() => {
     const loadHistory = async () => {
       if (!sessionId) return;
-
-      // 既に読み込み中の場合はスキップ
       if (isLoadingRef.current) return;
-
-      // セッションが変更された場合のみ履歴を読み込む
       if (prevSessionIdRef.current === sessionId) return;
-      prevSessionIdRef.current = sessionId;
 
-      // 現在のセッションIDを設定
+      prevSessionIdRef.current = sessionId;
       setCurrentSessionId(sessionId);
       setHistoryError(null);
       setShouldResume(false);
@@ -166,7 +171,7 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
       try {
         const session = await sessionsApi.get(sessionId);
         if (session.is_processing) {
-          console.log('[useChat] Session is processing, will request resume after connection');
+          console.log('[useChat] Session is processing, will request resume');
           setShouldResume(true);
         }
       } catch (error) {
@@ -188,10 +193,9 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
 
       try {
         const response = await sessionsApi.getMessages(sessionId);
-        if (response.messages && response.messages.length > 0) {
+        if (response.messages?.length > 0) {
           const transformedMessages = response.messages.map(transformApiMessage);
           loadMessages(transformedMessages);
-          // キャッシュに保存
           cacheMessages(sessionId, transformedMessages);
         }
         setRetryCount(0);
@@ -235,50 +239,40 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
 
   // ページ離脱時の状態保存
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      // ストリーミング中の場合は部分メッセージを保存
+    const handleUnload = () => {
       if (isStreaming && sessionId) {
         savePartialStreamingMessage(sessionId);
       }
     };
 
-    // visibilitychangeでも保存（モバイル対応）
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && isStreaming && sessionId) {
         savePartialStreamingMessage(sessionId);
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('beforeunload', handleUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('beforeunload', handleUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isStreaming, sessionId, savePartialStreamingMessage]);
 
-  // セッション変更時にドラフトを保存
-  useEffect(() => {
-    return () => {
-      // クリーンアップ時に現在のドラフトを保存する処理は
-      // ChatInputコンポーネントで行う
-    };
-  }, [sessionId]);
-
   // 履歴再読み込み
-  const retryLoadHistory = useCallback(async () => {
-    if (!sessionId || retryCount >= MAX_RETRIES) return;
+  const retryLoadHistory = useCallback(() => {
+    if (!sessionId || retryCount >= CONFIG.MAX_RETRIES) return;
 
     setRetryCount((prev) => prev + 1);
-    prevSessionIdRef.current = null; // リセットして再読み込みをトリガー
+    prevSessionIdRef.current = null;
     setHistoryError(null);
   }, [sessionId, retryCount]);
 
+  // メッセージ送信
   const handleSend = useCallback(
-    (content: string, files?: any[]) => {
+    (content: string, files?: unknown[]) => {
       if (!content.trim()) return;
-      // 送信時にドラフトをクリア
       if (sessionId) {
         clearDraftMessage(sessionId);
       }
@@ -287,15 +281,7 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     [sendMessage, sessionId, clearDraftMessage]
   );
 
-  const handleInterrupt = useCallback(() => {
-    interrupt();
-  }, [interrupt]);
-
-  const handleClearMessages = useCallback(() => {
-    clearMessages();
-  }, [clearMessages]);
-
-  // ドラフトメッセージの保存
+  // ドラフト保存
   const saveDraft = useCallback(
     (content: string) => {
       if (sessionId) {
@@ -305,7 +291,7 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     [sessionId, setDraftMessage]
   );
 
-  // ドラフトメッセージの取得
+  // ドラフト取得
   const getDraft = useCallback(() => {
     if (!sessionId) return '';
     return getDraftMessage(sessionId);
@@ -316,7 +302,6 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     messages,
     currentStreamingMessage,
     toolExecutions: Object.values(toolExecutions),
-    // ストリーミング中のコンテンツブロック（時系列順）
     streamingContentBlocks: getStreamingContentBlocks(),
 
     // Status
@@ -329,7 +314,7 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
     // Error handling
     historyError,
     retryLoadHistory,
-    canRetry: historyError?.retryable && retryCount < MAX_RETRIES,
+    canRetry: historyError?.retryable && retryCount < CONFIG.MAX_RETRIES,
 
     // Draft
     saveDraft,
@@ -337,8 +322,8 @@ export const useChat = ({ sessionId }: UseChatOptions) => {
 
     // Actions
     sendMessage: handleSend,
-    interrupt: handleInterrupt,
-    clearMessages: handleClearMessages,
+    interrupt,
+    clearMessages,
     reconnect,
     requestResume,
     answerQuestion,
