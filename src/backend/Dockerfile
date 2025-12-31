@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     docker.io \
     gnupg \
+    sudo \
     && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_VERSION}.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
@@ -42,9 +43,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -sSL https://install.python-poetry.org | python3 - \
     && ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry
 
-# Create non-root user
+# Create non-root user with sudo privileges for apt-get
 RUN groupadd -r appuser -g 1000 && \
-    useradd -r -u 1000 -g appuser -m -s /bin/bash appuser
+    useradd -r -u 1000 -g appuser -m -s /bin/bash appuser && \
+    echo "appuser ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt" > /etc/sudoers.d/appuser && \
+    chmod 0440 /etc/sudoers.d/appuser
 
 # Set working directory
 WORKDIR /app
