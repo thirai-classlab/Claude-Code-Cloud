@@ -4,16 +4,13 @@ Project Models
 プロジェクト関連のデータモデル
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
-def _utc_now() -> datetime:
-    """Return current UTC datetime with timezone info."""
-    return datetime.now(timezone.utc)
+from app.utils.helpers import jst_now
 
 
 class ProjectStatus(str, Enum):

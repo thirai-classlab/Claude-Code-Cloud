@@ -429,9 +429,27 @@ class CronScheduler:
                     job_parts = cron_log.job_id.split(":", 1)
                     schedule_name = job_parts[1] if len(job_parts) > 1 else cron_log.job_id
 
+                    # Get command from active schedules or .cron.json
+                    command = ""
+                    schedule = self.active_schedules.get(cron_log.job_id)
+                    if schedule:
+                        command = schedule.command
+                    else:
+                        # Try to load from .cron.json file
+                        try:
+                            cron_path = Path(settings.workspace_base) / project_id / ".cron.json"
+                            if cron_path.exists():
+                                with open(cron_path, "r", encoding="utf-8") as f:
+                                    cron_data = json.load(f)
+                                    schedule_data = cron_data.get("schedules", {}).get(schedule_name, {})
+                                    command = schedule_data.get("command", "")
+                        except Exception:
+                            pass
+
                     logs.append({
                         "id": cron_log.id,
                         "schedule_name": schedule_name,
+                        "command": command,
                         "job_id": cron_log.job_id,
                         "project_id": project_id,
                         "started_at": cron_log.started_at.isoformat() if cron_log.started_at else None,

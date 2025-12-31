@@ -4,11 +4,10 @@ Health Check API
 ヘルスチェックエンドポイント
 """
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter
 
 from app.schemas.response import HealthCheckResponse
+from app.utils.helpers import current_timestamp
 
 router = APIRouter(tags=["health"])
 
@@ -24,5 +23,5 @@ async def health_check() -> HealthCheckResponse:
     return HealthCheckResponse(
         status="ok",
         version="1.0.0",
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=current_timestamp(),
     )

@@ -4,9 +4,11 @@ SQLAlchemy Database Models
 データベースモデル定義
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
+
+from app.utils.helpers import jst_now
 
 from sqlalchemy import (
     Boolean,

@@ -4,13 +4,14 @@ Usage Service
 プロジェクトの使用量集計と利用制限チェックサービス
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional, Tuple, List
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import ProjectModel, SessionModel
+from app.utils.helpers import jst_now
 
 
 class UsageService:

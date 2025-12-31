@@ -5,7 +5,7 @@ Session Manager
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select, delete, func, and_
@@ -17,7 +17,7 @@ from app.models.database import SessionModel, MessageModel
 from app.models.errors import MaxSessionsExceededError, ProjectNotFoundError, SessionNotFoundError
 from app.models.messages import ChatMessage, MessageRole
 from app.models.sessions import Session, SessionStatus
-from app.utils.helpers import generate_id
+from app.utils.helpers import generate_id, jst_now
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

@@ -4,7 +4,7 @@ Share Service
 プロジェクト共有管理サービス
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import select, delete
@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 from app.models.database import ProjectModel, ProjectShareModel, UserModel
 from app.models.project_share import PermissionLevel, ProjectShare
 from app.schemas.share import ProjectShareResponse, SharedProjectInfo
-from app.utils.helpers import generate_id
+from app.utils.helpers import generate_id, jst_now
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

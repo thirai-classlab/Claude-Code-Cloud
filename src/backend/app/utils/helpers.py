@@ -6,8 +6,22 @@ Helper Functions
 
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict
+from zoneinfo import ZoneInfo
+
+# 日本標準時（JST）タイムゾーン
+JST = ZoneInfo("Asia/Tokyo")
+
+
+def jst_now() -> datetime:
+    """
+    日本時間（JST）での現在時刻を返す
+
+    Returns:
+        datetime: 日本時間での現在時刻（タイムゾーン情報付き）
+    """
+    return datetime.now(JST)
 
 
 def generate_id() -> str:
@@ -21,8 +35,8 @@ def generate_hash(data: str) -> str:
 
 
 def current_timestamp() -> str:
-    """現在のタイムスタンプをISO形式で取得"""
-    return datetime.now(timezone.utc).isoformat()
+    """現在のタイムスタンプをISO形式で取得（日本時間）"""
+    return datetime.now(JST).isoformat()
 
 
 def safe_dict_get(d: Dict[str, Any], key: str, default: Any = None) -> Any:

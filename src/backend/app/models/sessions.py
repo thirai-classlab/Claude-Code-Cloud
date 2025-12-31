@@ -4,16 +4,13 @@ Session Models
 セッション関連のデータモデル
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-
-def _utc_now() -> datetime:
-    """UTC現在時刻を返す"""
-    return datetime.now(timezone.utc)
-
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.utils.helpers import jst_now
 
 
 class SessionStatus(str, Enum):

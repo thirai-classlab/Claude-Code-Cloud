@@ -5,7 +5,7 @@ Project Manager
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import select, func, delete, or_
@@ -16,7 +16,7 @@ from app.config import settings
 from app.models.database import ProjectModel, SessionModel
 from app.models.errors import MaxProjectsExceededError, ProjectNotFoundError
 from app.models.projects import Project, ProjectStatus
-from app.utils.helpers import generate_id
+from app.utils.helpers import generate_id, jst_now
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
