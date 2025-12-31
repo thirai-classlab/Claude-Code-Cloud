@@ -50,7 +50,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ projectId }) => {
     loadSessions(projectId);
   }, [projectId, loadProjects, loadSessions]);
 
-  const handleCreateSession = async (data: { name?: string }) => {
+  const handleCreateSession = async (data: { name?: string; model?: string }) => {
     const session = await createSession(projectId, data);
     navigateToSession(projectId, session.id);
     setIsCreateModalOpen(false);
@@ -112,22 +112,23 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ projectId }) => {
       <div className="h-full flex flex-col overflow-hidden">
         {/* Project Header */}
         <div className="flex-shrink-0 px-6 py-6 border-b border-border-subtle">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-text-primary mb-1">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold text-text-primary mb-1 truncate">
                 {project.name}
               </h1>
               {project.description && (
-                <p className="text-text-secondary max-w-2xl">
+                <p className="text-text-secondary line-clamp-2">
                   {project.description}
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Button
                 variant="secondary"
                 size="md"
                 onClick={openTemplateModal}
+                className="whitespace-nowrap"
               >
                 Save as Template
               </Button>
@@ -135,6 +136,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ projectId }) => {
                 variant="primary"
                 size="md"
                 onClick={() => setIsCreateModalOpen(true)}
+                className="whitespace-nowrap"
               >
                 + New Session
               </Button>

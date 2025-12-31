@@ -4,7 +4,7 @@ Usage Service
 プロジェクトの使用量集計と利用制限チェックサービス
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple, List
 
 from sqlalchemy import select, func

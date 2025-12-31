@@ -77,6 +77,29 @@ export const useSessions = (projectId?: string) => {
   );
 
   /**
+   * Update a session's model
+   */
+  const updateSessionModel = useCallback(
+    async (sessionId: string, model: string) => {
+      try {
+        const data: UpdateSessionRequest = { model };
+        const updatedSession = await sessionsApi.update(sessionId, data);
+        // Update the session in the store
+        const { sessions } = useSessionStore.getState();
+        const updatedSessions = sessions.map(s =>
+          s.id === sessionId ? { ...s, model: updatedSession.model } : s
+        );
+        setSessions(updatedSessions);
+        return updatedSession;
+      } catch (err: any) {
+        console.error('Failed to update session model:', err);
+        throw err;
+      }
+    },
+    [setSessions]
+  );
+
+  /**
    * Delete a session
    */
   const deleteSession = useCallback(
@@ -125,6 +148,7 @@ export const useSessions = (projectId?: string) => {
     loadSessions,
     createSession,
     updateSessionTitle,
+    updateSessionModel,
     deleteSession,
     selectSession,
     loadMessages,

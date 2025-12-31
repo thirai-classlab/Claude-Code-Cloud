@@ -5,7 +5,7 @@ Session Manager
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select, delete, func, and_
@@ -160,6 +160,7 @@ class SessionManager:
         session_id: str,
         name: Optional[str] = None,
         status: Optional[SessionStatus] = None,
+        model: Optional[str] = None,
     ) -> Optional[Session]:
         """
         セッション更新
@@ -168,6 +169,7 @@ class SessionManager:
             session_id: セッションID
             name: 新しいセッション名 (オプション)
             status: 新しいステータス (オプション)
+            model: 新しいClaudeモデル (オプション)
 
         Returns:
             Optional[Session]: 更新されたセッション
@@ -183,10 +185,12 @@ class SessionManager:
             session_model.name = name
         if status:
             session_model.status = status.value
+        if model:
+            session_model.model = model
         session_model.updated_at = datetime.now(timezone.utc)
 
         await self.session.flush()
-        logger.info("Session updated", session_id=session_id)
+        logger.info("Session updated", session_id=session_id, model=model)
         return self._model_to_pydantic(session_model)
 
     async def update_activity(self, session_id: str) -> None:
@@ -235,14 +239,14 @@ class SessionManager:
         return self._model_to_pydantic(session_model)
 
     async def update_sdk_session_id(
-        self, session_id: str, sdk_session_id: str
+        self, session_id: str, sdk_session_id: Optional[str]
     ) -> Optional[Session]:
         """
         SDKセッションIDを更新（セッション再開用）
 
         Args:
             session_id: セッションID
-            sdk_session_id: Claude SDKのセッションID
+            sdk_session_id: Claude SDKのセッションID（Noneでクリア）
 
         Returns:
             Optional[Session]: 更新されたセッション

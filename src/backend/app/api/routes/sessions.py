@@ -130,6 +130,7 @@ async def update_session(
     updated_session = await manager.update_session(
         session_id=session_id,
         name=request.name,
+        model=request.model,
     )
 
     if not updated_session:

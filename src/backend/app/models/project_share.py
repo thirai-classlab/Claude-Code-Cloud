@@ -4,13 +4,16 @@ Project Share Models
 プロジェクト共有関連のPydanticデータモデル
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.utils.helpers import jst_now
+
+def _utc_now() -> datetime:
+    """UTC現在時刻を返す"""
+    return datetime.now(timezone.utc)
 
 
 class PermissionLevel(str, Enum):

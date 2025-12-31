@@ -355,6 +355,7 @@ You have access to the following default tools:
         config: ConfigBundle,
         system_prompt: Optional[str] = None,
         resume_session_id: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> ClaudeAgentOptions:
         """
         Claude Agent SDK オプションを構築する
@@ -363,6 +364,7 @@ You have access to the following default tools:
             config: 設定バンドル
             system_prompt: カスタムシステムプロンプト（Noneの場合は自動生成）
             resume_session_id: 再開するSDKセッションID（Noneの場合は新規セッション）
+            model: 使用するClaudeモデル（Noneの場合はデフォルト）
 
         Returns:
             ClaudeAgentOptions: SDKオプション
@@ -388,6 +390,7 @@ You have access to the following default tools:
             setting_sources=["project"],  # Skills/Commands をファイルシステムから読み込み
             env={"ANTHROPIC_API_KEY": config.project.api_key},  # プロジェクト固有のAPIキー
             resume=resume_session_id,  # セッション再開用（Noneの場合は新規セッション）
+            model=model,  # セッションで選択されたモデル
         )
 
         # ログ出力
@@ -409,6 +412,7 @@ You have access to the following default tools:
         logger.info(
             "Built Claude Agent SDK options",
             project_id=self.project_id,
+            model=model,
             tools_count=len(tools),
             mcp_servers_count=len(config.mcp_servers_config),
             agents_count=len(config.agents_config),

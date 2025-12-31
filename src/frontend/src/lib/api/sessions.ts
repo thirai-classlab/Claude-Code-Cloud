@@ -8,6 +8,8 @@ import { Session } from '@/types/session';
 
 export interface UpdateSessionRequest {
   title?: string;
+  name?: string;
+  model?: string;
 }
 
 // APIから返されるメッセージの形式（バックエンドのChatMessageResponse）

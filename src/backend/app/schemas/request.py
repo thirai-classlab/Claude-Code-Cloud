@@ -37,6 +37,7 @@ class UpdateSessionRequest(BaseModel):
     """セッション更新リクエスト"""
 
     name: Optional[str] = Field(default=None, max_length=100, description="セッション名")
+    model: Optional[str] = Field(default=None, description="使用Claudeモデル")
 
 
 class ChatMessageRequest(BaseModel):

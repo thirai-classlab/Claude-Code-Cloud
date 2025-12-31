@@ -11,7 +11,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import agents, auth, commands, cron, files, health, mcp, project_config, projects, sessions, shares, skills, templates
+from app.api.routes import agents, auth, commands, cron, files, health, mcp, models, project_config, projects, sessions, shares, skills, templates
 from app.api.websocket.handlers import handle_chat_websocket
 from app.config import settings
 from app.core.cron_scheduler import get_cron_scheduler, shutdown_cron_scheduler
@@ -125,6 +125,7 @@ app.include_router(shares.router, prefix=settings.api_prefix)
 app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(project_config.router, prefix=settings.api_prefix)
 app.include_router(templates.router, prefix=settings.api_prefix)
+app.include_router(models.router, prefix=settings.api_prefix)
 
 
 # WebSocketエンドポイント

@@ -87,3 +87,6 @@ export type {
   CreateProjectFromTemplateRequest,
   CreateTemplateFromProjectRequest,
 } from '@/types/template';
+
+export { modelsApi } from './models';
+export type { ModelInfo, ModelsResponse } from './models';

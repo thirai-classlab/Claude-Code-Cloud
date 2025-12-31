@@ -5,12 +5,15 @@ User Models
 FastAPI-Users互換フォーマット
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.utils.helpers import jst_now
+
+def _utc_now() -> datetime:
+    """UTC現在時刻を返す"""
+    return datetime.now(timezone.utc)
 
 
 class User(BaseModel):

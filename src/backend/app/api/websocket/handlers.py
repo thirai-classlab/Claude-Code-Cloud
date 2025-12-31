@@ -10,7 +10,7 @@ import json
 import os
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional
 
@@ -708,6 +708,10 @@ async def handle_chat_message(
             # 処理状態をDBに永続化（ストリーム再開用）
             await session_manager.set_processing(session_id, True)
 
+            # セッション情報を取得（モデル情報含む）
+            session_info = await session_manager.get_session(session_id)
+            session_model = session_info.model if session_info else None
+
             # ChatMessageProcessor で設定読み込み
             processor = ChatMessageProcessor(db_session, project_id)
             config = await processor.load_config()
@@ -748,8 +752,12 @@ async def handle_chat_message(
             # SDKセッションIDを取得（セッション再開用）
             sdk_session_id = await session_manager.get_sdk_session_id(session_id)
 
-            # SDK オプション構築（既存のSDKセッションIDがあれば再開）
-            options = processor.build_sdk_options(config, resume_session_id=sdk_session_id)
+            # SDK オプション構築（既存のSDKセッションIDがあれば再開、セッションのモデルを使用）
+            options = processor.build_sdk_options(
+                config,
+                resume_session_id=sdk_session_id,
+                model=session_model,
+            )
 
             # セッション状態を取得
             session_state = conn_manager.get_session_state(session_id)
@@ -957,10 +965,43 @@ async def handle_chat_message(
                 resume_sdk_session=sdk_session_id,
             )
 
-            # ストリーミング処理
-            full_response_text, content_blocks, usage_info, was_interrupted, new_sdk_session_id = await _stream_response(
-                session_id, options, message, conn_manager, tool_use_id_map, hook_tool_results
-            )
+            # ストリーミング処理（リトライ対応）
+            try:
+                full_response_text, content_blocks, usage_info, was_interrupted, new_sdk_session_id = await _stream_response(
+                    session_id, options, message, conn_manager, tool_use_id_map, hook_tool_results
+                )
+            except Exception as stream_error:
+                error_str = str(stream_error)
+                # SDKセッション再開失敗の場合、新規セッションでリトライ
+                is_resume_error = (
+                    "No conversation found" in error_str or
+                    "terminated process" in error_str or
+                    "exit code: 1" in error_str
+                )
+                if is_resume_error:
+                    logger.warning(
+                        "SDK session resume failed, retrying without resume",
+                        session_id=session_id,
+                        error=error_str,
+                    )
+
+                    # SDKクライアントキャッシュをクリア
+                    await conn_manager.close_sdk_client(session_id)
+
+                    # sdk_session_idをクリアしてリビルド
+                    await session_manager.update_sdk_session_id(session_id, None)
+                    options = processor.build_sdk_options(
+                        config,
+                        resume_session_id=None,  # 新規セッション
+                        model=session_model,
+                    )
+
+                    # リトライ
+                    full_response_text, content_blocks, usage_info, was_interrupted, new_sdk_session_id = await _stream_response(
+                        session_id, options, message, conn_manager, tool_use_id_map, hook_tool_results
+                    )
+                else:
+                    raise
 
             # SDKセッションIDをDBに保存（初回または変更があった場合）
             if new_sdk_session_id and new_sdk_session_id != sdk_session_id:

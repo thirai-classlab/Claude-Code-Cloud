@@ -4,7 +4,7 @@ SQLAlchemy Database Models
 データベースモデル定義
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import uuid
 

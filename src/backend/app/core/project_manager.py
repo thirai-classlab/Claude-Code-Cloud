@@ -5,7 +5,7 @@ Project Manager
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import select, func, delete, or_

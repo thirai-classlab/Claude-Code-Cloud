@@ -9,8 +9,23 @@ import { ToolUseWithResultCard } from './ToolUseWithResultCard';
 import { MarkdownContent } from './MarkdownContent';
 import { QuestionCard } from './QuestionCard';
 import { useChat } from '@/hooks/useChat';
-import { projectsApi } from '@/lib/api';
+import { useSessions } from '@/hooks/useSessions';
+import { projectsApi, modelsApi } from '@/lib/api';
 import { ToolUseBlock, ToolResultBlock, ContentBlock } from '@/types/message';
+
+// Model type from API
+interface ModelInfo {
+  id: string;
+  display_name: string;
+  type: string;
+}
+
+// Fallback models if API is unavailable
+const FALLBACK_MODELS: ModelInfo[] = [
+  { id: 'claude-sonnet-4-20250514', display_name: 'Claude Sonnet 4', type: 'model' },
+  { id: 'claude-opus-4-20250514', display_name: 'Claude Opus 4', type: 'model' },
+  { id: 'claude-3-5-haiku-20241022', display_name: 'Claude 3.5 Haiku', type: 'model' },
+];
 
 // === Types ===
 interface ChatContainerProps {
@@ -46,15 +61,58 @@ const ConnectionStatus: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
+// モデルセレクター
+const ModelSelector: React.FC<{
+  currentModel: string;
+  onModelChange: (model: string) => void;
+  disabled: boolean;
+  models: ModelInfo[];
+}> = ({ currentModel, onModelChange, disabled, models }) => {
+  // Find current model in the list, or use a default display
+  const currentModelInfo = models.find(m => m.id === currentModel);
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-text-tertiary">Model:</span>
+      <select
+        value={currentModel}
+        onChange={(e) => onModelChange(e.target.value)}
+        disabled={disabled}
+        className="text-xs bg-bg-secondary border border-border rounded px-2 py-1 text-text-primary focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {models.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.display_name}
+          </option>
+        ))}
+        {!currentModelInfo && (
+          <option value={currentModel}>
+            {currentModel}
+          </option>
+        )}
+      </select>
+    </div>
+  );
+};
+
 // ヘッダー
 const ChatHeader: React.FC<{
   isStreaming: boolean;
   connectionStatus: string;
+  currentModel: string;
   onInterrupt: () => void;
-}> = ({ isStreaming, connectionStatus, onInterrupt }) => (
+  onModelChange: (model: string) => void;
+  models: ModelInfo[];
+}> = ({ isStreaming, connectionStatus, currentModel, onInterrupt, onModelChange, models }) => (
   <div className="flex items-center justify-between px-6 h-header border-b border-border">
     <h2 className="text-lg font-semibold text-text-primary">Chat</h2>
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-4">
+      <ModelSelector
+        currentModel={currentModel}
+        onModelChange={onModelChange}
+        disabled={isStreaming}
+        models={models}
+      />
       {isStreaming && (
         <button
           onClick={onInterrupt}
@@ -222,6 +280,51 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
     pendingQuestion,
   } = useChat({ sessionId });
 
+  const { sessions, updateSessionModel } = useSessions(projectId);
+
+  // Model list from API
+  const [models, setModels] = useState<ModelInfo[]>(FALLBACK_MODELS);
+
+  // Load models from API
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const response = await modelsApi.listRecommended();
+        if (response.models.length > 0) {
+          setModels(response.models);
+        }
+      } catch (err) {
+        console.error('Failed to load models, using fallback:', err);
+      }
+    };
+    loadModels();
+  }, []);
+
+  // Find current session
+  const currentSession = sessions.find(s => s.id === sessionId);
+  const [currentModel, setCurrentModel] = useState(currentSession?.model || 'claude-sonnet-4-20250514');
+
+  // Update model when session changes
+  useEffect(() => {
+    if (currentSession?.model) {
+      setCurrentModel(currentSession.model);
+    }
+  }, [currentSession?.model]);
+
+  // Handle model change
+  const handleModelChange = useCallback(async (newModel: string) => {
+    setCurrentModel(newModel);
+    try {
+      await updateSessionModel(sessionId, newModel);
+    } catch (err) {
+      console.error('Failed to update model:', err);
+      // Revert to previous model on error
+      if (currentSession?.model) {
+        setCurrentModel(currentSession.model);
+      }
+    }
+  }, [sessionId, updateSessionModel, currentSession?.model]);
+
   const [costLimit, setCostLimit] = useState<CostLimitState>({
     error: null,
     isChecking: false,
@@ -292,7 +395,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
       <ChatHeader
         isStreaming={isStreaming}
         connectionStatus={connectionStatus}
+        currentModel={currentModel}
         onInterrupt={interrupt}
+        onModelChange={handleModelChange}
+        models={models}
       />
 
       {/* Messages Area */}
