@@ -67,7 +67,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   useEffect(() => {
     loadData();

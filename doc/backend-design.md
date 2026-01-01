@@ -1,12 +1,12 @@
 # Web版Claude Code バックエンド詳細設計書
 
 **作成日:** 2025-12-20
-**最終更新:** 2025-12-30
-**バージョン:** 1.4
+**最終更新:** 2026-01-01
+**バージョン:** 1.5
 **ステータス:** ✅ 完了（100%）
 **対象:** FastAPI + Claude Agent SDK (Python) バックエンド実装
 **実行環境:** Docker Container
-**関連ドキュメント:** [データベース設計書](database-design.md), [アーキテクチャ設計書](architecture-design.md)
+**関連ドキュメント:** [データベース設計書](database-design.md), [アーキテクチャ設計書](architecture-design.md), [リファクタリング記録](refactoring-2025-01.md)
 
 ---
 

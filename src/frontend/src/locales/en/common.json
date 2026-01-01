@@ -312,7 +312,8 @@
   "sessionPage": {
     "loading": "Loading session...",
     "sessionNotFound": "Session not found",
-    "backToProject": "Back to Project"
+    "backToProject": "Back to Project",
+    "backToProjectName": "Back to {{name}}"
   },
   "createSession": {
     "title": "New Session",

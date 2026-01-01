@@ -4,10 +4,12 @@ Project Share API
 プロジェクト共有管理エンドポイント
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_permission_service, get_share_service
 from app.api.middleware import handle_exceptions
+from app.core.auth.users import current_active_user
+from app.models.database import UserModel
 from app.models.errors import NotFoundError, PermissionDeniedError, ValidationError
 from app.models.project_share import PermissionLevel
 from app.schemas.share import (
@@ -32,7 +34,7 @@ router = APIRouter(tags=["shares"])
 async def share_project(
     project_id: str,
     request: ShareProjectRequest,
-    current_user_id: str = Query(..., description="現在のユーザーID (認証情報から取得)"),
+    user: UserModel = Depends(current_active_user),
     permission_service: PermissionService = Depends(get_permission_service),
     share_service: ShareService = Depends(get_share_service),
 ) -> ProjectShareResponse:
@@ -44,13 +46,15 @@ async def share_project(
     Args:
         project_id: プロジェクトID
         request: 共有リクエスト
-        current_user_id: 現在のユーザーID
+        user: 認証済みユーザー
         permission_service: 権限サービス (DI)
         share_service: 共有サービス (DI)
 
     Returns:
         ProjectShareResponse: 作成された共有情報
     """
+    current_user_id = user.id
+
     # 権限チェック (オーナーまたはadmin)
     if not await permission_service.can_admin(current_user_id, project_id):
         raise PermissionDeniedError("You don't have permission to share this project")
@@ -78,7 +82,7 @@ async def share_project(
     )
 
     # 共有元ユーザー情報を取得
-    sharer = await permission_service.get_user_by_id(current_user_id)
+    sharer = user
 
     return ProjectShareResponse(
         id=share.id,
@@ -100,7 +104,7 @@ async def share_project(
 @handle_exceptions
 async def list_project_shares(
     project_id: str,
-    current_user_id: str = Query(..., description="現在のユーザーID (認証情報から取得)"),
+    user: UserModel = Depends(current_active_user),
     permission_service: PermissionService = Depends(get_permission_service),
     share_service: ShareService = Depends(get_share_service),
 ) -> ProjectShareListResponse:
@@ -111,13 +115,15 @@ async def list_project_shares(
 
     Args:
         project_id: プロジェクトID
-        current_user_id: 現在のユーザーID
+        user: 認証済みユーザー
         permission_service: 権限サービス (DI)
         share_service: 共有サービス (DI)
 
     Returns:
         ProjectShareListResponse: 共有一覧
     """
+    current_user_id = user.id
+
     # アクセス権チェック
     if not await permission_service.can_access_project(current_user_id, project_id):
         raise PermissionDeniedError("You don't have access to this project")
@@ -131,15 +137,15 @@ async def list_project_shares(
 
 
 @router.put(
-    "/projects/{project_id}/shares/{user_id}",
+    "/projects/{project_id}/shares/{target_user_id}",
     response_model=ProjectShareResponse,
 )
 @handle_exceptions
 async def update_project_share(
     project_id: str,
-    user_id: str,
+    target_user_id: str,
     request: UpdateShareRequest,
-    current_user_id: str = Query(..., description="現在のユーザーID (認証情報から取得)"),
+    user: UserModel = Depends(current_active_user),
     permission_service: PermissionService = Depends(get_permission_service),
     share_service: ShareService = Depends(get_share_service),
 ) -> ProjectShareResponse:
@@ -150,15 +156,17 @@ async def update_project_share(
 
     Args:
         project_id: プロジェクトID
-        user_id: 共有先ユーザーID
+        target_user_id: 共有先ユーザーID
         request: 更新リクエスト
-        current_user_id: 現在のユーザーID
+        user: 認証済みユーザー
         permission_service: 権限サービス (DI)
         share_service: 共有サービス (DI)
 
     Returns:
         ProjectShareResponse: 更新された共有情報
     """
+    current_user_id = user.id
+
     # 権限チェック (オーナーまたはadmin)
     if not await permission_service.can_admin(current_user_id, project_id):
         raise PermissionDeniedError("You don't have permission to modify shares for this project")
@@ -166,15 +174,15 @@ async def update_project_share(
     # 共有を更新
     share = await share_service.update_share(
         project_id=project_id,
-        user_id=user_id,
+        user_id=target_user_id,
         permission_level=request.permission_level,
     )
 
     if not share:
-        raise NotFoundError("Share", user_id)
+        raise NotFoundError("Share", target_user_id)
 
     # ユーザー情報を取得
-    target_user = await permission_service.get_user_by_id(user_id)
+    target_user = await permission_service.get_user_by_id(target_user_id)
     sharer = await permission_service.get_user_by_id(share.shared_by) if share.shared_by else None
 
     return ProjectShareResponse(
@@ -191,14 +199,14 @@ async def update_project_share(
 
 
 @router.delete(
-    "/projects/{project_id}/shares/{user_id}",
+    "/projects/{project_id}/shares/{target_user_id}",
     status_code=204,
 )
 @handle_exceptions
 async def delete_project_share(
     project_id: str,
-    user_id: str,
-    current_user_id: str = Query(..., description="現在のユーザーID (認証情報から取得)"),
+    target_user_id: str,
+    user: UserModel = Depends(current_active_user),
     permission_service: PermissionService = Depends(get_permission_service),
     share_service: ShareService = Depends(get_share_service),
 ) -> None:
@@ -210,20 +218,22 @@ async def delete_project_share(
 
     Args:
         project_id: プロジェクトID
-        user_id: 共有先ユーザーID
-        current_user_id: 現在のユーザーID
+        target_user_id: 共有先ユーザーID
+        user: 認証済みユーザー
         permission_service: 権限サービス (DI)
         share_service: 共有サービス (DI)
     """
+    current_user_id = user.id
+
     # 自分自身の共有解除、またはadmin権限が必要
-    is_self = current_user_id == user_id
+    is_self = current_user_id == target_user_id
     has_admin = await permission_service.can_admin(current_user_id, project_id)
 
     if not is_self and not has_admin:
         raise PermissionDeniedError("You don't have permission to remove this share")
 
     # 共有を削除
-    deleted = await share_service.delete_share(project_id, user_id)
+    deleted = await share_service.delete_share(project_id, target_user_id)
 
     if not deleted:
-        raise NotFoundError("Share", user_id)
+        raise NotFoundError("Share", target_user_id)

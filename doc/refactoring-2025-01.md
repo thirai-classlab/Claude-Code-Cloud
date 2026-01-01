@@ -333,12 +333,122 @@ pie title コード変更の内訳
 
 ---
 
+## 2026-01-01 追加リファクタリング
+
+### 4. セキュリティ強化: shares.py 認証修正
+
+**問題点:**
+- `shares.py` の全エンドポイントで `current_user_id` をクエリパラメータとして受け取っていた
+- これにより、任意のユーザーが他のユーザーになりすまして操作可能なセキュリティホール
+
+**修正内容:**
+
+```mermaid
+flowchart LR
+    subgraph 修正前["修正前 (脆弱)"]
+        A["Query(current_user_id)"]
+        B["ユーザーが任意のIDを指定可能"]
+        A --> B
+    end
+
+    subgraph 修正後["修正後 (安全)"]
+        C["Depends(current_active_user)"]
+        D["JWTトークンから認証済みユーザーを取得"]
+        C --> D
+    end
+```
+
+**変更ファイル:**
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `api/routes/shares.py` | 全エンドポイントで `current_active_user` 依存性を使用 |
+
+**修正したエンドポイント:**
+
+| エンドポイント | 変更点 |
+|---------------|--------|
+| `POST /projects/{project_id}/shares` | `user: UserModel = Depends(current_active_user)` |
+| `GET /projects/{project_id}/shares` | 同上 |
+| `PUT /projects/{project_id}/shares/{target_user_id}` | 同上、パスパラメータ名を `user_id` → `target_user_id` に変更 |
+| `DELETE /projects/{project_id}/shares/{target_user_id}` | 同上 |
+
+---
+
+### 5. エラーハンドリング統一: mcp.py, files.py
+
+**問題点:**
+- `mcp.py` で直接 `HTTPException` を使用、アプリケーション標準の `AppException` パターンを使用していなかった
+- `files.py` で try-except ブロックが各エンドポイントで重複
+
+**修正内容:**
+
+```python
+# 修正前
+@router.get("/projects/{project_id}/config")
+async def get_mcp_config(project_id: str):
+    try:
+        # ...
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 修正後
+@router.get("/projects/{project_id}/config")
+@handle_exceptions  # デコレータで統一的なエラーハンドリング
+async def get_mcp_config(project_id: str):
+    # 例外は AppException を raise、デコレータが HTTPException に変換
+    if not config_path.exists():
+        raise NotFoundError("MCP configuration file", project_id)
+```
+
+**変更ファイル:**
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `api/routes/mcp.py` | `@handle_exceptions` デコレータ追加、`NotFoundError`/`ValidationError` 使用 |
+| `api/routes/files.py` | `@handle_exceptions` デコレータ追加、try-except 削除 |
+
+---
+
+### 6. ESLint警告修正
+
+**問題点:**
+- `PricingEditor.tsx` で `useCallback` の依存配列に `t` (翻訳関数) が含まれていなかった
+
+**修正内容:**
+
+```typescript
+// 修正前
+const loadData = useCallback(async () => {
+  // t を使用
+}, [projectId]);
+
+// 修正後
+const loadData = useCallback(async () => {
+  // t を使用
+}, [projectId, t]);
+```
+
+---
+
+## 今回のリファクタリング効果
+
+| カテゴリ | 改善内容 | 影響 |
+|---------|---------|------|
+| セキュリティ | 認証バイパス脆弱性修正 | 高 |
+| コード品質 | エラーハンドリング統一 | 中 |
+| 保守性 | ESLint警告ゼロ達成 | 低 |
+
+---
+
 ## 今後の推奨事項
 
 1. **単体テストの追加**: `ChatMessageProcessor` クラスのユニットテスト
 2. **E2Eテスト**: チャット機能の統合テスト
 3. **パフォーマンス計測**: React DevTools Profiler での確認
 4. **設定エディタの完全共通化**: 残りのエディタコンポーネント (Agent, Skill, Command) も共通化を検討
+5. **フロントエンド重複コンポーネント統合**: `ProjectList/ProjectListNav`, `SessionList/SessionListNav` の統合
+6. **any型の削減**: `MarkdownContent.tsx` の型安全性改善
 
 ---
 
@@ -347,6 +457,9 @@ pie title コード変更の内訳
 - バックエンド: `src/backend/app/`
   - `api/dependencies.py`
   - `api/websocket/handlers.py`
+  - `api/routes/shares.py` (セキュリティ修正)
+  - `api/routes/mcp.py` (エラーハンドリング統一)
+  - `api/routes/files.py` (エラーハンドリング統一)
   - `core/chat_processor.py`
   - `models/errors.py`
 
@@ -359,3 +472,4 @@ pie title コード変更の内訳
   - `chat/ToolExecutionGroup.tsx`
   - `layout/MainLayout.tsx`
   - `editor/shared/`
+  - `editor/PricingEditor.tsx` (ESLint修正)

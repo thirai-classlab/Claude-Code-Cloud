@@ -1,34 +1,37 @@
 # PM Context - 最終更新: 2026-01-01
 
 ## 前回のセッション概要
-i18n（国際化）機能の実装完了。フロントエンド全体の日本語/英語切り替え対応。
+リファクタリングとデバッグの完了。セキュリティ修正、エラーハンドリング統一、設計書更新を実施。
 
 ## 完了したタスク
 
-### i18n実装（2025-12-31〜2026-01-01）
-1. react-i18next導入・設定
-2. 翻訳ファイル作成（ja/en）
-3. 言語セレクタコンポーネント実装
-4. 基本UIコンポーネントへの翻訳適用
-5. エディター関連コンポーネントへの翻訳適用（追加対応）
-   - EditorContainer（タブラベル）
-   - ProjectSettingsEditor
-   - MCPSettingsEditor
-   - AgentSettingsEditor
-   - SkillsSettingsEditor
-   - CommandSettingsEditor
-   - CronSettingsEditor
-   - PricingEditor
-   - CreateSessionModal
-   - WelcomePanel
-   - ProjectPage/SessionPage
-   - SessionListNav/SessionList
+### リファクタリング（2026-01-01）
+1. **セキュリティ修正 (高優先度)**
+   - `shares.py`: クエリパラメータで受け取っていた`current_user_id`を`Depends(current_active_user)`に変更
+   - 認証バイパス脆弱性を修正
+
+2. **ESLint警告修正**
+   - `PricingEditor.tsx`: useCallbackの依存配列に`t`を追加
+
+3. **エラーハンドリング統一**
+   - `mcp.py`: `@handle_exceptions`デコレータ追加、`NotFoundError`/`ValidationError`使用
+   - `files.py`: `@handle_exceptions`デコレータ追加、重複try-except削除
+
+4. **設計書更新**
+   - `refactoring-2025-01.md`: 今回の変更内容を追記
+   - `backend-design.md`: バージョン1.5に更新
 
 ## 現在の状態
-- ビルド: 正常
-- Docker: 起動中
-- 翻訳: 全コンポーネント対応完了
+- ビルド: 正常 (ESLint警告ゼロ)
+- Docker: 全コンテナ正常稼働
+- テスト: 構文チェック合格
 
 ## 次回の推奨アクション
-- 新規翻訳漏れがないか定期確認
-- 新機能追加時は翻訳キーも同時追加
+- フロントエンド重複コンポーネント統合（ProjectList/ProjectListNav, SessionList/SessionListNav）
+- any型の削減（MarkdownContent.tsx等）
+- 単体テストの追加（ChatMessageProcessor等）
+
+## 技術的知見
+- FastAPIの`Depends(current_active_user)`でJWTトークンから認証済みユーザーを取得可能
+- `@handle_exceptions`デコレータで統一的なエラーハンドリングを実現
+- Reactの`useCallback`では翻訳関数`t`も依存配列に含める必要あり

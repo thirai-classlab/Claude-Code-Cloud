@@ -311,7 +311,8 @@
   "sessionPage": {
     "loading": "セッションを読み込み中...",
     "sessionNotFound": "セッションが見つかりません",
-    "backToProject": "プロジェクトに戻る"
+    "backToProject": "プロジェクトに戻る",
+    "backToProjectName": "{{name}}に戻る"
   },
   "createSession": {
     "title": "新規セッション",

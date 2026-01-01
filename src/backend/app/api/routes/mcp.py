@@ -6,10 +6,12 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.api.middleware import handle_exceptions
 from app.config import settings
+from app.models.errors import NotFoundError, ValidationError
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
@@ -45,6 +47,7 @@ def get_mcp_config_path(project_id: str) -> Path:
 
 
 @router.get("/projects/{project_id}/config", response_model=MCPConfigResponse)
+@handle_exceptions
 async def get_mcp_config(project_id: str) -> MCPConfigResponse:
     """
     Get MCP configuration for a project
@@ -59,25 +62,18 @@ async def get_mcp_config(project_id: str) -> MCPConfigResponse:
             path=str(config_path)
         )
 
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
+        try:
             data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValidationError(f"Invalid JSON in .mcp.json: {str(e)}")
 
-        config = MCPConfig(**data)
-        return MCPConfigResponse(config=config, path=str(config_path))
-    except json.JSONDecodeError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid JSON in .mcp.json: {str(e)}"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error reading .mcp.json: {str(e)}"
-        )
+    config = MCPConfig(**data)
+    return MCPConfigResponse(config=config, path=str(config_path))
 
 
 @router.put("/projects/{project_id}/config", response_model=MCPConfigResponse)
+@handle_exceptions
 async def update_mcp_config(
     project_id: str,
     request: UpdateMCPConfigRequest
@@ -90,27 +86,19 @@ async def update_mcp_config(
 
     # Ensure project directory exists
     if not config_path.parent.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"Project workspace not found: {project_id}"
-        )
+        raise NotFoundError("Project workspace", project_id)
 
-    try:
-        # Convert to dict and write
-        config_dict = request.config.model_dump(exclude_none=True)
+    # Convert to dict and write
+    config_dict = request.config.model_dump(exclude_none=True)
 
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config_dict, f, indent=2, ensure_ascii=False)
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config_dict, f, indent=2, ensure_ascii=False)
 
-        return MCPConfigResponse(config=request.config, path=str(config_path))
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error writing .mcp.json: {str(e)}"
-        )
+    return MCPConfigResponse(config=request.config, path=str(config_path))
 
 
 @router.delete("/projects/{project_id}/servers/{server_name}")
+@handle_exceptions
 async def delete_mcp_server(project_id: str, server_name: str) -> Dict[str, Any]:
     """
     Delete a specific MCP server from configuration
@@ -118,31 +106,17 @@ async def delete_mcp_server(project_id: str, server_name: str) -> Dict[str, Any]
     config_path = get_mcp_config_path(project_id)
 
     if not config_path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="MCP configuration file not found"
-        )
+        raise NotFoundError("MCP configuration file", project_id)
 
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    with open(config_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-        if "mcpServers" not in data or server_name not in data["mcpServers"]:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Server '{server_name}' not found in configuration"
-            )
+    if "mcpServers" not in data or server_name not in data["mcpServers"]:
+        raise NotFoundError("Server", server_name)
 
-        del data["mcpServers"][server_name]
+    del data["mcpServers"][server_name]
 
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
-        return {"message": f"Server '{server_name}' deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error updating .mcp.json: {str(e)}"
-        )
+    return {"message": f"Server '{server_name}' deleted successfully"}

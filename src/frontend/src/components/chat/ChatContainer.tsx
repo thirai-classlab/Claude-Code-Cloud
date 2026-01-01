@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ThinkingIndicator } from './ThinkingIndicator';
@@ -10,6 +12,7 @@ import { MarkdownContent } from './MarkdownContent';
 import { QuestionCard } from './QuestionCard';
 import { useChat } from '@/hooks/useChat';
 import { useSessions } from '@/hooks/useSessions';
+import { useProjectStore } from '@/stores/projectStore';
 import { projectsApi, modelsApi } from '@/lib/api';
 import { ToolUseBlock, ToolResultBlock, ContentBlock } from '@/types/message';
 
