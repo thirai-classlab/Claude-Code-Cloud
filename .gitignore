@@ -46,6 +46,10 @@ coverage/
 
 # Workspace (user generated files)
 workspace/
+.serena/
+.doc_drafts/
+.docs/
+.claude/
 !workspace/.gitkeep
 
 # Redis data
