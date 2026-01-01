@@ -6,7 +6,7 @@
 ## Changes Made
 
 ### Header.tsx
-- ロゴを「C³」のシンプルなテキストに変更（セリフフォント削除）
+- タイトルを「Claude Code Cloud」に統一（シンプルなsans-serifフォント）
 - パンくずリストはシンプルな形式を維持（プロジェクト名のみ表示）
 
 ### ProjectPage.tsx

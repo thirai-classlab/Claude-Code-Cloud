@@ -50,10 +50,10 @@ export const Header: React.FC = () => {
           </svg>
         </Button>
 
-        {/* Logo - links to home */}
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" title="Claude Code Cloud">
+        {/* Logo and title - links to home */}
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <span className="w-5 h-5 rounded-[5px] bg-gradient-to-br from-accent to-purple-500" />
-          <span className="text-sm font-medium text-text-secondary hidden sm:inline">C³</span>
+          <span className="text-sm font-medium text-text-primary hidden sm:inline">Claude Code Cloud</span>
         </Link>
 
         {/* Breadcrumb navigation */}
