@@ -53,10 +53,9 @@ services:
       - DEBUG=${DEBUG:-false}
       - LOG_LEVEL=${LOG_LEVEL:-info}
 
-      # Claude API
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
-      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-4.5}
-      - MAX_TOKENS=${MAX_TOKENS:-4096}
+      # Claude API (API keys are managed per-project in DB)
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-20250514}
+      - MAX_TOKENS=${MAX_TOKENS:-16000}
 
       # MySQL
       - MYSQL_HOST=mysql

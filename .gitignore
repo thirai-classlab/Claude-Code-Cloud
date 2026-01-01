@@ -48,7 +48,6 @@ coverage/
 workspace/
 .serena/
 doc_draft/
-docs/
 .ai
 .claude/
 !workspace/.gitkeep
