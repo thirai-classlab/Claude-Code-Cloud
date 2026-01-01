@@ -50,13 +50,10 @@ export const Header: React.FC = () => {
           </svg>
         </Button>
 
-        {/* Logo and title - links to home */}
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+        {/* Logo - links to home */}
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" title="Claude Code Cloud">
           <span className="w-5 h-5 rounded-[5px] bg-gradient-to-br from-accent to-purple-500" />
-          <h1 className="text-base font-semibold text-text-primary">
-            <span className="hidden sm:inline">Claude Code</span>
-            <span className="sm:hidden">CC</span>
-          </h1>
+          <span className="text-sm font-medium text-text-secondary hidden sm:inline">C³</span>
         </Link>
 
         {/* Breadcrumb navigation */}
@@ -82,36 +79,6 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Back button - show on session page to go back to project */}
-        {sessionIdFromUrl && projectIdFromUrl && (
-          <Link href={`/projects/${projectIdFromUrl}`}>
-            <Button
-              variant="default"
-              size="sm"
-              title={t('sessionPage.backToProject')}
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              {t('sessionPage.backToProject')}
-            </Button>
-          </Link>
-        )}
-        {/* Home button - show on project page (not session page) */}
-        {projectIdFromUrl && !sessionIdFromUrl && (
-          <Link href="/">
-            <Button
-              variant="default"
-              size="sm"
-              title={t('nav.backToHome')}
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              {t('nav.backToHome')}
-            </Button>
-          </Link>
-        )}
         <LanguageSelector />
 
         {/* User info and logout */}

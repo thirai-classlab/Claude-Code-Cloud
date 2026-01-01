@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "Claude Code",
+    "title": "Claude Code Cloud",
     "description": "Claudeを搭載したWebベースのコーディングアシスタント"
   },
   "nav": {
@@ -285,7 +285,7 @@
     }
   },
   "welcome": {
-    "title": "Claude Codeへようこそ",
+    "title": "Claude Code Cloudへようこそ",
     "subtitle": "AIアシスタンスでコーディングを始めましょう",
     "projects": "プロジェクト",
     "newProject": "新規プロジェクト",

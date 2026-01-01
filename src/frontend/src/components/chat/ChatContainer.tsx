@@ -106,28 +106,49 @@ const ChatHeader: React.FC<{
   onInterrupt: () => void;
   onModelChange: (model: string) => void;
   models: ModelInfo[];
-}> = ({ isStreaming, connectionStatus, currentModel, onInterrupt, onModelChange, models }) => (
-  <div className="flex items-center justify-between px-6 h-header border-b border-border">
-    <h2 className="text-lg font-semibold text-text-primary">Chat</h2>
-    <div className="flex items-center gap-4">
-      <ModelSelector
-        currentModel={currentModel}
-        onModelChange={onModelChange}
-        disabled={isStreaming}
-        models={models}
-      />
-      {isStreaming && (
-        <button
-          onClick={onInterrupt}
-          className="btn px-3 py-1 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-all duration-fast"
-        >
-          Stop
-        </button>
-      )}
-      <ConnectionStatus status={connectionStatus} />
+  projectId?: string;
+  projectName?: string;
+}> = ({ isStreaming, connectionStatus, currentModel, onInterrupt, onModelChange, models, projectId, projectName }) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center justify-between px-6 h-header border-b border-border">
+      <div className="flex items-center gap-4">
+        {projectId && (
+          <Link href={`/projects/${projectId}`}>
+            <button
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-secondary rounded-md transition-all duration-fast"
+              title={t('sessionPage.backToProjectName', { name: projectName || t('sessionPage.backToProject') })}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span>{projectName ? t('sessionPage.backToProjectName', { name: projectName }) : t('sessionPage.backToProject')}</span>
+            </button>
+          </Link>
+        )}
+        <h2 className="text-lg font-semibold text-text-primary">Chat</h2>
+      </div>
+      <div className="flex items-center gap-4">
+        <ModelSelector
+          currentModel={currentModel}
+          onModelChange={onModelChange}
+          disabled={isStreaming}
+          models={models}
+        />
+        {isStreaming && (
+          <button
+            onClick={onInterrupt}
+            className="btn px-3 py-1 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-all duration-fast"
+          >
+            Stop
+          </button>
+        )}
+        <ConnectionStatus status={connectionStatus} />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ローディングインジケーター
 const LoadingIndicator: React.FC = () => (
@@ -284,6 +305,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
   } = useChat({ sessionId });
 
   const { sessions, updateSessionModel } = useSessions(projectId);
+  const { projects } = useProjectStore();
+
+  // Get current project for back button
+  const currentProject = projectId ? projects.find(p => p.id === projectId) : null;
 
   // Model list from API
   const [models, setModels] = useState<ModelInfo[]>(FALLBACK_MODELS);
@@ -402,6 +427,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ sessionId, project
         onInterrupt={interrupt}
         onModelChange={handleModelChange}
         models={models}
+        projectId={projectId}
+        projectName={currentProject?.name}
       />
 
       {/* Messages Area */}

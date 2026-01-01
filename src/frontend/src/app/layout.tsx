@@ -3,7 +3,7 @@ import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Claude Code - Web Edition',
+  title: 'Claude Code Cloud - Web Edition',
   description: 'Web-based coding assistant powered by Claude',
 };
 

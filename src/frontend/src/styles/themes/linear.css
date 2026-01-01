@@ -33,6 +33,7 @@
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-serif: 'Playfair Display', 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif;
 
   /* Shadows (minimal for this theme) */
   --shadow-sm: none;

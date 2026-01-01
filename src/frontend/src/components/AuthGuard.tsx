@@ -35,7 +35,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple-500 animate-pulse" />
-            <span className="text-xl font-semibold text-text-primary">Claude Code</span>
+            <span className="text-xl font-semibold text-text-primary">Claude Code Cloud</span>
           </div>
           {/* Loading indicator */}
           <div className="flex items-center gap-2">

@@ -51,6 +51,7 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-sans)'],
         mono: ['var(--font-mono)'],
+        serif: ['var(--font-serif)'],
       },
       fontSize: {
         'xs': ['11px', { lineHeight: '1.4' }],

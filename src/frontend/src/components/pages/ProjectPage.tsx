@@ -116,11 +116,22 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({ projectId }) => {
         <div className="flex-shrink-0 px-6 py-6 border-b border-border-subtle">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl font-bold text-text-primary mb-1 truncate">
-                {project.name}
-              </h1>
+              <div className="flex items-center gap-3 mb-1">
+                <Link
+                  href="/"
+                  className="flex items-center justify-center w-8 h-8 rounded-md bg-bg-secondary hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  title={t('nav.backToHome')}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Link>
+                <h1 className="text-2xl font-bold text-text-primary truncate">
+                  {project.name}
+                </h1>
+              </div>
               {project.description && (
-                <p className="text-text-secondary line-clamp-2">
+                <p className="text-text-secondary line-clamp-2 ml-11">
                   {project.description}
                 </p>
               )}
