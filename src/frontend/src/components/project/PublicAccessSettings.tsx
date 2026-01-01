@@ -130,10 +130,10 @@ export function PublicAccessSettings({ projectId }: Props) {
     try {
       await navigator.clipboard.writeText(settings.public_url);
       setCopied(true);
-      toast.success('コピーしました');
+      toast.success(t('editor.publicAccess.copySuccess'));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('コピーに失敗しました');
+      toast.error(t('editor.publicAccess.copyFailed'));
     }
   };
 
@@ -145,7 +145,7 @@ export function PublicAccessSettings({ projectId }: Props) {
       const updatedSettings = await updatePublicAccess(projectId, { enabled: !enabled });
       setSettings(updatedSettings);
       setEnabled(!enabled);
-      toast.success(!enabled ? '共有を有効にしました' : '共有を停止しました');
+      toast.success(!enabled ? t('editor.publicAccess.sharingEnabled') : t('editor.publicAccess.sharingStopped'));
     } catch (err: any) {
       toast.error(err.message || t('editor.publicAccess.saveError'));
     } finally {
@@ -161,7 +161,7 @@ export function PublicAccessSettings({ projectId }: Props) {
       const updatedSettings = await updatePublicAccess(projectId, { password });
       setSettings(updatedSettings);
       setPassword('');
-      toast.success('パスワードを設定しました');
+      toast.success(t('editor.publicAccess.passwordSetSuccess'));
     } catch (err: any) {
       toast.error(err.message || t('editor.publicAccess.saveError'));
     } finally {
@@ -176,7 +176,7 @@ export function PublicAccessSettings({ projectId }: Props) {
     try {
       const updatedSettings = await updatePublicAccess(projectId, { clear_password: true });
       setSettings(updatedSettings);
-      toast.success('パスワードを解除しました');
+      toast.success(t('editor.publicAccess.passwordCleared'));
     } catch (err: any) {
       toast.error(err.message || t('editor.publicAccess.saveError'));
     } finally {
@@ -194,7 +194,7 @@ export function PublicAccessSettings({ projectId }: Props) {
         setIpInput(data.ip);
       }
     } catch {
-      toast.error('IPアドレスの取得に失敗しました');
+      toast.error(t('editor.publicAccess.ipFetchError'));
     } finally {
       setFetchingIp(false);
     }
@@ -226,12 +226,12 @@ export function PublicAccessSettings({ projectId }: Props) {
     }
 
     if (invalidIps.length > 0) {
-      toast.error(`無効な形式: ${invalidIps.join(', ')}`);
+      toast.error(t('editor.publicAccess.invalidIpFormat', { ips: invalidIps.join(', ') }));
       return;
     }
 
     if (validIps.length === 0) {
-      toast.error('追加するIPがありません（重複を除外）');
+      toast.error(t('editor.publicAccess.noIpToAdd'));
       return;
     }
 
@@ -241,9 +241,9 @@ export function PublicAccessSettings({ projectId }: Props) {
       const updatedSettings = await updatePublicAccess(projectId, { allowed_ips: newIps });
       setSettings(updatedSettings);
       setIpInput('');
-      toast.success(`${validIps.length}件のIPを追加しました`);
+      toast.success(t('editor.publicAccess.ipAdded', { count: validIps.length }));
     } catch (err: any) {
-      toast.error(err.message || 'IP追加に失敗しました');
+      toast.error(err.message || t('editor.publicAccess.ipAddFailed'));
     } finally {
       setSaving(false);
     }
@@ -260,9 +260,9 @@ export function PublicAccessSettings({ projectId }: Props) {
         allowed_ips: newIps.length > 0 ? newIps : []
       });
       setSettings(updatedSettings);
-      toast.success('IPを削除しました');
+      toast.success(t('editor.publicAccess.ipRemoved'));
     } catch (err: any) {
-      toast.error(err.message || 'IP削除に失敗しました');
+      toast.error(err.message || t('editor.publicAccess.ipRemoveFailed'));
     } finally {
       setSaving(false);
     }
@@ -271,10 +271,10 @@ export function PublicAccessSettings({ projectId }: Props) {
   // URL再発行
   const handleRegenerateToken = async () => {
     const confirmed = await confirm({
-      title: 'URLを再発行',
-      message: '現在のURLは無効になります。続けますか？',
-      confirmLabel: '再発行',
-      cancelLabel: 'キャンセル',
+      title: t('editor.publicAccess.regenerateUrlTitle'),
+      message: t('editor.publicAccess.regenerateUrlMessage'),
+      confirmLabel: t('editor.publicAccess.regenerateLabel'),
+      cancelLabel: t('common.cancel'),
       variant: 'warning',
     });
     if (!confirmed) return;
@@ -283,7 +283,7 @@ export function PublicAccessSettings({ projectId }: Props) {
     try {
       const updatedSettings = await regenerateToken(projectId);
       setSettings(updatedSettings);
-      toast.success('URLを再発行しました');
+      toast.success(t('editor.publicAccess.urlRegenerated'));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -294,10 +294,10 @@ export function PublicAccessSettings({ projectId }: Props) {
   // 共有削除
   const handleDelete = async () => {
     const confirmed = await confirm({
-      title: '外部共有を削除',
-      message: 'URLは完全に無効になります。この操作は取り消せません。',
-      confirmLabel: '削除',
-      cancelLabel: 'キャンセル',
+      title: t('editor.publicAccess.deleteShareTitle'),
+      message: t('editor.publicAccess.deleteShareMessage'),
+      confirmLabel: t('editor.publicAccess.deleteLabel'),
+      cancelLabel: t('common.cancel'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -309,7 +309,7 @@ export function PublicAccessSettings({ projectId }: Props) {
       setEnabled(false);
       setPassword('');
       setShowAdvanced(false);
-      toast.success('削除しました');
+      toast.success(t('editor.publicAccess.deleteSuccess'));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -349,10 +349,9 @@ export function PublicAccessSettings({ projectId }: Props) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-text-primary mb-2">コマンドがありません</h2>
+            <h2 className="text-lg font-semibold text-text-primary mb-2">{t('editor.publicAccess.noCommands')}</h2>
             <p className="text-sm text-text-tertiary">
-              外部共有するには、まずコマンドを作成してください。
-              コマンドは外部ユーザーが実行できる機能です。
+              {t('editor.commands.createFirst')}
             </p>
           </div>
         </div>
@@ -371,10 +370,9 @@ export function PublicAccessSettings({ projectId }: Props) {
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-text-primary mb-1">外部共有について</h3>
+              <h3 className="text-sm font-medium text-text-primary mb-1">{t('editor.publicAccess.title')}</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
-                URLを発行すると、ログインなしでブラウザからアクセスできるようになります。
-                選択したコマンドのみが外部ユーザーに公開され、実行可能になります。
+                {t('editor.publicAccess.enableAccessDesc')}
               </p>
             </div>
           </div>
@@ -383,9 +381,9 @@ export function PublicAccessSettings({ projectId }: Props) {
         {/* コマンド選択 */}
         <div className="rounded-lg border border-border bg-bg-secondary p-4">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm text-text-primary font-medium">公開するコマンドを選択</div>
+            <div className="text-sm text-text-primary font-medium">{t('editor.publicAccess.selectCommand')}</div>
             <div className="text-xs text-text-tertiary">
-              {selectedCount > 0 ? `${selectedCount}件選択中` : '必須'}
+              {selectedCount > 0 ? t('editor.publicAccess.selectedCount', { count: selectedCount }) : t('editor.publicAccess.required')}
             </div>
           </div>
           <div className="divide-y divide-border">
@@ -417,7 +415,7 @@ export function PublicAccessSettings({ projectId }: Props) {
               : 'bg-bg-tertiary text-text-tertiary cursor-not-allowed'
           } disabled:opacity-50`}
         >
-          {saving ? '作成中...' : selectedCount > 0 ? '共有URLを取得' : 'コマンドを選択してください'}
+          {saving ? t('editor.publicAccess.creating') : selectedCount > 0 ? t('editor.publicAccess.getShareUrl') : t('editor.publicAccess.selectCommand')}
         </button>
       </div>
     );
@@ -432,7 +430,7 @@ export function PublicAccessSettings({ projectId }: Props) {
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${enabled ? 'bg-green-500' : 'bg-zinc-500'}`} />
             <span className={`text-sm font-medium ${enabled ? 'text-green-400' : 'text-zinc-400'}`}>
-              {enabled ? '共有中' : '停止中'}
+              {enabled ? t('editor.publicAccess.sharing') : t('editor.publicAccess.stopped')}
             </span>
           </div>
           <button
@@ -440,7 +438,7 @@ export function PublicAccessSettings({ projectId }: Props) {
             disabled={saving}
             className="text-xs px-3 py-1 rounded bg-bg-tertiary hover:bg-bg-hover text-text-secondary transition-colors disabled:opacity-50"
           >
-            {enabled ? '停止' : '再開'}
+            {enabled ? t('editor.publicAccess.stop') : t('editor.publicAccess.resume')}
           </button>
         </div>
 
@@ -455,7 +453,7 @@ export function PublicAccessSettings({ projectId }: Props) {
               {settings.public_url}
             </div>
             <span className={`text-xs px-2 py-1 rounded ${copied ? 'bg-green-500 text-white' : 'bg-accent text-white'}`}>
-              {copied ? '✓' : 'コピー'}
+              {copied ? t('editor.publicAccess.copiedMark') : t('editor.publicAccess.copyButton')}
             </span>
           </div>
         </button>
@@ -464,9 +462,9 @@ export function PublicAccessSettings({ projectId }: Props) {
       {/* パスワード */}
       <div className="rounded-lg border border-border bg-bg-secondary p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-text-primary">パスワード保護</span>
+          <span className="text-sm text-text-primary">{t('editor.publicAccess.password')}</span>
           {settings.has_password && (
-            <span className="text-xs px-2 py-0.5 bg-green-500/10 text-green-400 rounded">設定済</span>
+            <span className="text-xs px-2 py-0.5 bg-green-500/10 text-green-400 rounded">{t('editor.publicAccess.passwordSet')}</span>
           )}
         </div>
         <div className="flex gap-2">
@@ -474,7 +472,7 @@ export function PublicAccessSettings({ projectId }: Props) {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder={settings.has_password ? '新しいパスワード' : 'パスワードを入力'}
+            placeholder={settings.has_password ? t('editor.publicAccess.newPassword') : t('editor.publicAccess.enterPassword')}
             className="flex-1 bg-bg-tertiary border border-border rounded px-3 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent"
           />
           {password ? (
@@ -483,7 +481,7 @@ export function PublicAccessSettings({ projectId }: Props) {
               disabled={saving}
               className="px-3 py-1.5 bg-accent text-white text-sm rounded transition-colors disabled:opacity-50"
             >
-              設定
+              {t('editor.publicAccess.set')}
             </button>
           ) : settings.has_password ? (
             <button
@@ -491,7 +489,7 @@ export function PublicAccessSettings({ projectId }: Props) {
               disabled={saving}
               className="px-3 py-1.5 text-red-400 text-sm hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
             >
-              解除
+              {t('editor.publicAccess.remove')}
             </button>
           ) : null}
         </div>
@@ -500,15 +498,15 @@ export function PublicAccessSettings({ projectId }: Props) {
       {/* IP制限 */}
       <div className="rounded-lg border border-border bg-bg-secondary p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-text-primary">IP制限</span>
+          <span className="text-sm text-text-primary">{t('editor.publicAccess.ipRestrictions')}</span>
           {settings.allowed_ips && settings.allowed_ips.length > 0 && (
             <span className="text-xs px-2 py-0.5 bg-green-500/10 text-green-400 rounded">
-              {settings.allowed_ips.length}件設定済
+              {t('editor.publicAccess.passwordSet')}
             </span>
           )}
         </div>
         <p className="text-xs text-text-tertiary mb-3">
-          指定したIPアドレスからのみアクセスを許可します。カンマやスペース区切りで複数入力可能です。
+          {t('editor.publicAccess.ipRestrictions')}
         </p>
         <div className="flex gap-2 mb-4">
           <input
@@ -522,21 +520,21 @@ export function PublicAccessSettings({ projectId }: Props) {
             onClick={handleFetchCurrentIp}
             disabled={fetchingIp}
             className="px-3 py-1.5 text-text-secondary text-xs hover:bg-bg-hover border border-border rounded transition-colors disabled:opacity-50 whitespace-nowrap"
-            title="現在のIPアドレスを取得"
+            title={t('editor.publicAccess.getCurrentIpTooltip')}
           >
-            {fetchingIp ? '...' : '現在のIP'}
+            {fetchingIp ? '...' : t('editor.publicAccess.getCurrentIp')}
           </button>
           <button
             onClick={handleAddIp}
             disabled={saving || !ipInput.trim()}
             className="px-3 py-1.5 bg-accent text-white text-sm rounded transition-colors disabled:opacity-50"
           >
-            追加
+            {t('editor.publicAccess.add')}
           </button>
         </div>
 
         {/* 指定中のIPアドレス */}
-        <div className="text-xs text-text-secondary mb-2">指定中のIPアドレス</div>
+        <div className="text-xs text-text-secondary mb-2">{t('editor.publicAccess.registeredIps')}</div>
         {settings.allowed_ips && settings.allowed_ips.length > 0 ? (
           <div className="space-y-1">
             {settings.allowed_ips.map((ip) => (
@@ -550,14 +548,14 @@ export function PublicAccessSettings({ projectId }: Props) {
                   disabled={saving}
                   className="text-xs text-text-tertiary hover:text-red-400 transition-colors disabled:opacity-50"
                 >
-                  削除
+                  {t('editor.publicAccess.delete')}
                 </button>
               </div>
             ))}
           </div>
         ) : (
           <div className="py-3 px-2 bg-bg-tertiary rounded text-center">
-            <span className="text-xs text-text-tertiary">IPアドレスが指定されていません（全てのIPからアクセス可能）</span>
+            <span className="text-xs text-text-tertiary">{t('editor.publicAccess.noIpRestriction')}</span>
           </div>
         )}
       </div>
@@ -565,7 +563,7 @@ export function PublicAccessSettings({ projectId }: Props) {
       {/* 公開コマンド（コマンドがある場合のみ） */}
       {commands.length > 0 && (
         <div className="rounded-lg border border-border bg-bg-secondary p-4">
-          <div className="text-sm text-text-primary mb-3">公開コマンド</div>
+          <div className="text-sm text-text-primary mb-3">{t('editor.publicAccess.publicCommands')}</div>
           <div className="divide-y divide-border">
             {commands.map((cmd) => (
               <div key={cmd.command_id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
@@ -592,7 +590,7 @@ export function PublicAccessSettings({ projectId }: Props) {
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="w-full p-3 flex items-center justify-between text-sm text-text-secondary hover:bg-bg-hover transition-colors"
         >
-          <span>詳細設定</span>
+          <span>{t('editor.tabs.settings')}</span>
           <svg className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -604,14 +602,14 @@ export function PublicAccessSettings({ projectId }: Props) {
               disabled={saving}
               className="w-full p-2 text-left text-sm text-text-secondary hover:bg-bg-hover rounded transition-colors disabled:opacity-50"
             >
-              URLを再発行
+              {t('editor.publicAccess.regenerateUrlTitle')}
             </button>
             <button
               onClick={handleDelete}
               disabled={saving}
               className="w-full p-2 text-left text-sm text-red-400 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
             >
-              外部共有を削除
+              {t('editor.publicAccess.deleteShareTitle')}
             </button>
           </div>
         )}
