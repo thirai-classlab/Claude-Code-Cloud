@@ -413,12 +413,12 @@ class PublicAccessService:
             "exp": datetime.now(timezone.utc) + timedelta(hours=expires_hours),
             "type": "public_session",
         }
-        return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+        return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
     def verify_session_token(self, token: str) -> Optional[str]:
         """セッショントークンを検証し、public_access_idを返す"""
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
             if payload.get("type") != "public_session":
                 return None
             return payload.get("public_access_id")
@@ -451,30 +451,41 @@ class PublicAccessService:
     async def create_public_session(
         self,
         public_access: ProjectPublicAccessModel,
-        command_id: str,
         ip_address: str,
         user_agent: Optional[str] = None,
+        command_id: Optional[str] = None,
     ) -> Optional[PublicSessionModel]:
-        """公開セッションを作成"""
-        # コマンドが公開されているか確認
-        result = await self.db.execute(
-            select(ProjectCommandModel)
-            .join(CommandPublicSettingModel)
-            .where(
-                and_(
-                    ProjectCommandModel.id == command_id,
-                    ProjectCommandModel.project_id == public_access.project_id,
-                    CommandPublicSettingModel.is_public == True,
+        """公開セッションを作成
+
+        Args:
+            public_access: 外部公開設定
+            ip_address: クライアントIPアドレス
+            user_agent: ユーザーエージェント
+            command_id: コマンドID（フリーチャット時はNone）
+
+        Returns:
+            作成されたセッション、またはNone（コマンドが無効な場合）
+        """
+        # コマンドIDが指定された場合、公開されているか確認
+        if command_id:
+            result = await self.db.execute(
+                select(ProjectCommandModel)
+                .join(CommandPublicSettingModel)
+                .where(
+                    and_(
+                        ProjectCommandModel.id == command_id,
+                        ProjectCommandModel.project_id == public_access.project_id,
+                        CommandPublicSettingModel.is_public == True,
+                    )
                 )
             )
-        )
-        command = result.scalar_one_or_none()
-        if not command:
-            return None
+            command = result.scalar_one_or_none()
+            if not command:
+                return None
 
         session = PublicSessionModel(
             public_access_id=public_access.id,
-            command_id=command_id,
+            command_id=command_id,  # Noneの場合はフリーチャット
             ip_address=ip_address,
             user_agent=user_agent,
             message_count=0,

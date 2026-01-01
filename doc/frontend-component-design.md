@@ -60,7 +60,9 @@ graph LR
         Avatar["Avatar"]
         Badge["Badge"]
         Indicator["Indicator"]
-        Icon["Icon"]
+        Toggle["Toggle"]
+        StatusBanner["StatusBanner"]
+        CopyButton["CopyButton"]
     end
 ```
 
@@ -71,6 +73,9 @@ graph LR
 | `Avatar` | name, variant | ユーザー/アシスタントアバター |
 | `Badge` | children, variant | ステータスバッジ |
 | `Indicator` | active, color | ドットインジケーター |
+| `Toggle` | checked, onChange, size, label | トグルスイッチ |
+| `StatusBanner` | status, title, message | ステータスバナー |
+| `CopyButton` | text, onCopy | コピーボタン |
 
 ### 2.2 Molecules（分子）
 
@@ -84,6 +89,7 @@ graph LR
         MessageHeader["MessageHeader"]
         CodeHeader["CodeHeader"]
         StatusBadge["StatusBadge"]
+        CollapsibleSection["CollapsibleSection"]
     end
 ```
 
@@ -94,6 +100,7 @@ graph LR
 | `MessageHeader` | Avatar + Name + Time | メッセージヘッダー |
 | `CodeHeader` | LangDot + Filename + CopyButton | コードブロックヘッダー |
 | `StatusBadge` | Indicator + Badge | ステータス表示 |
+| `CollapsibleSection` | Header + Content（開閉可能） | アコーディオンセクション |
 
 ### 2.3 Organisms（有機体）
 
@@ -107,8 +114,18 @@ graph LR
         Message["Message"]
         CodeBlock["CodeBlock"]
         ChatInput["ChatInput"]
+        PublicAccessSettings["PublicAccessSettings"]
     end
 ```
+
+| コンポーネント | 説明 |
+|--------------|------|
+| `Sidebar` | サイドバーナビゲーション |
+| `Header` | ページヘッダー |
+| `Message` | チャットメッセージ表示 |
+| `CodeBlock` | コードブロック表示 |
+| `ChatInput` | チャット入力エリア |
+| `PublicAccessSettings` | 外部公開設定パネル（IP制限、パスワード保護、コマンド公開設定） |
 
 ### 2.4 Templates（テンプレート）
 
@@ -171,7 +188,58 @@ interface ButtonProps {
 
 ---
 
-### 3.2 Avatar
+### 3.2 Toggle
+
+```typescript
+interface ToggleProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  size?: 'sm' | 'md' | 'lg';
+  label?: string;
+  disabled?: boolean;
+}
+```
+
+**スタイル仕様:**
+
+| Size | Track | Thumb | Translation |
+|------|-------|-------|-------------|
+| sm | 32x16px | 12x12px | 16px |
+| md | 44x24px | 20x20px | 20px |
+| lg | 56x28px | 24x24px | 28px |
+
+| State | Track背景 | Thumb |
+|-------|----------|-------|
+| OFF | bg-tertiary | 白 |
+| ON | accent | 白（右に移動） |
+
+```css
+/* Track */
+.toggle-track {
+  position: relative;
+  border-radius: 9999px;
+  transition: background-color 0.2s;
+}
+
+/* Thumb */
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  background: white;
+  border-radius: 9999px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+}
+
+.toggle-checked .toggle-thumb {
+  transform: translateX(var(--thumb-translate));
+}
+```
+
+---
+
+### 3.3 Avatar
 
 ```typescript
 interface AvatarProps {

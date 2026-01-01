@@ -22,6 +22,7 @@ vi .env  # または nano .env
 
 最低限、以下の2つを設定してください：
 
+
 ```bash
 # 必須: Anthropic API Key
 ANTHROPIC_API_KEY=sk-ant-api03-YOUR_KEY_HERE

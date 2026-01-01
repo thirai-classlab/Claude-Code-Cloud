@@ -165,14 +165,15 @@ class PublicCommandListResponse(BaseModel):
 
 class CreatePublicSessionRequest(BaseModel):
     """公開セッション作成リクエスト"""
-    command_id: str
+    command_id: Optional[str] = Field(default=None, description="コマンドID（フリーチャット時はNone）")
 
 
 class CreatePublicSessionResponse(BaseModel):
     """公開セッション作成レスポンス"""
     session_id: str
-    command: PublicCommandResponse
+    command: Optional[PublicCommandResponse] = Field(default=None, description="コマンド情報（フリーチャット時はNone）")
     limits: dict
+    mode: str = Field(default="command", description="セッションモード（command/free_chat）")
 
 
 class PublicChatMessage(BaseModel):

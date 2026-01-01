@@ -296,25 +296,33 @@ async def create_public_session(
     # セッション作成
     session = await public_access_service.create_public_session(
         public_access=public_access,
-        command_id=request_data.command_id,
         ip_address=client_ip,
         user_agent=user_agent,
+        command_id=request_data.command_id,  # Noneの場合はフリーチャット
     )
 
     if not session:
         raise ValidationError("Invalid command or command is not public")
 
-    # コマンド情報取得
-    commands = await public_access_service.get_public_commands(public_access)
-    cmd = next((c for c in commands if c.id == request_data.command_id), None)
-
-    return CreatePublicSessionResponse(
-        session_id=session.id,
-        command=PublicCommandResponse(
+    # モード判定とレスポンス構築
+    if request_data.command_id:
+        # コマンドモード
+        commands = await public_access_service.get_public_commands(public_access)
+        cmd = next((c for c in commands if c.id == request_data.command_id), None)
+        command_response = PublicCommandResponse(
             id=cmd.id if cmd else request_data.command_id,
             name=cmd.name if cmd else "",
             description=cmd.description if cmd else None,
-        ),
+        )
+        mode = "command"
+    else:
+        # フリーチャットモード
+        command_response = None
+        mode = "free_chat"
+
+    return CreatePublicSessionResponse(
+        session_id=session.id,
+        command=command_response,
         limits={
             "max_messages": public_access.max_messages_per_session,
             "remaining_messages": (
@@ -323,6 +331,7 @@ async def create_public_session(
                 else None
             ),
         },
+        mode=mode,
     )
 
 

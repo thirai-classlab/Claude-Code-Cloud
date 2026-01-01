@@ -47,8 +47,9 @@ coverage/
 # Workspace (user generated files)
 workspace/
 .serena/
-.doc_drafts/
-.docs/
+doc_draft/
+docs/
+.ai
 .claude/
 !workspace/.gitkeep
 

@@ -203,11 +203,12 @@ export interface PublicCommandList {
 
 export interface CreatePublicSessionResponse {
   session_id: string;
-  command: PublicCommand;
+  command: PublicCommand | null;
   limits: {
     max_messages: number | null;
     remaining_messages: number | null;
   };
+  mode: 'command' | 'free_chat';
 }
 
 /**
@@ -256,10 +257,13 @@ export async function getPublicCommands(
 
 /**
  * 公開セッションを作成（認証不要、パスワード認証後はトークン必要）
+ * @param token アクセストークン
+ * @param commandId コマンドID（フリーチャット時はnull/undefined）
+ * @param sessionToken セッショントークン（パスワード認証後）
  */
 export async function createPublicSession(
   token: string,
-  commandId: string,
+  commandId?: string | null,
   sessionToken?: string
 ): Promise<CreatePublicSessionResponse> {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -267,10 +271,14 @@ export async function createPublicSession(
   if (sessionToken) {
     headers['Authorization'] = `Bearer ${sessionToken}`;
   }
+  const body: { command_id?: string } = {};
+  if (commandId) {
+    body.command_id = commandId;
+  }
   const response = await fetch(`${baseUrl}/api/public/${token}/sessions`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ command_id: commandId }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     throw new Error('Failed to create session');
