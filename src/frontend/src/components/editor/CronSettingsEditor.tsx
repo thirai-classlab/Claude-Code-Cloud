@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { cronApi } from '@/lib/api/cron';
+import { toast } from '@/stores/toastStore';
 import {
   CronScheduleResponse,
   CronScheduleCreateRequest,
@@ -50,8 +51,6 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
@@ -59,13 +58,12 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
 
   const loadSchedules = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const response = await cronApi.getSchedules(projectId);
       setSchedules(response.schedules);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load cron schedules';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -92,11 +90,6 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
       loadExecutionLogs();
     }
   }, [activeTab, loadExecutionLogs]);
-
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
 
   const parseArgsString = (argsStr: string): Record<string, unknown> => {
     if (!argsStr.trim()) return {};
@@ -137,10 +130,10 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
       setIsSaving(true);
       await cronApi.deleteSchedule(projectId, name);
       setSchedules(schedules.filter(s => s.name !== name));
-      showSuccess(t('editor.cron.scheduleDeleted', { name }));
+      toast.success(t('editor.cron.scheduleDeleted', { name }));
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : t('common.error');
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -153,12 +146,12 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
       setSchedules(schedules.map(s =>
         s.name === name ? updatedSchedule : s
       ));
-      showSuccess(updatedSchedule.enabled
+      toast.success(updatedSchedule.enabled
         ? t('editor.cron.scheduleEnabled', { name })
         : t('editor.cron.scheduleDisabled', { name }));
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : t('common.error');
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -168,10 +161,10 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
     try {
       setIsSaving(true);
       await cronApi.runScheduleNow(projectId, name);
-      showSuccess(t('editor.cron.scheduleTriggered', { name }));
+      toast.success(t('editor.cron.scheduleTriggered', { name }));
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : t('common.error');
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -179,7 +172,7 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
 
   const handleSaveSchedule = async () => {
     if (!scheduleForm.name.trim() || !scheduleForm.command.trim() || !scheduleForm.cron.trim()) {
-      setError(t('editor.cron.validationRequired'));
+      toast.warning(t('editor.cron.validationRequired'));
       return;
     }
 
@@ -195,7 +188,6 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
 
     try {
       setIsSaving(true);
-      setError(null);
 
       if (editingSchedule) {
         const { name, ...updateData } = scheduleData;
@@ -203,11 +195,11 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
         setSchedules(schedules.map(s =>
           s.name === editingSchedule ? updatedSchedule : s
         ));
-        showSuccess(t('editor.cron.scheduleUpdated'));
+        toast.success(t('editor.cron.scheduleUpdated'));
       } else {
         const newSchedule = await cronApi.createSchedule(projectId, scheduleData);
         setSchedules([...schedules, newSchedule]);
-        showSuccess(t('editor.cron.scheduleAdded'));
+        toast.success(t('editor.cron.scheduleAdded'));
       }
 
       setIsAddingSchedule(false);
@@ -215,7 +207,7 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
       setScheduleForm(emptyScheduleForm);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : t('common.error');
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -225,7 +217,6 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
     setIsAddingSchedule(false);
     setEditingSchedule(null);
     setScheduleForm(emptyScheduleForm);
-    setError(null);
   };
 
   const handlePresetSelect = (cronExpression: string) => {
@@ -308,18 +299,6 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
           </button>
         </div>
       </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
-      )}
-      {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-          <p className="text-sm text-green-600">{successMessage}</p>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">

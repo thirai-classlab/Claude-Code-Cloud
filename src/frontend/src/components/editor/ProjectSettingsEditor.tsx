@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectsApi } from '@/lib/api';
 import { useProjects } from '@/hooks/useProjects';
+import { toast } from '@/stores/toastStore';
 
 interface ProjectSettingsEditorProps {
   projectId: string;
@@ -19,8 +20,6 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
   const { updateProject: updateProjectInStore } = useProjects();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -35,7 +34,6 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
 
   const loadProject = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const project = await projectsApi.get(projectId);
       setName(project.name);
@@ -45,7 +43,7 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
       setOriginalDescription(project.description || '');
       setOriginalApiKey(project.api_key || '');
     } catch (err: any) {
-      setError(err.message || 'Failed to load project');
+      toast.error(err.message || 'Failed to load project');
     } finally {
       setIsLoading(false);
     }
@@ -55,21 +53,15 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
     loadProject();
   }, [loadProject]);
 
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
   const isDirty = name !== originalName || description !== originalDescription || apiKey !== originalApiKey;
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError(t('editor.projectSettings.projectNameRequired'));
+      toast.warning(t('editor.projectSettings.projectNameRequired'));
       return;
     }
 
     setIsSaving(true);
-    setError(null);
 
     try {
       const updatedProject = await projectsApi.update(projectId, {
@@ -86,9 +78,9 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
       setOriginalDescription(description.trim());
       setOriginalApiKey(apiKey.trim());
 
-      showSuccess(t('editor.projectSettings.saveSuccess'));
+      toast.success(t('editor.projectSettings.saveSuccess'));
     } catch (err: any) {
-      setError(err.message || t('editor.projectSettings.saveError'));
+      toast.error(err.message || t('editor.projectSettings.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -98,7 +90,6 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
     setName(originalName);
     setDescription(originalDescription);
     setApiKey(originalApiKey);
-    setError(null);
   };
 
   if (isLoading) {
@@ -116,18 +107,6 @@ export const ProjectSettingsEditor: React.FC<ProjectSettingsEditorProps> = ({ pr
         <h2 className="text-lg font-semibold text-text-primary">{t('editor.projectSettings.title')}</h2>
         <p className="text-xs text-text-tertiary mt-1">{t('editor.projectSettings.subtitle')}</p>
       </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
-          <p className="text-sm text-red-400">{error}</p>
-        </div>
-      )}
-      {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
-          <p className="text-sm text-green-400">{successMessage}</p>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">

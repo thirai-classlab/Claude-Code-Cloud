@@ -90,3 +90,5 @@ export type {
 
 export { modelsApi } from './models';
 export type { ModelInfo, ModelsResponse } from './models';
+
+export * from './publicAccess';

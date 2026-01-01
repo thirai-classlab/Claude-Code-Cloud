@@ -11,8 +11,9 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import agents, auth, commands, cron, files, health, mcp, models, project_config, projects, sessions, shares, skills, templates
+from app.api.routes import agents, auth, commands, cron, files, health, mcp, models, project_config, projects, public_access, public_api, sessions, shares, skills, templates
 from app.api.websocket.handlers import handle_chat_websocket
+from app.api.websocket.public_handlers import handle_public_chat_websocket
 from app.config import settings
 from app.core.cron_scheduler import get_cron_scheduler, shutdown_cron_scheduler
 from app.models.errors import AppException, ErrorResponse
@@ -118,6 +119,7 @@ app.include_router(sessions.router, prefix=settings.api_prefix)
 app.include_router(files.router, prefix=settings.api_prefix)
 app.include_router(mcp.router, prefix=settings.api_prefix)
 app.include_router(agents.router, prefix=settings.api_prefix)
+app.include_router(public_access.router, prefix=settings.api_prefix)  # Must be before commands router (path conflict)
 app.include_router(commands.router, prefix=settings.api_prefix)
 app.include_router(skills.router, prefix=settings.api_prefix)
 app.include_router(cron.router, prefix=settings.api_prefix)
@@ -126,6 +128,7 @@ app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(project_config.router, prefix=settings.api_prefix)
 app.include_router(templates.router, prefix=settings.api_prefix)
 app.include_router(models.router, prefix=settings.api_prefix)
+app.include_router(public_api.router, prefix=settings.api_prefix)
 
 
 # WebSocketエンドポイント
@@ -139,6 +142,21 @@ async def websocket_chat_endpoint(websocket: WebSocket, session_id: str) -> None
         session_id: セッションID
     """
     await handle_chat_websocket(websocket, session_id)
+
+
+@app.websocket(f"{settings.ws_prefix}/public/{{token}}/{{session_id}}")
+async def websocket_public_chat_endpoint(
+    websocket: WebSocket, token: str, session_id: str
+) -> None:
+    """
+    公開チャットWebSocketエンドポイント
+
+    Args:
+        websocket: WebSocketインスタンス
+        token: 公開アクセストークン
+        session_id: 公開セッションID
+    """
+    await handle_public_chat_websocket(websocket, token, session_id)
 
 
 # ルートエンドポイント

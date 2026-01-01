@@ -17,6 +17,7 @@ from app.core.session_manager import SessionManager
 from app.services.file_service import FileService
 from app.services.permission_service import PermissionService
 from app.services.project_config_service import ProjectConfigService
+from app.services.public_access_service import PublicAccessService
 from app.services.share_service import ShareService
 from app.services.usage_service import UsageService
 from app.utils.database import get_session_context
@@ -85,3 +86,13 @@ async def get_project_config_service(
     MCP Server, Agent, Skill, CommandのCRUD操作に使用します。
     """
     return ProjectConfigService(session)
+
+
+async def get_public_access_service(
+    session: AsyncSession = Depends(get_db_session),
+) -> PublicAccessService:
+    """PublicAccessService取得
+
+    外部公開機能に使用します。
+    """
+    return PublicAccessService(session)

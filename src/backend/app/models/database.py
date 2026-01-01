@@ -91,6 +91,8 @@ class ProjectModel(Base):
     agents = relationship("ProjectAgentModel", back_populates="project", cascade="all, delete-orphan")
     skills = relationship("ProjectSkillModel", back_populates="project", cascade="all, delete-orphan")
     commands = relationship("ProjectCommandModel", back_populates="project", cascade="all, delete-orphan")
+    # Public access
+    public_access = relationship("ProjectPublicAccessModel", back_populates="project", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_projects_user_status", "user_id", "status"),
@@ -292,6 +294,7 @@ class ProjectCommandModel(Base):
 
     # Relationships
     project = relationship("ProjectModel", back_populates="commands")
+    public_setting = relationship("CommandPublicSettingModel", back_populates="command", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("project_id", "name", name="uq_project_commands_project_name"),
@@ -347,4 +350,77 @@ class ProjectTemplateFileModel(Base):
     __table_args__ = (
         UniqueConstraint("template_id", "file_path", name="uq_template_files_template_path"),
         Index("ix_template_files_template", "template_id"),
+    )
+
+
+# ============================================
+# Project Public Access Models
+# ============================================
+
+
+class ProjectPublicAccessModel(Base):
+    """プロジェクト外部公開設定テーブル"""
+    __tablename__ = "project_public_access"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True)
+    access_token = Column(String(64), nullable=False, unique=True, index=True)  # 公開用トークン
+    enabled = Column(Boolean, default=False, nullable=False)  # 公開有効フラグ
+    password_hash = Column(String(255), nullable=True)  # パスワードハッシュ（NULL=不要）
+    allowed_ips = Column(JSON, nullable=True)  # 許可IPリスト（NULL=制限なし）
+    max_sessions_per_day = Column(Integer, nullable=True)  # 1日あたり最大セッション数
+    max_messages_per_session = Column(Integer, nullable=True)  # セッションあたり最大メッセージ数
+    expires_at = Column(DateTime, nullable=True)  # 公開期限（NULL=無期限）
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    project = relationship("ProjectModel", back_populates="public_access")
+    public_sessions = relationship("PublicSessionModel", back_populates="public_access", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_project_public_access_project", "project_id"),
+    )
+
+
+class CommandPublicSettingModel(Base):
+    """コマンド公開設定テーブル"""
+    __tablename__ = "command_public_settings"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    command_id = Column(String(36), ForeignKey("project_commands.id", ondelete="CASCADE"), nullable=False, unique=True)
+    is_public = Column(Boolean, default=False, nullable=False)  # 外部公開フラグ
+    priority = Column(Integer, default=0, nullable=False)  # 表示優先順位
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    command = relationship("ProjectCommandModel", back_populates="public_setting")
+
+    __table_args__ = (
+        Index("ix_command_public_settings_command", "command_id"),
+    )
+
+
+class PublicSessionModel(Base):
+    """外部公開セッションテーブル"""
+    __tablename__ = "public_sessions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    public_access_id = Column(String(36), ForeignKey("project_public_access.id", ondelete="CASCADE"), nullable=False)
+    command_id = Column(String(36), ForeignKey("project_commands.id", ondelete="SET NULL"), nullable=True)
+    ip_address = Column(String(45), nullable=False)  # IPv6対応
+    user_agent = Column(String(500), nullable=True)
+    message_count = Column(Integer, default=0, nullable=False)
+    sdk_session_id = Column(String(100), nullable=True, index=True)  # Claude SDK セッションID
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_activity_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    public_access = relationship("ProjectPublicAccessModel", back_populates="public_sessions")
+    command = relationship("ProjectCommandModel")
+
+    __table_args__ = (
+        Index("ix_public_sessions_public_access", "public_access_id"),
+        Index("ix_public_sessions_created", "created_at"),
     )

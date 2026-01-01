@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     api_prefix: str = Field(default="/api", description="API route prefix")
     ws_prefix: str = Field(default="/ws", description="WebSocket route prefix")
 
+    # Frontend URL (for public access links)
+    FRONTEND_URL: str = Field(default="http://localhost:3000", description="Frontend URL")
+
     # Claude Agent Configuration
     default_model: str = Field(default="claude-opus-4-5", description="Default Claude model")
     max_turns: int = Field(default=20, description="Maximum conversation turns")
@@ -119,3 +122,8 @@ class Settings(BaseSettings):
 
 # グローバル設定インスタンス
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    """設定インスタンスを取得"""
+    return settings

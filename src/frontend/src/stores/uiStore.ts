@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 type Theme = 'light' | 'dark' | 'claude' | 'linear';
-type EditorTab = 'vscode' | 'mcp' | 'agents' | 'commands' | 'skills' | 'cron' | 'settings' | 'pricing';
+type EditorTab = 'vscode' | 'mcp' | 'agents' | 'commands' | 'skills' | 'cron' | 'settings' | 'pricing' | 'public';
 type Language = 'ja' | 'en';
 
 interface UIState {

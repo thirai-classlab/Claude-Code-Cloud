@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { projectsApi } from '@/lib/api';
 import { UsageStats, CostLimitCheck, CostLimitUpdateRequest } from '@/types/project';
+import { toast } from '@/stores/toastStore';
 
 interface PricingEditorProps {
   projectId: string;
@@ -38,8 +39,6 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [limitCheck, setLimitCheck] = useState<CostLimitCheck | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // 利用制限の入力値（空文字は無制限を意味する）
   const [limitDaily, setLimitDaily] = useState<string>('');
@@ -48,7 +47,6 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const [usageStats, costCheck] = await Promise.all([
         projectsApi.getUsage(projectId),
@@ -63,7 +61,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       setLimitMonthly(costCheck.limit_monthly !== null ? costCheck.limit_monthly.toString() : '');
     } catch (err) {
       console.error('Failed to load usage data:', err);
-      setError(t('editor.pricing.loadError'));
+      toast.error(t('editor.pricing.loadError'));
     } finally {
       setIsLoading(false);
     }
@@ -75,8 +73,6 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
 
   const handleSaveLimits = async () => {
     setIsSaving(true);
-    setError(null);
-    setSuccessMessage(null);
 
     try {
       const request: CostLimitUpdateRequest = {
@@ -86,13 +82,13 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       };
 
       await projectsApi.updateCostLimits(projectId, request);
-      setSuccessMessage(t('editor.pricing.limitUpdated'));
+      toast.success(t('editor.pricing.limitUpdated'));
 
       // 再読み込み
       await loadData();
     } catch (err) {
       console.error('Failed to update cost limits:', err);
-      setError(t('editor.pricing.limitUpdateError'));
+      toast.error(t('editor.pricing.limitUpdateError'));
     } finally {
       setIsSaving(false);
     }
@@ -102,12 +98,10 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
     if (!confirm(t('editor.pricing.confirmClearAll'))) return;
 
     setIsSaving(true);
-    setError(null);
-    setSuccessMessage(null);
 
     try {
       await projectsApi.clearCostLimits(projectId);
-      setSuccessMessage(t('editor.pricing.limitCleared'));
+      toast.success(t('editor.pricing.limitCleared'));
       setLimitDaily('');
       setLimitWeekly('');
       setLimitMonthly('');
@@ -116,7 +110,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       await loadData();
     } catch (err) {
       console.error('Failed to clear cost limits:', err);
-      setError(t('editor.pricing.limitClearError'));
+      toast.error(t('editor.pricing.limitClearError'));
     } finally {
       setIsSaving(false);
     }
@@ -175,18 +169,6 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="max-w-3xl space-y-6">
-          {/* Error / Success Messages */}
-          {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-          {successMessage && (
-            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm">
-              {successMessage}
-            </div>
-          )}
-
           {/* Cost Limit Warning */}
           {limitCheck && !limitCheck.can_use && (
             <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">

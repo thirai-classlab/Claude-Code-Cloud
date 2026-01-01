@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/atoms';
 import { Modal } from '@/components/common/Modal';
 import { templatesApi } from '@/lib/api/templates';
+import { toast } from '@/stores/toastStore';
 import type { TemplateListItem, CreateTemplateRequest, UpdateTemplateRequest } from '@/types/template';
 
 interface TemplateSectionProps {
@@ -21,16 +22,14 @@ export const TemplateSection: React.FC<TemplateSectionProps> = ({ onSelectTempla
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TemplateListItem | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const loadTemplates = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const data = await templatesApi.list({ include_public: true });
       setTemplates(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load templates');
+      toast.error(err instanceof Error ? err.message : 'Failed to load templates');
     } finally {
       setIsLoading(false);
     }
@@ -67,9 +66,10 @@ export const TemplateSection: React.FC<TemplateSectionProps> = ({ onSelectTempla
     if (!confirm(`Delete template "${template.name}"?`)) return;
     try {
       await templatesApi.delete(template.id);
+      toast.success(`Template "${template.name}" deleted`);
       await loadTemplates();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete template');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete template');
     }
   };
 
@@ -119,22 +119,15 @@ export const TemplateSection: React.FC<TemplateSectionProps> = ({ onSelectTempla
             </div>
           )}
 
-          {/* Error */}
-          {error && (
-            <div className="p-4 bg-status-error/10 border border-status-error/30 rounded-lg">
-              <p className="text-sm text-status-error">{error}</p>
-            </div>
-          )}
-
           {/* Empty */}
-          {!isLoading && !error && templates.length === 0 && (
+          {!isLoading && templates.length === 0 && (
             <div className="text-center py-8 text-text-secondary">
               <p>No templates yet. Create one to get started!</p>
             </div>
           )}
 
           {/* Templates */}
-          {!isLoading && !error && templates.length > 0 && (
+          {!isLoading && templates.length > 0 && (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {templates.map((template) => (
                 <TemplateCard
