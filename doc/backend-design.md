@@ -1,7 +1,7 @@
 # Web版Claude Code バックエンド詳細設計書
 
 **作成日:** 2025-12-20
-**最終更新:** 2026-01-01
+**最終更新:** 2026-01-02
 **バージョン:** 1.5
 **ステータス:** ✅ 完了（100%）
 **対象:** FastAPI + Claude Agent SDK (Python) バックエンド実装
@@ -12,14 +12,52 @@
 
 ## 目次
 
-1. [ディレクトリ構造](#1-ディレクトリ構造)
-2. [主要クラス設計](#2-主要クラス設計)
-3. [API設計詳細](#3-api設計詳細)
-4. [エラーハンドリング](#4-エラーハンドリング)
-5. [セキュリティ](#5-セキュリティ)
-6. [パフォーマンス最適化](#6-パフォーマンス最適化)
-7. [テスト戦略](#7-テスト戦略)
-8. [デプロイメント](#8-デプロイメント)
+- [1. ディレクトリ構造](#1-ディレクトリ構造)
+  - [1.1 完全なディレクトリツリー](#11-完全なディレクトリツリー)
+  - [1.2 主要ファイルの役割](#12-主要ファイルの役割)
+- [2. 主要クラス設計](#2-主要クラス設計)
+  - [2.1 ClaudeClient](#21-claudeclient-coreclaudeclientpy)
+  - [2.2 ProjectManager](#22-projectmanager-coreprojectmanagerpy)
+  - [2.3 SessionManager](#23-sessionmanager-coresessionmanagerpy)
+  - [2.4 WebSocketHandler](#24-websockethandler-apiwebsockethandlerspy)
+- [3. API設計詳細](#3-api設計詳細)
+  - [3.1 REST API エンドポイント仕様](#31-rest-api-エンドポイント仕様)
+    - [3.1.0 プロジェクト管理](#310-プロジェクト管理)
+    - [3.1.1 セッション管理](#311-セッション管理)
+    - [3.1.2 ファイル操作](#312-ファイル操作)
+    - [3.1.3 システム](#313-システム)
+    - [3.1.4 code-server連携](#314-code-server連携)
+  - [3.2 WebSocket API 仕様](#32-websocket-api-仕様)
+- [4. エラーハンドリング](#4-エラーハンドリング)
+  - [4.1 エラー階層設計](#41-エラー階層設計)
+  - [4.2 グローバルエラーハンドラー](#42-グローバルエラーハンドラー)
+  - [4.3 エラーハンドラー登録](#43-エラーハンドラー登録)
+  - [4.4 WebSocketエラーハンドリング](#44-websocketエラーハンドリング)
+- [5. セキュリティ](#5-セキュリティ)
+  - [5.1 サンドボックス設定](#51-サンドボックス設定)
+  - [5.2 入力検証](#52-入力検証)
+  - [5.3 認証・認可](#53-認証認可-オプション実装)
+  - [5.4 レート制限](#54-レート制限)
+  - [5.5 CORS設定](#55-cors設定)
+- [6. パフォーマンス最適化](#6-パフォーマンス最適化)
+  - [6.1 データベース接続プール](#61-データベース接続プール)
+  - [6.2 キャッシング戦略](#62-キャッシング戦略)
+  - [6.3 非同期処理最適化](#63-非同期処理最適化)
+  - [6.4 バッチ処理](#64-バッチ処理)
+- [7. テスト戦略](#7-テスト戦略)
+  - [7.1 ユニットテスト](#71-ユニットテスト)
+  - [7.2 統合テスト](#72-統合テスト)
+  - [7.3 テストカバレッジ目標](#73-テストカバレッジ目標)
+- [8. デプロイメント](#8-デプロイメント)
+  - [8.1 Dockerfile](#81-dockerfile)
+  - [8.2 requirements.txt](#82-requirementstxt)
+  - [8.3 docker-compose.yml](#83-docker-composeyml)
+  - [8.4 環境変数設定](#84-環境変数設定)
+- [付録](#付録)
+  - [A. コード品質チェックリスト](#a-コード品質チェックリスト)
+  - [B. 主要依存関係バージョン](#b-主要依存関係バージョン)
+  - [C. 開発コマンド](#c-開発コマンド)
+- [変更履歴](#変更履歴)
 
 ---
 
@@ -266,15 +304,15 @@ ClaudeClientWrapper = ClaudeClient
 **責務:** プロジェクトのライフサイクル管理。1つのプロジェクトに複数のセッションを紐付け。
 
 ```python
-from typing import Optional, List, Dict
-from datetime import datetime
+from typing import Optional, List
+from datetime import datetime, timezone
 import uuid
-import json
-from redis.asyncio import Redis
-from app.models.projects import Project, ProjectStatus
-from app.utils.redis_client import get_redis
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.database import ProjectModel, SessionModel, ProjectStatus
+from app.services.base_service import BaseService
 
-class ProjectManager:
+class ProjectManager(BaseService):
     """
     プロジェクト管理クラス
 
@@ -282,7 +320,7 @@ class ProjectManager:
     - プロジェクト作成・取得・削除
     - プロジェクト配下のセッション管理
     - ワークスペースディレクトリ管理
-    - Redis永続化
+    - MySQL永続化
 
     データ構造:
     - 1 Project : N Sessions (1対多の関係)
@@ -292,19 +330,19 @@ class ProjectManager:
 
     def __init__(
         self,
-        redis: Redis,
+        session: AsyncSession,
         workspace_base: str,
         max_projects: int = 50,
         max_sessions_per_project: int = 20
     ):
         """
         Args:
-            redis: Redis クライアント
+            session: SQLAlchemy AsyncSession
             workspace_base: ワークスペース基底ディレクトリ
             max_projects: 最大プロジェクト数
             max_sessions_per_project: プロジェクトあたり最大セッション数
         """
-        self.redis = redis
+        super().__init__(session)
         self.workspace_base = workspace_base
         self.max_projects = max_projects
         self.max_sessions_per_project = max_sessions_per_project
@@ -314,7 +352,7 @@ class ProjectManager:
         name: str,
         user_id: Optional[str] = None,
         description: Optional[str] = None
-    ) -> Project:
+    ) -> ProjectModel:
         """
         新規プロジェクト作成
 
@@ -324,7 +362,7 @@ class ProjectManager:
             description: プロジェクト説明 (オプション)
 
         Returns:
-            Project: 作成されたプロジェクト
+            ProjectModel: 作成されたプロジェクト
 
         Raises:
             MaxProjectsExceededError: 最大プロジェクト数超過
@@ -337,65 +375,54 @@ class ProjectManager:
             )
 
         # プロジェクト生成
-        project = Project(
+        project = ProjectModel(
             id=str(uuid.uuid4()),
             name=name,
             user_id=user_id,
             description=description,
             status=ProjectStatus.ACTIVE,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            session_count=0
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         # ワークスペースディレクトリ作成
         workspace_path = self._get_workspace_path(project.id)
         await self._create_workspace(workspace_path)
 
-        # Redis に保存
-        await self._save_project(project)
+        # MySQL に保存
+        self.session.add(project)
+        await self.session.flush()
 
         return project
 
-    async def get_project(self, project_id: str) -> Optional[Project]:
+    async def get_project(self, project_id: str) -> Optional[ProjectModel]:
         """プロジェクト取得"""
-        project_key = f"project:{project_id}"
-        data = await self.redis.get(project_key)
-
-        if not data:
-            return None
-
-        project_dict = json.loads(data)
-        return Project.parse_obj(project_dict)
+        stmt = select(ProjectModel).where(ProjectModel.id == project_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def list_projects(
         self,
         user_id: Optional[str] = None,
         limit: int = 50,
         offset: int = 0
-    ) -> List[Project]:
+    ) -> List[ProjectModel]:
         """プロジェクト一覧取得"""
-        projects = []
-        pattern = "project:*"
+        stmt = select(ProjectModel)
+        if user_id:
+            stmt = stmt.where(ProjectModel.user_id == user_id)
+        stmt = stmt.order_by(ProjectModel.updated_at.desc())
+        stmt = stmt.offset(offset).limit(limit)
 
-        async for key in self.redis.scan_iter(match=pattern):
-            data = await self.redis.get(key)
-            if data:
-                project = Project.parse_obj(json.loads(data))
-                if user_id is None or project.user_id == user_id:
-                    projects.append(project)
-
-        # ソート (更新日時の降順)
-        projects.sort(key=lambda p: p.updated_at, reverse=True)
-
-        return projects[offset:offset + limit]
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
 
     async def update_project(
         self,
         project_id: str,
         name: Optional[str] = None,
         description: Optional[str] = None
-    ) -> Optional[Project]:
+    ) -> Optional[ProjectModel]:
         """プロジェクト更新"""
         project = await self.get_project(project_id)
         if not project:
@@ -405,59 +432,37 @@ class ProjectManager:
             project.name = name
         if description is not None:
             project.description = description
-        project.updated_at = datetime.utcnow()
+        project.updated_at = datetime.now(timezone.utc)
 
-        await self._save_project(project)
+        await self.session.flush()
         return project
 
     async def delete_project(self, project_id: str):
         """
         プロジェクト削除
 
-        注意: 配下のすべてのセッションも削除されます
+        注意: 配下のすべてのセッションも削除されます（CASCADE）
         """
-        # 配下のセッションを削除
-        session_keys = await self.redis.keys(f"session:*:project:{project_id}")
-        for key in session_keys:
-            await self.redis.delete(key)
-
-        # プロジェクト削除
-        await self.redis.delete(f"project:{project_id}")
-
-        # ワークスペース削除
-        # await self._cleanup_workspace(project_id)
+        project = await self.get_project(project_id)
+        if project:
+            await self.session.delete(project)
+            await self.session.flush()
 
     async def get_session_count(self, project_id: str) -> int:
         """プロジェクト配下のセッション数取得"""
-        pattern = f"session:*"
-        count = 0
-        async for key in self.redis.scan_iter(match=pattern):
-            data = await self.redis.get(key)
-            if data:
-                session_data = json.loads(data)
-                if session_data.get("project_id") == project_id:
-                    count += 1
-        return count
+        stmt = select(func.count(SessionModel.id)).where(
+            SessionModel.project_id == project_id
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
 
     async def _count_projects(self, user_id: Optional[str] = None) -> int:
         """プロジェクト数カウント"""
-        count = 0
-        pattern = "project:*"
-        async for key in self.redis.scan_iter(match=pattern):
-            if user_id:
-                data = await self.redis.get(key)
-                if data:
-                    project_dict = json.loads(data)
-                    if project_dict.get("user_id") == user_id:
-                        count += 1
-            else:
-                count += 1
-        return count
-
-    async def _save_project(self, project: Project):
-        """プロジェクトをRedisに保存"""
-        project_key = f"project:{project.id}"
-        await self.redis.set(project_key, project.json())
+        stmt = select(func.count(ProjectModel.id))
+        if user_id:
+            stmt = stmt.where(ProjectModel.user_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
 
     def _get_workspace_path(self, project_id: str) -> str:
         """ワークスペースパス取得"""
@@ -473,28 +478,28 @@ class ProjectManager:
 
 1. **1:N関係:** 1つのプロジェクトに複数のセッションを紐付け
 2. **ワークスペース共有:** 同一プロジェクト内のセッションは同じワークスペースを共有
-3. **カスケード削除:** プロジェクト削除時に配下のセッションも削除
+3. **カスケード削除:** プロジェクト削除時に配下のセッションも削除（MySQLのCASCADE設定）
 4. **セッション数制限:** プロジェクトごとの最大セッション数を制限
 
 ---
 
 ### 2.3 SessionManager (core/session_manager.py)
 
-**責務:** セッションのライフサイクル管理、Redis連携、クリーンアップ。セッションは必ずプロジェクトに紐付く。
+**責務:** セッションのライフサイクル管理、MySQL連携、クリーンアップ。セッションは必ずプロジェクトに紐付く。
 
 ```python
 from typing import Optional, Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import asyncio
-import json
-from redis.asyncio import Redis
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.claude_client import ClaudeClientWrapper
 from app.core.security.sandbox import SandboxConfig
 from app.core.project_manager import ProjectManager
-from app.models.sessions import Session, SessionStatus
-from app.utils.redis_client import get_redis
+from app.models.database import SessionModel, SessionStatus
+from app.services.base_service import BaseService
 
-class SessionManager:
+class SessionManager(BaseService):
     """
     セッション管理クラス
 
@@ -502,7 +507,7 @@ class SessionManager:
     - セッション作成・取得・削除 (プロジェクト配下)
     - アクティブセッションの追跡
     - セッションタイムアウト管理
-    - Redis永続化
+    - MySQL永続化
 
     データ構造:
     - Sessionは必ずproject_idを持つ
@@ -511,19 +516,19 @@ class SessionManager:
 
     def __init__(
         self,
-        redis: Redis,
+        session: AsyncSession,
         project_manager: ProjectManager,
         session_timeout: int = 3600,
         max_sessions_per_project: int = 20
     ):
         """
         Args:
-            redis: Redis クライアント
+            session: SQLAlchemy AsyncSession
             project_manager: プロジェクトマネージャー
             session_timeout: セッションタイムアウト(秒)
             max_sessions_per_project: プロジェクトあたり最大セッション数
         """
-        self.redis = redis
+        super().__init__(session)
         self.project_manager = project_manager
         self.session_timeout = session_timeout
         self.max_sessions_per_project = max_sessions_per_project
@@ -535,7 +540,7 @@ class SessionManager:
         project_id: str,
         title: Optional[str] = None,
         sandbox_config: Optional[SandboxConfig] = None
-    ) -> Session:
+    ) -> SessionModel:
         """
         新規セッション作成 (プロジェクト配下)
 
@@ -545,7 +550,7 @@ class SessionManager:
             sandbox_config: サンドボックス設定
 
         Returns:
-            Session: 作成されたセッション
+            SessionModel: 作成されたセッション
 
         Raises:
             ProjectNotFoundError: プロジェクト不存在
@@ -564,41 +569,38 @@ class SessionManager:
             )
 
         # セッション生成
-        session = Session(
+        session_model = SessionModel(
             project_id=project_id,
             title=title or f"Chat {session_count + 1}",
             status=SessionStatus.ACTIVE,
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(seconds=self.session_timeout)
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(seconds=self.session_timeout)
         )
 
         # ワークスペースパス (プロジェクトのワークスペースを使用)
         workspace_path = self.project_manager._get_workspace_path(project_id)
 
-        # Redis に保存
-        await self._save_session(session)
-
-        # プロジェクトのセッション数更新
-        project.session_count = session_count + 1
-        await self.project_manager._save_project(project)
+        # MySQL に保存
+        self.session.add(session_model)
+        await self.session.flush()
 
         # Claudeクライアント初期化
         client = ClaudeClientWrapper(
-            session_id=session.id,
+            session_id=session_model.id,
             workspace_path=workspace_path,
             sandbox_config=sandbox_config or SandboxConfig.default()
         )
         await client.__aenter__()
-        self._active_clients[session.id] = client
+        self._active_clients[session_model.id] = client
 
-        return session
+        return session_model
 
     async def list_sessions(
         self,
         project_id: str,
         limit: int = 50,
         offset: int = 0
-    ) -> List[Session]:
+    ) -> List[SessionModel]:
         """
         プロジェクト配下のセッション一覧取得
 
@@ -608,41 +610,27 @@ class SessionManager:
             offset: オフセット
 
         Returns:
-            List[Session]: セッション一覧
+            List[SessionModel]: セッション一覧
         """
-        sessions = []
-        pattern = "session:*"
+        stmt = select(SessionModel).where(
+            SessionModel.project_id == project_id,
+            SessionModel.expires_at > datetime.now(timezone.utc)
+        ).order_by(SessionModel.updated_at.desc())
+        stmt = stmt.offset(offset).limit(limit)
 
-        async for key in self.redis.scan_iter(match=pattern):
-            if not key.decode().endswith(":history"):
-                data = await self.redis.get(key)
-                if data:
-                    session_dict = json.loads(data)
-                    if session_dict.get("project_id") == project_id:
-                        session = Session.parse_obj(session_dict)
-                        # 期限切れでないもののみ
-                        if datetime.utcnow() <= session.expires_at:
-                            sessions.append(session)
-
-        # ソート (更新日時の降順)
-        sessions.sort(key=lambda s: s.updated_at or s.created_at, reverse=True)
-
-        return sessions[offset:offset + limit]
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
 
     async def _count_sessions_in_project(self, project_id: str) -> int:
         """プロジェクト内のアクティブセッション数カウント"""
-        count = 0
-        pattern = "session:*"
-        async for key in self.redis.scan_iter(match=pattern):
-            if not key.decode().endswith(":history"):
-                data = await self.redis.get(key)
-                if data:
-                    session_dict = json.loads(data)
-                    if session_dict.get("project_id") == project_id:
-                        count += 1
-        return count
+        stmt = select(func.count(SessionModel.id)).where(
+            SessionModel.project_id == project_id,
+            SessionModel.expires_at > datetime.now(timezone.utc)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
 
-    async def get_session(self, session_id: str) -> Optional[Session]:
+    async def get_session(self, session_id: str) -> Optional[SessionModel]:
         """
         セッション取得
 
@@ -650,23 +638,21 @@ class SessionManager:
             session_id: セッションID
 
         Returns:
-            Session or None
+            SessionModel or None
         """
-        session_key = f"session:{session_id}"
-        data = await self.redis.get(session_key)
+        stmt = select(SessionModel).where(SessionModel.id == session_id)
+        result = await self.session.execute(stmt)
+        session_model = result.scalar_one_or_none()
 
-        if not data:
+        if not session_model:
             return None
 
-        session_dict = json.loads(data)
-        session = Session.parse_obj(session_dict)
-
         # タイムアウトチェック
-        if datetime.utcnow() > session.expires_at:
+        if datetime.now(timezone.utc) > session_model.expires_at:
             await self.delete_session(session_id)
             return None
 
-        return session
+        return session_model
 
     async def get_client(self, session_id: str) -> Optional[ClaudeClientWrapper]:
         """
@@ -693,12 +679,13 @@ class SessionManager:
             await client.__aexit__(None, None, None)
             del self._active_clients[session_id]
 
-        # Redis から削除
-        await self.redis.delete(f"session:{session_id}")
-        await self.redis.delete(f"session:{session_id}:history")
-
-        # ワークスペース削除 (オプション)
-        # await self._cleanup_workspace(session_id)
+        # MySQL から削除
+        stmt = select(SessionModel).where(SessionModel.id == session_id)
+        result = await self.session.execute(stmt)
+        session_model = result.scalar_one_or_none()
+        if session_model:
+            await self.session.delete(session_model)
+            await self.session.flush()
 
     async def update_activity(self, session_id: str):
         """
@@ -707,11 +694,11 @@ class SessionManager:
         Args:
             session_id: セッションID
         """
-        session = await self.get_session(session_id)
-        if session:
-            session.last_activity = datetime.utcnow()
-            session.expires_at = datetime.utcnow() + timedelta(seconds=self.session_timeout)
-            await self._save_session(session)
+        session_model = await self.get_session(session_id)
+        if session_model:
+            session_model.last_activity = datetime.now(timezone.utc)
+            session_model.expires_at = datetime.now(timezone.utc) + timedelta(seconds=self.session_timeout)
+            await self.session.flush()
 
     async def start_cleanup_task(self):
         """定期クリーンアップタスク開始"""
@@ -741,45 +728,26 @@ class SessionManager:
 
     async def _cleanup_expired_sessions(self):
         """期限切れセッション削除"""
-        pattern = "session:*"
-        async for key in self.redis.scan_iter(match=pattern):
-            if not key.decode().endswith(":history"):
-                session_id = key.decode().split(":")[1]
-                session = await self.get_session(session_id)
-                if session and datetime.utcnow() > session.expires_at:
-                    await self.delete_session(session_id)
+        stmt = select(SessionModel).where(
+            SessionModel.expires_at < datetime.now(timezone.utc)
+        )
+        result = await self.session.execute(stmt)
+        expired_sessions = result.scalars().all()
+        for session_model in expired_sessions:
+            await self.delete_session(session_model.id)
 
     async def _count_active_sessions(self) -> int:
         """アクティブセッション数カウント"""
-        count = 0
-        pattern = "session:*"
-        async for key in self.redis.scan_iter(match=pattern):
-            if not key.decode().endswith(":history"):
-                count += 1
-        return count
-
-    async def _save_session(self, session: Session):
-        """セッションをRedisに保存"""
-        session_key = f"session:{session.id}"
-        await self.redis.setex(
-            session_key,
-            self.session_timeout,
-            session.json()
+        stmt = select(func.count(SessionModel.id)).where(
+            SessionModel.expires_at > datetime.now(timezone.utc)
         )
-
-    def _get_workspace_path(self, session_id: str) -> str:
-        """ワークスペースパス取得"""
-        return f"{self.workspace_base}/{session_id}"
-
-    async def _create_workspace(self, path: str):
-        """ワークスペースディレクトリ作成"""
-        import os
-        os.makedirs(path, exist_ok=True)
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
 ```
 
 #### 設計上の重要ポイント
 
-1. **Redis永続化:** セッション情報の永続化とタイムアウト管理
+1. **MySQL永続化:** セッション情報の永続化とタイムアウト管理
 2. **アクティブクライアント管理:** メモリ内での高速アクセス
 3. **自動クリーンアップ:** バックグラウンドタスクでの期限切れセッション削除
 4. **リソース制限:** 最大セッション数の制御
@@ -1633,7 +1601,7 @@ async def list_files(
   "status": "healthy",
   "timestamp": "2025-12-20T10:00:00Z",
   "services": {
-    "redis": "connected",
+    "database": "connected",
     "claude_sdk": "available"
   },
   "active_sessions": 5,
@@ -1643,18 +1611,24 @@ async def list_files(
 
 **Implementation:**
 ```python
-from app.utils.redis_client import get_redis
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from app.api.dependencies import get_db
 
 @router.get("/api/health")
-async def health_check(redis: Redis = Depends(get_redis)):
+async def health_check(db: AsyncSession = Depends(get_db)):
     """ヘルスチェック"""
-    redis_status = "connected" if await redis.ping() else "disconnected"
+    try:
+        await db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception:
+        db_status = "disconnected"
 
     return {
-        "status": "healthy" if redis_status == "connected" else "degraded",
+        "status": "healthy" if db_status == "connected" else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
         "services": {
-            "redis": redis_status,
+            "database": db_status,
             "claude_sdk": "available"
         }
     }
@@ -2118,10 +2092,10 @@ class ClaudeSDKError(ServerError):
     def __init__(self, message: str, details: Optional[dict] = None):
         super().__init__(message, code="CLAUDE_SDK_ERROR", details=details)
 
-class RedisConnectionError(ServerError):
-    """Redis 接続エラー"""
+class DatabaseConnectionError(ServerError):
+    """データベース接続エラー"""
     def __init__(self, message: str):
-        super().__init__(message, code="REDIS_ERROR")
+        super().__init__(message, code="DATABASE_ERROR")
 
 class ToolExecutionError(ServerError):
     """ツール実行エラー"""
@@ -2518,35 +2492,46 @@ app.add_middleware(
 
 ## 6. パフォーマンス最適化
 
-### 6.1 Redis接続プール
+### 6.1 データベース接続プール
 
 ```python
-# utils/redis_client.py
-from redis.asyncio import Redis, ConnectionPool
+# core/database.py
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from typing import Optional
 
-_redis_pool: Optional[ConnectionPool] = None
+_engine = None
+_session_factory = None
 
-async def init_redis_pool(redis_url: str, max_connections: int = 50):
-    """Redis接続プール初期化"""
-    global _redis_pool
-    _redis_pool = ConnectionPool.from_url(
-        redis_url,
-        max_connections=max_connections,
-        decode_responses=True
+async def init_database(database_url: str, pool_size: int = 20, max_overflow: int = 10):
+    """データベース接続プール初期化"""
+    global _engine, _session_factory
+
+    _engine = create_async_engine(
+        database_url,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        pool_pre_ping=True,
+        echo=False
     )
 
-async def get_redis() -> Redis:
-    """Redis クライアント取得"""
-    if not _redis_pool:
-        raise RuntimeError("Redis pool not initialized")
-    return Redis(connection_pool=_redis_pool)
+    _session_factory = async_sessionmaker(
+        bind=_engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )
 
-async def close_redis_pool():
-    """Redis接続プール クローズ"""
-    global _redis_pool
-    if _redis_pool:
-        await _redis_pool.disconnect()
+async def get_db() -> AsyncSession:
+    """データベースセッション取得"""
+    if not _session_factory:
+        raise RuntimeError("Database not initialized")
+    async with _session_factory() as session:
+        yield session
+
+async def close_database():
+    """データベース接続クローズ"""
+    global _engine
+    if _engine:
+        await _engine.dispose()
 ```
 
 ### 6.2 キャッシング戦略
@@ -2554,20 +2539,23 @@ async def close_redis_pool():
 ```python
 # services/chat_service.py
 from functools import lru_cache
-from app.utils.redis_client import get_redis
+from cachetools import TTLCache
+from typing import Optional
 
 class ChatService:
     """チャットサービス"""
 
-    async def get_cached_response(self, message_hash: str) -> Optional[str]:
-        """キャッシュされたレスポンス取得"""
-        redis = await get_redis()
-        return await redis.get(f"response:{message_hash}")
+    def __init__(self):
+        # メモリ内キャッシュ (TTL: 1時間, 最大1000エントリ)
+        self._cache = TTLCache(maxsize=1000, ttl=3600)
 
-    async def cache_response(self, message_hash: str, response: str, ttl: int = 3600):
+    def get_cached_response(self, message_hash: str) -> Optional[str]:
+        """キャッシュされたレスポンス取得"""
+        return self._cache.get(f"response:{message_hash}")
+
+    def cache_response(self, message_hash: str, response: str):
         """レスポンスをキャッシュ"""
-        redis = await get_redis()
-        await redis.setex(f"response:{message_hash}", ttl, response)
+        self._cache[f"response:{message_hash}"] = response
 ```
 
 ### 6.3 非同期処理最適化
@@ -2745,8 +2733,13 @@ python-multipart==0.0.9
 # Claude Agent SDK
 claude-agent-sdk==1.0.0
 
-# Redis
-redis[hiredis]==5.0.1
+# Database (MySQL)
+sqlalchemy[asyncio]==2.0.23
+aiomysql==0.2.0
+alembic==1.13.1
+
+# キャッシング
+cachetools==5.3.2
 
 # データ検証
 pydantic==2.5.0
@@ -2776,45 +2769,56 @@ httpx==0.25.2
 ### 8.3 docker-compose.yml
 
 ```yaml
-version: '3.8'
+version: '3.9'
 
 services:
   backend:
     build:
-      context: ./backend
+      context: ./src/backend
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - REDIS_URL=redis://redis:6379
+      # MySQL
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=claude
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-claude_password}
+      - MYSQL_DATABASE=claude_code
+      # Application
       - WORKSPACE_PATH=/app/workspace
       - MAX_SESSIONS=100
       - SESSION_TIMEOUT=3600
       - ALLOWED_ORIGINS=http://localhost:3000
       - LOG_LEVEL=INFO
+      - SECRET_KEY=${SECRET_KEY}
     depends_on:
-      redis:
+      mysql:
         condition: service_healthy
     volumes:
       - workspace-data:/app/workspace
-      - ./backend/app:/app/app:ro
+      - ./src/backend/app:/app/app:ro
     networks:
       - claude-network
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
+  mysql:
+    image: mysql:8.0
     ports:
-      - "6379:6379"
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_password}
+      - MYSQL_DATABASE=claude_code
+      - MYSQL_USER=claude
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-claude_password}
     volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+      - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
       retries: 5
+      start_period: 30s
     networks:
       - claude-network
     restart: unless-stopped
@@ -2822,7 +2826,7 @@ services:
 volumes:
   workspace-data:
     driver: local
-  redis-data:
+  mysql-data:
     driver: local
 
 networks:
@@ -2834,11 +2838,14 @@ networks:
 
 ```bash
 # .env.example
-# Anthropic API
-ANTHROPIC_API_KEY=sk-ant-xxx
 
-# Redis
-REDIS_URL=redis://redis:6379
+# MySQL Database
+MYSQL_HOST=mysql
+MYSQL_PORT=3306
+MYSQL_USER=claude
+MYSQL_PASSWORD=claude_password
+MYSQL_DATABASE=claude_code
+MYSQL_ROOT_PASSWORD=root_password
 
 # Application
 WORKSPACE_PATH=/app/workspace
@@ -2856,11 +2863,15 @@ CODE_SERVER_PASSWORD=your-password-here
 SECRET_KEY=your-secret-key-here
 ALLOWED_ORIGINS=http://localhost:3000
 
+# Claude Model (API keys are managed per-project in DB)
+CLAUDE_MODEL=claude-sonnet-4-20250514
+MAX_TOKENS=16000
+
 # Logging
 LOG_LEVEL=INFO
 
 # Rate Limiting
-RATE_LIMIT_PER_MINUTE=10
+RATE_LIMIT_PER_MINUTE=30
 
 # Features
 ENABLE_AUTH=false
@@ -2898,7 +2909,8 @@ flowchart TD
     end
 
     subgraph データ["データ・ストレージ"]
-        REDIS["Redis<br/>7.x"] --> REDIS_D["セッション・キャッシュ"]
+        MYSQL["MySQL<br/>8.0"] --> MYSQL_D["データベース"]
+        SQLALCHEMY["SQLAlchemy<br/>2.0+"] --> SQLALCHEMY_D["ORM"]
         PYDANTIC["Pydantic<br/>2.x"] --> PYDANTIC_D["データ検証"]
     end
 ```
@@ -2942,6 +2954,8 @@ docker-compose logs -f backend
 | v1.1 | 2025-12-21 | ドキュメント完成度100%達成 |
 | v1.2 | 2025-12-29 | ディレクトリ構造更新、テンプレート/共有機能追加 |
 | v1.3 | 2025-12-29 | テーブル形式に統一（主要ファイル、変更履歴） |
+| v1.4 | 2026-01-01 | SDKセッション再開機能追加 |
+| v1.5 | 2026-01-02 | 目次追加、Redis→MySQL移行に伴うドキュメント更新 |
 
 ---
 
@@ -2949,8 +2963,8 @@ docker-compose logs -f backend
 
 | 項目 | 値 |
 |------|-----|
-| 設計書バージョン | 1.3 |
-| 最終更新 | 2025-12-29 |
+| 設計書バージョン | 1.5 |
+| 最終更新 | 2026-01-02 |
 | 作成者 | Claude Code |
-| レビューステータス | ✅ 完了 |
+| レビューステータス | 確認中 |
 | 完成度 | 100% |

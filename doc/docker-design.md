@@ -1,23 +1,74 @@
 # Web版Claude Code - Docker/インフラ設計書
 
 **作成日:** 2025-12-20
-**最終更新:** 2025-12-21
-**バージョン:** 1.1
-**ステータス:** ✅ 完了（100%）
+**最終更新:** 2026-01-02
+**バージョン:** 1.3
+**ステータス:** 完了（100%）
 
 ---
 
 ## 目次
+
 1. [概要](#1-概要)
+   - [1.1 インフラ構成図](#11-インフラ構成図)
+   - [1.2 設計原則](#12-設計原則)
 2. [Docker Compose構成](#2-docker-compose構成)
+   - [2.1 完全版 docker-compose.yml](#21-完全版-docker-composeyml)
+   - [2.2 開発用 docker-compose.dev.yml](#22-開発用-docker-composedevyml)
 3. [Dockerfile設計](#3-dockerfile設計)
+   - [3.1 Backend Dockerfile](#31-backend-dockerfile)
+   - [3.2 Backend requirements.txt](#32-backend-requirementstxt-alternative-to-poetry)
+   - [3.3 Frontend Dockerfile](#33-frontend-dockerfile)
+   - [3.4 .dockerignore (Backend)](#34-dockerignore-backend)
+   - [3.5 .dockerignore (Frontend)](#35-dockerignore-frontend)
 4. [環境変数設計](#4-環境変数設計)
+   - [4.1 .env.example (Root)](#41-envexample-root)
+   - [4.2 .env.development](#42-envdevelopment)
+   - [4.3 .env.production](#43-envproduction)
+   - [4.4 環境変数バリデーション](#44-環境変数バリデーション)
 5. [ボリューム設計](#5-ボリューム設計)
+   - [5.1 ボリューム構成](#51-ボリューム構成)
+   - [5.2 Workspace ディレクトリ構造](#52-workspace-ディレクトリ構造)
+   - [5.3 ボリュームバックアップ戦略](#53-ボリュームバックアップ戦略)
 6. [ネットワーク設計](#6-ネットワーク設計)
+   - [6.1 ネットワーク構成](#61-ネットワーク構成)
+   - [6.2 サービス間通信](#62-サービス間通信)
+   - [6.3 ネットワークセキュリティ](#63-ネットワークセキュリティ)
 7. [セキュリティ考慮事項](#7-セキュリティ考慮事項)
+   - [7.1 セキュリティチェックリスト](#71-セキュリティチェックリスト)
+   - [7.2 非rootユーザー実行](#72-非rootユーザー実行)
+   - [7.3 シークレット管理 (Docker Secrets)](#73-シークレット管理-docker-secrets)
+   - [7.4 セキュリティスキャン](#74-セキュリティスキャン)
 8. [運用設計](#8-運用設計)
+   - [8.1 ヘルスチェック](#81-ヘルスチェック)
+   - [8.2 ログ設計](#82-ログ設計)
+   - [8.3 メトリクス収集](#83-メトリクス収集)
+   - [8.4 コンテナリビルドルール](#84-コンテナリビルドルール必須)
+   - [8.5 起動・停止スクリプト](#85-起動停止スクリプト)
 9. [スケーリング戦略](#9-スケーリング戦略)
+   - [9.1 水平スケーリング](#91-水平スケーリング)
+   - [9.2 リソース最適化](#92-リソース最適化)
+   - [9.3 Kubernetes移行パス](#93-kubernetes移行パス)
 10. [トラブルシューティング](#10-トラブルシューティング)
+    - [10.1 よくある問題と解決策](#101-よくある問題と解決策)
+    - [10.2 デバッグコマンド](#102-デバッグコマンド)
+    - [10.3 パフォーマンス診断](#103-パフォーマンス診断)
+    - [10.4 クリーンアップ](#104-クリーンアップ)
+11. [Docker-in-Docker (DinD) 設計](#11-docker-in-docker-dind-設計)
+    - [11.1 DinD概要](#111-dind概要)
+    - [11.2 DinDアーキテクチャ](#112-dindアーキテクチャ)
+    - [11.3 DinDの利点](#113-dindの利点)
+    - [11.4 docker-compose.dind.yml](#114-docker-composedindyml)
+    - [11.5 DinD Executor](#115-dind-executor)
+    - [11.6 セキュリティ考慮事項](#116-セキュリティ考慮事項)
+    - [11.7 DinD関連コマンド](#117-dind関連コマンド)
+    - [11.8 関連ドキュメント](#118-関連ドキュメント)
+- [付録](#付録)
+  - [A. MySQL設定](#a-mysql設定)
+  - [B. Makefile](#b-makefile)
+  - [C. CI/CD パイプライン例](#c-cicd-パイプライン例-github-actions)
+- [まとめ](#まとめ)
+- [変更履歴](#変更履歴)
 
 ---
 
@@ -33,12 +84,12 @@ flowchart TB
                 FE["frontend<br/>(Next.js)<br/>Port: 3000<br/>User: node"]
                 BE["backend<br/>(FastAPI)<br/>Port: 8000<br/>User: appuser"]
                 CS["code-server<br/>(VSCode)<br/>Port: 8080<br/>User: coder"]
-                RD["redis<br/>(7-alpine)<br/>Port: 6379<br/>User: redis"]
+                DB["mysql<br/>(8.0)<br/>Port: 3306<br/>User: mysql"]
             end
 
             subgraph Volumes["ボリューム"]
                 WV["workspace-data<br/>/app/workspace<br/>(backend & code-server共有)"]
-                RV["redis-data<br/>/data"]
+                MV["mysql-data<br/>/var/lib/mysql"]
             end
         end
 
@@ -46,18 +97,18 @@ flowchart TB
             HP1["3000:3000 (Frontend)"]
             HP2["8000:8000 (Backend API)"]
             HP3["8080:8080 (code-server)"]
-            HP4["6379:6379 (Redis - debug用)"]
+            HP4["3306:3306 (MySQL - debug用)"]
         end
     end
 
     BE --> WV
     CS --> WV
-    RD --> RV
+    DB --> MV
 
     HP1 -.-> FE
     HP2 -.-> BE
     HP3 -.-> CS
-    HP4 -.-> RD
+    HP4 -.-> DB
 ```
 
 ```mermaid
@@ -66,7 +117,7 @@ classDiagram
         frontend: Next.js 20.11-alpine, Port 3000, User node
         backend: FastAPI Python 3.11-slim, Port 8000, User appuser
         code-server: VSCode Web 4.96.2, Port 8080, User coder
-        redis: Redis 7.2-alpine, Port 6379, User redis
+        mysql: MySQL 8.0, Port 3306, User mysql
     }
 ```
 
@@ -145,14 +196,16 @@ services:
       - DEBUG=${DEBUG:-false}
       - LOG_LEVEL=${LOG_LEVEL:-info}
 
-      # Claude API
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
-      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-4.5}
-      - MAX_TOKENS=${MAX_TOKENS:-4096}
+      # Claude API (API keys are managed per-project in DB)
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-20250514}
+      - MAX_TOKENS=${MAX_TOKENS:-16000}
 
-      # Redis
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - REDIS_MAX_CONNECTIONS=${REDIS_MAX_CONNECTIONS:-50}
+      # MySQL
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=claude
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-claude_password}
+      - MYSQL_DATABASE=claude_code
 
       # Session
       - SESSION_TIMEOUT=${SESSION_TIMEOUT:-3600}
@@ -170,9 +223,9 @@ services:
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-30}
     volumes:
       - workspace-data:/app/workspace:rw
-      - ./backend/app:/app/app:ro  # Development only
+      - ./src/backend/app:/app/app:ro  # Development only
     depends_on:
-      redis:
+      mysql:
         condition: service_healthy
     networks:
       - claude-network
@@ -196,35 +249,31 @@ services:
           cpus: '1'
           memory: 2G
 
-  # Redis Service (Cache & Session Store)
-  redis:
-    container_name: claude-redis
-    image: redis:7.2-alpine
+  # MySQL Service (Database)
+  mysql:
+    container_name: claude-mysql
+    image: mysql:8.0
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_password}
+      - MYSQL_DATABASE=claude_code
+      - MYSQL_USER=claude
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-claude_password}
     volumes:
-      - redis-data:/data:rw
-      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    command: >
-      redis-server
-      /usr/local/etc/redis/redis.conf
-      --requirepass ${REDIS_PASSWORD:-}
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --appendonly yes
-      --appendfsync everysec
+      - mysql-data:/var/lib/mysql:rw
     networks:
       - claude-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     labels:
-      - "com.example.description=Redis Cache & Session Store"
-      - "com.example.service=redis"
+      - "com.example.description=MySQL Database"
+      - "com.example.service=mysql"
     deploy:
       resources:
         limits:
@@ -282,17 +331,13 @@ volumes:
       o: bind
       device: ${WORKSPACE_HOST_PATH:-./workspace}
 
-  redis-data:
+  mysql-data:
     driver: local
-    name: claude-redis-data
+    name: claude-mysql-data
 
   code-server-data:
     driver: local
     name: claude-code-server-data
-
-  code-server-config:
-    driver: local
-    name: claude-code-server-config
 
 # Networks
 networks:
@@ -316,7 +361,7 @@ services:
     build:
       target: development
     volumes:
-      - ./frontend:/app:cached
+      - ./src/frontend:/app:cached
       - /app/node_modules
       - /app/.next
     environment:
@@ -327,7 +372,7 @@ services:
     build:
       target: development
     volumes:
-      - ./backend:/app:cached
+      - ./src/backend:/app:cached
       - /app/.venv
     environment:
       - ENVIRONMENT=development
@@ -336,9 +381,9 @@ services:
       - RELOAD=true
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-  redis:
+  mysql:
     ports:
-      - "6379:6379"
+      - "3306:3306"
 ```
 
 ---
@@ -483,9 +528,10 @@ python-multipart==0.0.9
 anthropic==0.39.0
 # Note: Claude Code CLI is installed separately if needed
 
-# Database & Cache
-redis==5.0.8
-redis-om==0.3.1
+# Database
+SQLAlchemy==2.0.23
+aiomysql==0.2.0
+mysqlclient==2.2.0
 
 # Data Validation
 pydantic==2.9.2
@@ -741,7 +787,7 @@ COMPOSE_PROJECT_NAME=claude-code
 # ----------------
 FRONTEND_PORT=3000
 BACKEND_PORT=8000
-REDIS_PORT=6379
+MYSQL_PORT=3306
 CODE_SERVER_PORT=8080
 
 # ----------------
@@ -761,16 +807,19 @@ LOG_LEVEL=info  # debug | info | warning | error
 # ----------------
 # Claude API Configuration
 # ----------------
-ANTHROPIC_API_KEY=sk-ant-api03-xxxxxxxxxxxx
-CLAUDE_MODEL=claude-opus-4.5
-MAX_TOKENS=4096
+# Note: API keys are managed per-project in the database
+CLAUDE_MODEL=claude-sonnet-4-20250514
+MAX_TOKENS=16000
 
 # ----------------
-# Redis Configuration
+# MySQL Configuration
 # ----------------
-REDIS_URL=redis://redis:6379/0
-REDIS_PASSWORD=  # Leave empty for no password
-REDIS_MAX_CONNECTIONS=50
+MYSQL_HOST=mysql
+MYSQL_PORT=3306
+MYSQL_USER=claude
+MYSQL_PASSWORD=claude_password
+MYSQL_DATABASE=claude_code
+MYSQL_ROOT_PASSWORD=root_password
 
 # ----------------
 # Session Management
@@ -859,7 +908,7 @@ Backend側で環境変数を検証するPydantic設定:
 ```python
 # backend/app/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -874,14 +923,16 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: Literal["debug", "info", "warning", "error"] = "info"
 
-    # Claude API
-    anthropic_api_key: str
-    claude_model: str = "claude-opus-4.5"
-    max_tokens: int = 4096
+    # Claude API (API keys are managed per-project in database)
+    claude_model: str = "claude-sonnet-4-20250514"
+    max_tokens: int = 16000
 
-    # Redis
-    redis_url: str = "redis://redis:6379/0"
-    redis_max_connections: int = 50
+    # MySQL
+    mysql_host: str = "mysql"
+    mysql_port: int = 3306
+    mysql_user: str = "claude"
+    mysql_password: str = "claude_password"
+    mysql_database: str = "claude_code"
 
     # Session
     session_timeout: int = 3600
@@ -898,15 +949,16 @@ class Settings(BaseSettings):
     # Rate Limiting
     rate_limit_per_minute: int = 30
 
+    @property
+    def database_url(self) -> str:
+        return f"mysql+aiomysql://{self.mysql_user}:{self.mysql_password}@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         # Validation
         if len(self.secret_key) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters")
-
-        if not self.anthropic_api_key.startswith("sk-ant-"):
-            raise ValueError("Invalid ANTHROPIC_API_KEY format")
 
 settings = Settings()
 ```
@@ -925,10 +977,10 @@ flowchart TD
         V1_M --> V1_U[用途: ユーザーのプロジェクトファイル backend + code-server共有]
         V1_U --> V1_P[パーミッション: rw 1000:1000]
 
-        V2[redis-data] --> V2_T[タイプ: Named]
-        V2_T --> V2_M[マウント先: /data]
-        V2_M --> V2_U[用途: Redis永続化データ]
-        V2_U --> V2_P[パーミッション: rw redis:redis]
+        V2[mysql-data] --> V2_T[タイプ: Named]
+        V2_T --> V2_M[マウント先: /var/lib/mysql]
+        V2_M --> V2_U[用途: MySQL永続化データ]
+        V2_U --> V2_P[パーミッション: rw mysql:mysql]
 
         V3[backend-app] --> V3_T[タイプ: Bind dev]
         V3_T --> V3_M[マウント先: /app/app]
@@ -944,11 +996,6 @@ flowchart TD
         V5_T --> V5_M[マウント先: /home/coder/.local/share/code-server]
         V5_M --> V5_U[用途: VSCode拡張機能、設定データ]
         V5_U --> V5_P[パーミッション: rw coder:coder]
-
-        V6[code-server-config] --> V6_T[タイプ: Named]
-        V6_T --> V6_M[マウント先: /home/coder/.config/code-server]
-        V6_M --> V6_U[用途: code-server設定ファイル]
-        V6_U --> V6_P[パーミッション: rw coder:coder]
     end
 ```
 
@@ -986,12 +1033,9 @@ docker run --rm \
   -v "$BACKUP_DIR":/backup \
   alpine tar czf /backup/workspace-$(date +%H%M%S).tar.gz -C /data .
 
-# Backup Redis
-docker exec claude-redis redis-cli BGSAVE
-docker run --rm \
-  -v claude-redis-data:/data \
-  -v "$BACKUP_DIR":/backup \
-  alpine tar czf /backup/redis-$(date +%H%M%S).tar.gz -C /data .
+# Backup MySQL
+docker exec claude-mysql mysqldump -u root -p"${MYSQL_ROOT_PASSWORD:-root_password}" \
+  --all-databases > "$BACKUP_DIR/mysql-$(date +%H%M%S).sql"
 
 echo "Backup completed: $BACKUP_DIR"
 ```
@@ -1025,7 +1069,7 @@ flowchart LR
     subgraph サービス間通信
         F[frontend] -->|HTTP/WS:8000| B[backend]
         F -->|iframe:8080| CS[code-server]
-        B -->|Redis Protocol:6379| R[redis]
+        B -->|MySQL Protocol:3306| DB[mysql]
         H[host] -->|HTTP:3000| F
         H -->|HTTP:8000 開発時| B
         H -->|HTTP:8080| CS
@@ -1033,7 +1077,7 @@ flowchart LR
 
     subgraph 用途
         F -.-> F_D[API/WebSocket通信]
-        B -.-> B_D[キャッシュ/セッション]
+        B -.-> B_D[データベース/セッション]
         CS -.-> CS_D[VSCode Web エディタ]
         H -.-> H_D1[ユーザーアクセス]
         H -.-> H_D2[直接APIアクセス]
@@ -1066,13 +1110,13 @@ services:
       - "8080"  # フロントエンドからのiframe埋め込み用
     # 本番環境ではリバースプロキシ経由でのアクセスを推奨
 
-  redis:
+  mysql:
     networks:
       claude-network:
         ipv4_address: 172.28.0.30
     expose:
-      - "6379"  # 内部のみ公開
-    # ports:  # Redisは外部公開しない
+      - "3306"  # 内部のみ公開
+    # ports:  # MySQLは外部公開しない
 ```
 
 ---
@@ -1085,27 +1129,27 @@ services:
 flowchart TD
     subgraph セキュリティチェックリスト
         C1[コンテナセキュリティ]
-        C1 --> C1_1[✅ 非rootユーザー実行 - 全サービス]
-        C1 --> C1_2[✅ 最小限のベースイメージ alpine - Redis, Node]
-        C1 --> C1_3[🔄 読み取り専用ファイルシステム - 検討中]
-        C1 --> C1_4[🔄 Capability削減 - 検討中]
+        C1 --> C1_1[完了: 非rootユーザー実行 - 全サービス]
+        C1 --> C1_2[完了: 最小限のベースイメージ alpine - Node]
+        C1 --> C1_3[検討中: 読み取り専用ファイルシステム]
+        C1 --> C1_4[検討中: Capability削減]
 
         C2[シークレット管理]
-        C2 --> C2_1[✅ .envファイル除外 .gitignore - 実装済み]
-        C2 --> C2_2[🔄 Docker secrets使用 - 本番環境で検討]
-        C2 --> C2_3[✅ 環境変数検証 - Pydantic]
+        C2 --> C2_1[完了: .envファイル除外 .gitignore]
+        C2 --> C2_2[検討中: Docker secrets使用 - 本番環境]
+        C2 --> C2_3[完了: 環境変数検証 - Pydantic]
 
         C3[ネットワーク]
-        C3 --> C3_1[✅ 内部通信のみ許可 - 実装済み]
-        C3 --> C3_2[🔄 TLS/SSL対応 - リバースプロキシで実装]
+        C3 --> C3_1[完了: 内部通信のみ許可]
+        C3 --> C3_2[検討中: TLS/SSL対応 - リバースプロキシ]
 
         C4[イメージ]
-        C4 --> C4_1[🔄 脆弱性スキャン Trivy - CI/CDで実装]
-        C4 --> C4_2[🔄 定期的な更新 - 運用プロセス]
+        C4 --> C4_1[検討中: 脆弱性スキャン Trivy - CI/CD]
+        C4 --> C4_2[検討中: 定期的な更新 - 運用プロセス]
 
         C5[アクセス制御]
-        C5 --> C5_1[✅ CORS設定 - FastAPI]
-        C5 --> C5_2[✅ レート制限 - middleware]
+        C5 --> C5_1[完了: CORS設定 - FastAPI]
+        C5 --> C5_2[完了: レート制限 - middleware]
     end
 ```
 
@@ -1124,8 +1168,8 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001
 USER nextjs
 
-# Redis
-# 公式イメージがデフォルトでredisユーザー使用
+# MySQL
+# 公式イメージがデフォルトでmysqlユーザー使用
 ```
 
 ### 7.3 シークレット管理 (Docker Secrets)
@@ -1139,20 +1183,26 @@ version: '3.9'
 services:
   backend:
     secrets:
-      - anthropic_api_key
       - secret_key
-      - redis_password
+      - mysql_password
     environment:
-      - ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic_api_key
       - SECRET_KEY_FILE=/run/secrets/secret_key
-      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - MYSQL_PASSWORD_FILE=/run/secrets/mysql_password
+
+  mysql:
+    secrets:
+      - mysql_root_password
+      - mysql_password
+    environment:
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+      - MYSQL_PASSWORD_FILE=/run/secrets/mysql_password
 
 secrets:
-  anthropic_api_key:
-    external: true
   secret_key:
     external: true
-  redis_password:
+  mysql_password:
+    external: true
+  mysql_root_password:
     external: true
 ```
 
@@ -1169,8 +1219,8 @@ def read_secret(name: str, default: str = "") -> str:
     return os.getenv(name, default)
 
 class Settings(BaseSettings):
-    anthropic_api_key: str = Field(default_factory=lambda: read_secret("ANTHROPIC_API_KEY"))
     secret_key: str = Field(default_factory=lambda: read_secret("SECRET_KEY"))
+    mysql_password: str = Field(default_factory=lambda: read_secret("MYSQL_PASSWORD"))
 ```
 
 ### 7.4 セキュリティスキャン
@@ -1186,12 +1236,12 @@ trivy image --severity HIGH,CRITICAL claude-backend:latest
 echo "Scanning frontend image..."
 trivy image --severity HIGH,CRITICAL claude-frontend:latest
 
-echo "Scanning redis image..."
-trivy image --severity HIGH,CRITICAL redis:7.2-alpine
+echo "Scanning mysql image..."
+trivy image --severity HIGH,CRITICAL mysql:8.0
 
 # Dependency vulnerability check
 echo "Checking Python dependencies..."
-cd backend && poetry export -f requirements.txt | safety check --stdin
+cd src/backend && poetry export -f requirements.txt | safety check --stdin
 
 echo "Checking Node.js dependencies..."
 cd ../frontend && npm audit --production
@@ -1208,7 +1258,8 @@ cd ../frontend && npm audit --production
 ```python
 # backend/app/api/routes/health.py
 from fastapi import APIRouter, status
-from app.core.redis_client import redis_client
+from sqlalchemy import text
+from app.core.database import get_db
 
 router = APIRouter()
 
@@ -1220,12 +1271,13 @@ async def health_check():
         "services": {}
     }
 
-    # Check Redis
+    # Check MySQL
     try:
-        await redis_client.ping()
-        health_status["services"]["redis"] = "healthy"
+        async with get_db() as db:
+            await db.execute(text("SELECT 1"))
+        health_status["services"]["mysql"] = "healthy"
     except Exception as e:
-        health_status["services"]["redis"] = f"unhealthy: {str(e)}"
+        health_status["services"]["mysql"] = f"unhealthy: {str(e)}"
         health_status["status"] = "degraded"
 
     # Check Claude API (optional)
@@ -1504,13 +1556,15 @@ spec:
         ports:
         - containerPort: 8000
         env:
-        - name: REDIS_URL
-          value: redis://redis-service:6379
-        - name: ANTHROPIC_API_KEY
+        - name: MYSQL_HOST
+          value: mysql-service
+        - name: MYSQL_PORT
+          value: "3306"
+        - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
               name: claude-secrets
-              key: anthropic-api-key
+              key: mysql-password
         resources:
           requests:
             memory: "2Gi"
@@ -1542,12 +1596,12 @@ spec:
 flowchart LR
     subgraph よくある問題と解決策
         P1[Backend起動失敗]
-        P1 --> P1_C[原因: ANTHROPIC_API_KEY未設定]
+        P1 --> P1_C[原因: SECRET_KEY未設定]
         P1_C --> P1_S[解決策: .envファイル確認、環境変数設定]
 
-        P2[Redis接続エラー]
-        P2 --> P2_C[原因: Redisコンテナ未起動]
-        P2_C --> P2_S[解決策: docker-compose up -d redis]
+        P2[MySQL接続エラー]
+        P2 --> P2_C[原因: MySQLコンテナ未起動]
+        P2_C --> P2_S[解決策: docker-compose up -d mysql]
 
         P3[Frontend接続エラー]
         P3 --> P3_C[原因: Backend URL誤設定]
@@ -1600,15 +1654,15 @@ docker stats --no-stream
 echo -e "\n=== Service Health ==="
 curl -s http://localhost:8000/api/health | jq
 
-echo -e "\n=== Redis Info ==="
-docker-compose exec redis redis-cli INFO stats
+echo -e "\n=== MySQL Status ==="
+docker-compose exec mysql mysqladmin -u root -p"${MYSQL_ROOT_PASSWORD:-root_password}" status
 
 echo -e "\n=== Container Logs (Last 50 lines) ==="
 docker-compose logs --tail=50 backend
 
 echo -e "\n=== Network Connectivity ==="
 docker-compose exec frontend ping -c 3 backend
-docker-compose exec backend ping -c 3 redis
+docker-compose exec backend ping -c 3 mysql
 ```
 
 ### 10.4 クリーンアップ
@@ -1646,50 +1700,52 @@ echo "Cleanup completed"
 
 ## 付録
 
-### A. Redis設定ファイル
+### A. MySQL設定
 
-```conf
-# redis/redis.conf
+MySQL 8.0 公式イメージを使用しており、基本的な設定は環境変数で行います。
+カスタム設定が必要な場合は、設定ファイルをマウントできます。
 
-# Network
-bind 0.0.0.0
-protected-mode yes
-port 6379
+```ini
+# mysql/my.cnf
 
-# General
-daemonize no
-pidfile /var/run/redis_6379.pid
-loglevel notice
-logfile ""
+[mysqld]
+# Character Set
+character-set-server=utf8mb4
+collation-server=utf8mb4_unicode_ci
 
-# Persistence
-save 900 1
-save 300 10
-save 60 10000
-stop-writes-on-bgsave-error yes
-rdbcompression yes
-rdbchecksum yes
-dbfilename dump.rdb
-dir /data
+# Connection
+max_connections=200
+wait_timeout=600
+interactive_timeout=600
 
-# Append Only File
-appendonly yes
-appendfilename "appendonly.aof"
-appendfsync everysec
-no-appendfsync-on-rewrite no
-auto-aof-rewrite-percentage 100
-auto-aof-rewrite-min-size 64mb
+# Performance
+innodb_buffer_pool_size=256M
+innodb_log_file_size=64M
+innodb_flush_log_at_trx_commit=2
 
-# Memory Management
-maxmemory 512mb
-maxmemory-policy allkeys-lru
-maxmemory-samples 5
+# Query Cache (disabled in MySQL 8.0)
+# query_cache_type=0
+
+# Logging
+slow_query_log=1
+slow_query_log_file=/var/log/mysql/slow.log
+long_query_time=2
 
 # Security
-# requirepass yourpassword  # Set via command line
+local_infile=0
+skip_name_resolve=1
 
-# Limits
-maxclients 10000
+[client]
+default-character-set=utf8mb4
+```
+
+```yaml
+# docker-compose.yml でのマウント例
+services:
+  mysql:
+    volumes:
+      - mysql-data:/var/lib/mysql:rw
+      - ./mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
 ```
 
 ### B. Makefile
@@ -1751,8 +1807,8 @@ shell-backend:
 shell-frontend:
 	docker-compose exec frontend sh
 
-redis-cli:
-	docker-compose exec redis redis-cli
+mysql-cli:
+	docker-compose exec mysql mysql -u claude -p claude_code
 
 backup:
 	./scripts/backup-volumes.sh
@@ -2008,6 +2064,7 @@ volumes:
 | v1.0 | 2025-12-20 | 初版作成 |
 | v1.1 | 2025-12-21 | Mermaid形式への統一、インフラ構成図のビジュアル化 |
 | v1.2 | 2025-12-29 | DinDセクション追加、テーブル形式に統一、コンテナリビルドルール追加 |
+| v1.3 | 2026-01-02 | RedisをMySQLに変更、目次の完全更新、パス修正（src/frontend, src/backend） |
 
 ---
 
@@ -2015,8 +2072,8 @@ volumes:
 
 | 項目 | 値 |
 |------|-----|
-| 設計書バージョン | 1.2 |
-| 最終更新 | 2025-12-29 |
+| 設計書バージョン | 1.3 |
+| 最終更新 | 2026-01-02 |
 | 作成者 | Claude Code |
-| レビューステータス | ✅ 完了 |
+| レビューステータス | 完了 |
 | 完成度 | 100% |
