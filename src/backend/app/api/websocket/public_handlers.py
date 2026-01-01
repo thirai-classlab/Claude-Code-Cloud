@@ -369,19 +369,15 @@ async def _stream_public_response(
                             })
 
                 elif isinstance(sdk_message, ResultMessage):
+                    # 使用量情報（usageは辞書型）
+                    usage_dict = sdk_message.usage or {}
                     usage_info = {
-                        "total_cost_usd": getattr(sdk_message, "total_cost_usd", 0),
-                        "duration_ms": getattr(sdk_message, "duration_ms", 0),
-                        "input_tokens": (
-                            getattr(sdk_message.usage, "input_tokens", 0)
-                            if hasattr(sdk_message, "usage")
-                            else 0
-                        ),
-                        "output_tokens": (
-                            getattr(sdk_message.usage, "output_tokens", 0)
-                            if hasattr(sdk_message, "usage")
-                            else 0
-                        ),
+                        "total_cost_usd": sdk_message.total_cost_usd or 0,
+                        "duration_ms": sdk_message.duration_ms or 0,
+                        "input_tokens": usage_dict.get("input_tokens", 0),
+                        "output_tokens": usage_dict.get("output_tokens", 0),
+                        "cache_creation_input_tokens": usage_dict.get("cache_creation_input_tokens", 0),
+                        "cache_read_input_tokens": usage_dict.get("cache_read_input_tokens", 0),
                     }
                     sdk_session_id = getattr(sdk_message, "session_id", None)
 

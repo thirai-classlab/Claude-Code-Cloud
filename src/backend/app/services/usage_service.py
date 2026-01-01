@@ -13,12 +13,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.database import ProjectModel, SessionModel
 from app.utils.helpers import jst_now
 
+# JSTタイムゾーン
+JST = timezone(timedelta(hours=9))
+
 
 class UsageService:
     """使用量サービス"""
 
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    def _get_jst_start_of_day(self, days_ago: int = 0) -> datetime:
+        """
+        JST基準で指定日数前の0時0分を取得（UTC変換済み）
+
+        Args:
+            days_ago: 何日前か（0=今日）
+
+        Returns:
+            JSTの0時0分をUTCに変換したdatetime
+        """
+        # 現在のJST時刻
+        now_jst = datetime.now(JST)
+        # 指定日数前のJST 0時0分
+        start_of_day_jst = now_jst.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_ago)
+        # UTCに変換して返す（DBはUTCで保存されているため）
+        return start_of_day_jst.astimezone(timezone.utc)
 
     async def get_cost_by_period(
         self,
@@ -30,12 +50,13 @@ class UsageService:
 
         Args:
             project_id: プロジェクトID
-            days: 過去何日分を取得するか
+            days: 過去何日分を取得するか（1=今日、7=過去7日、30=過去30日）
 
         Returns:
             Tuple[cost, input_tokens, output_tokens]
         """
-        since = datetime.now(timezone.utc) - timedelta(days=days)
+        # JSTの0時基準で計算（days=1は今日の0時から、days=7は7日前の0時から）
+        since = self._get_jst_start_of_day(days - 1)  # days=1なら今日の0時、days=7なら6日前の0時
 
         result = await self.session.execute(
             select(

@@ -35,6 +35,7 @@ from app.core.chat_processor import ChatMessageProcessor, ConfigBundle
 from app.core.session_manager import SessionManager, MessageSaveError
 from app.models.messages import MessageRole
 from app.schemas.websocket import WSChatMessage, WSErrorMessage
+from app.services.usage_service import UsageService
 from app.utils.database import get_session_context
 from app.utils.logger import get_logger
 
@@ -55,6 +56,7 @@ class ErrorCode(str, Enum):
     SESSION_NOT_FOUND = "session_not_found"
     PROJECT_NOT_FOUND = "project_not_found"
     API_KEY_NOT_CONFIGURED = "api_key_not_configured"
+    COST_LIMIT_EXCEEDED = "cost_limit_exceeded"
     PROCESSING_ERROR = "processing_error"
     CHAT_ERROR = "chat_error"
     INVALID_MESSAGE_TYPE = "invalid_message_type"
@@ -735,6 +737,34 @@ async def handle_chat_message(
                 )
                 return
 
+            # 利用制限チェック
+            usage_service = UsageService(db_session)
+            cost_check = await usage_service.check_cost_limits(project_id)
+            if not cost_check.get("can_use", True):
+                exceeded_limits = cost_check.get("exceeded_limits", [])
+                limit_names = {
+                    "daily": "1日",
+                    "weekly": "7日",
+                    "monthly": "30日",
+                }
+                exceeded_names = [limit_names.get(l, l) for l in exceeded_limits]
+                error_msg = f"利用制限に達しました（{', '.join(exceeded_names)}の上限）。制限設定を確認してください。"
+                await conn_manager.send_error(
+                    session_id,
+                    error_msg,
+                    ErrorCode.COST_LIMIT_EXCEEDED,
+                    {
+                        "exceeded_limits": exceeded_limits,
+                        "cost_daily": cost_check.get("cost_daily", 0),
+                        "cost_weekly": cost_check.get("cost_weekly", 0),
+                        "cost_monthly": cost_check.get("cost_monthly", 0),
+                        "limit_daily": cost_check.get("limit_daily"),
+                        "limit_weekly": cost_check.get("limit_weekly"),
+                        "limit_monthly": cost_check.get("limit_monthly"),
+                    }
+                )
+                return
+
             # メッセージ履歴取得
             message_history = await session_manager.get_message_history(session_id)
             existing_message_count = len(message_history)
@@ -1056,6 +1086,18 @@ async def handle_chat_message(
             # アクティビティ更新
             await session_manager.update_activity(session_id)
 
+            # 使用量情報をDBに保存（料金追跡用）
+            total_tokens = usage_info.get("input_tokens", 0) + usage_info.get("output_tokens", 0)
+            total_cost = usage_info.get("total_cost_usd", 0)
+            if total_tokens > 0 or total_cost > 0:
+                await session_manager.update_usage(session_id, total_tokens, total_cost)
+                logger.debug(
+                    "Usage saved to DB",
+                    session_id=session_id,
+                    tokens=total_tokens,
+                    cost=total_cost,
+                )
+
             # 処理状態をDBでクリア（正常完了）
             await session_manager.set_processing(session_id, False)
 
@@ -1253,20 +1295,15 @@ async def _stream_response(
                 )
 
             elif isinstance(sdk_message, ResultMessage):
-                # 使用量情報
+                # 使用量情報（usageは辞書型）
+                usage_dict = sdk_message.usage or {}
                 usage_info = {
-                    "total_cost_usd": getattr(sdk_message, "total_cost_usd", 0),
-                    "duration_ms": getattr(sdk_message, "duration_ms", 0),
-                    "input_tokens": (
-                        getattr(sdk_message.usage, "input_tokens", 0)
-                        if hasattr(sdk_message, "usage")
-                        else 0
-                    ),
-                    "output_tokens": (
-                        getattr(sdk_message.usage, "output_tokens", 0)
-                        if hasattr(sdk_message, "usage")
-                        else 0
-                    ),
+                    "total_cost_usd": sdk_message.total_cost_usd or 0,
+                    "duration_ms": sdk_message.duration_ms or 0,
+                    "input_tokens": usage_dict.get("input_tokens", 0),
+                    "output_tokens": usage_dict.get("output_tokens", 0),
+                    "cache_creation_input_tokens": usage_dict.get("cache_creation_input_tokens", 0),
+                    "cache_read_input_tokens": usage_dict.get("cache_read_input_tokens", 0),
                 }
                 # SDKセッションIDを取得（セッション再開用）
                 sdk_session_id = getattr(sdk_message, "session_id", None)

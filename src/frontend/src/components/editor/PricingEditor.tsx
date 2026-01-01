@@ -15,39 +15,27 @@ interface PricingEditorProps {
   projectId: string;
 }
 
-// Claude model pricing (per 1M tokens)
-const PRICING = {
-  claude_sonnet: {
-    name: 'Claude 3.5 Sonnet',
-    input: 3.00,
-    output: 15.00,
-  },
-  claude_opus: {
-    name: 'Claude 3 Opus',
-    input: 15.00,
-    output: 75.00,
-  },
-  claude_haiku: {
-    name: 'Claude 3.5 Haiku',
-    input: 0.80,
-    output: 4.00,
-  },
-};
 
 export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [limitCheck, setLimitCheck] = useState<CostLimitCheck | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // 利用制限の入力値（空文字は無制限を意味する）
   const [limitDaily, setLimitDaily] = useState<string>('');
   const [limitWeekly, setLimitWeekly] = useState<string>('');
   const [limitMonthly, setLimitMonthly] = useState<string>('');
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
       const [usageStats, costCheck] = await Promise.all([
         projectsApi.getUsage(projectId),
@@ -55,6 +43,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       ]);
       setStats(usageStats);
       setLimitCheck(costCheck);
+      setLastUpdated(new Date());
 
       // 入力フィールドに現在の制限値をセット
       setLimitDaily(costCheck.limit_daily !== null ? costCheck.limit_daily.toString() : '');
@@ -65,12 +54,25 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
       toast.error(t('editor.pricing.loadError'));
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [projectId, t]);
+
+  const handleRefresh = useCallback(() => {
+    loadData(true);
+  }, [loadData]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const formatLastUpdated = (date: Date) => {
+    return new Intl.DateTimeFormat('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(date);
+  };
 
   const handleSaveLimits = async () => {
     setIsSaving(true);
@@ -170,8 +172,39 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
     <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border">
-        <h2 className="text-lg font-semibold text-text-primary">{t('editor.pricing.title')}</h2>
-        <p className="text-xs text-text-tertiary mt-1">{t('editor.pricing.description')}</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">{t('editor.pricing.title')}</h2>
+            <p className="text-xs text-text-tertiary mt-1">{t('editor.pricing.description')}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {lastUpdated && (
+              <span className="text-xs text-text-tertiary">
+                {formatLastUpdated(lastUpdated)}
+              </span>
+            )}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-2 rounded-lg bg-bg-secondary border border-border hover:bg-bg-tertiary transition-colors disabled:opacity-50"
+              title="最新の情報を取得"
+            >
+              <svg
+                className={`w-4 h-4 text-text-secondary ${isRefreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Content */}
@@ -365,40 +398,25 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
             </div>
           </div>
 
-          {/* Pricing Table */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">{t('editor.pricing.pricingTable')}</h3>
-            <div className="bg-bg-secondary rounded-lg border border-border overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider">{t('editor.pricing.model')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider">{t('editor.pricing.input')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wider">{t('editor.pricing.output')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {Object.entries(PRICING).map(([key, model]) => (
-                    <tr key={key} className="hover:bg-bg-tertiary transition-colors">
-                      <td className="px-4 py-3 text-sm text-text-primary">{model.name}</td>
-                      <td className="px-4 py-3 text-sm text-text-secondary text-right font-mono">${model.input.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-sm text-text-secondary text-right font-mono">${model.output.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-text-tertiary mt-2">
-              {t('editor.pricing.pricingNote')}
+          {/* Pricing Link */}
+          <div className="p-4 bg-bg-secondary rounded-lg border border-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-text-primary">API料金表</h3>
+                <p className="text-xs text-text-tertiary mt-1">最新の料金はClaudeの公式サイトをご確認ください</p>
+              </div>
               <a
-                href="https://www.anthropic.com/pricing"
+                href="https://claude.com/pricing#api"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-accent hover:underline ml-1"
+                className="flex items-center gap-2 px-4 py-2 bg-accent text-white text-sm rounded-lg hover:bg-accent/90 transition-colors"
               >
-                Anthropic Pricing
+                <span>料金を確認</span>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
               </a>
-            </p>
+            </div>
           </div>
 
           {/* Info Box */}
@@ -408,10 +426,30 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <h4 className="text-sm font-medium text-accent mb-1">{t('editor.pricing.usageNote')}</h4>
-                <p className="text-xs text-text-secondary">
-                  {t('editor.pricing.usageNoteText')}
-                </p>
+                <h4 className="text-sm font-medium text-accent mb-1">APIキーと料金について</h4>
+                <ul className="text-xs text-text-secondary space-y-1">
+                  <li>• 使用量はセッションごとに集計されます</li>
+                  <li>• 課金はプロジェクトに設定されたAPIキーに対して発生します</li>
+                  <li>• 正確な料金集計のため、プロジェクトごとにAPIキーを設定してください</li>
+                  <li>• 利用制限に達すると、新しいメッセージを送信できなくなります</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* API利用料金の更新タイミング説明 */}
+          <div className="p-4 bg-bg-secondary border border-border rounded-lg">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-text-tertiary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h4 className="text-sm font-medium text-text-primary mb-1">利用料金の更新タイミング</h4>
+                <ul className="text-xs text-text-secondary space-y-1">
+                  <li>• チャットメッセージの送信完了時に自動で記録されます</li>
+                  <li>• 中断されたメッセージの料金は含まれない場合があります</li>
+                  <li>• 最新の情報を確認するには、右上の同期ボタンをクリックしてください</li>
+                </ul>
               </div>
             </div>
           </div>

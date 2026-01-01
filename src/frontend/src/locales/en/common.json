@@ -113,6 +113,8 @@
     "theme": "Theme"
   },
   "editor": {
+    "openPanel": "Open panel",
+    "collapsePanel": "Collapse panel",
     "tabs": {
       "vscode": "VSCode",
       "mcp": "MCP",

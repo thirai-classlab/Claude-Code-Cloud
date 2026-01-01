@@ -113,6 +113,8 @@
     "theme": "テーマ"
   },
   "editor": {
+    "openPanel": "パネルを開く",
+    "collapsePanel": "パネルを閉じる",
     "tabs": {
       "vscode": "VSCode",
       "mcp": "MCP",

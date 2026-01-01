@@ -123,6 +123,21 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
   if (!isEditorPanelOpen) {
     return (
       <div className="h-full flex flex-col items-center bg-bg-secondary border-l border-border-subtle py-2 w-12">
+        {/* Open panel button */}
+        <button
+          onClick={toggleEditorPanel}
+          className="p-2 rounded-lg mb-3 text-text-secondary hover:text-accent hover:bg-bg-tertiary transition-colors"
+          title={t('editor.openPanel')}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </svg>
+        </button>
+
+        {/* Separator */}
+        <div className="w-6 h-px bg-border-subtle mb-3" />
+
+        {/* Tab icons */}
         {EDITOR_TAB_CONFIG.map((tab) => (
           <button
             key={tab.id}
