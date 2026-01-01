@@ -5,10 +5,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { Modal } from '@/components/common/Modal';
 import { templatesApi } from '@/lib/api/templates';
 import { toast } from '@/stores/toastStore';
+import { confirm } from '@/stores/confirmStore';
 import type { TemplateListItem, CreateTemplateRequest, UpdateTemplateRequest } from '@/types/template';
 
 interface TemplateSectionProps {
@@ -16,6 +18,7 @@ interface TemplateSectionProps {
 }
 
 export const TemplateSection: React.FC<TemplateSectionProps> = ({ onSelectTemplate }) => {
+  const { t } = useTranslation();
   const [templates, setTemplates] = useState<TemplateListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -63,7 +66,14 @@ export const TemplateSection: React.FC<TemplateSectionProps> = ({ onSelectTempla
   };
 
   const handleDeleteTemplate = async (template: TemplateListItem) => {
-    if (!confirm(`Delete template "${template.name}"?`)) return;
+    const confirmed = await confirm({
+      title: t('template.deleteTitle'),
+      message: t('template.confirmDelete', { name: template.name }),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await templatesApi.delete(template.id);
       toast.success(`Template "${template.name}" deleted`);
@@ -293,23 +303,20 @@ const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
   const [description, setDescription] = useState(initialData?.description || '');
   const [isPublic, setIsPublic] = useState(initialData?.is_public || false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setName(initialData?.name || '');
       setDescription(initialData?.description || '');
       setIsPublic(initialData?.is_public || false);
-      setError(null);
     }
   }, [isOpen, initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
     if (!name.trim()) {
-      setError('Template name is required');
+      toast.warning('Template name is required');
       return;
     }
 
@@ -320,8 +327,9 @@ const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
         description: description.trim() || undefined,
         is_public: isPublic,
       });
+      toast.success(initialData ? 'Template updated' : 'Template created');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save template');
+      toast.error(err instanceof Error ? err.message : 'Failed to save template');
     } finally {
       setIsSubmitting(false);
     }
@@ -375,13 +383,6 @@ const TemplateFormModal: React.FC<TemplateFormModalProps> = ({
             Make this template public
           </label>
         </div>
-
-        {/* Error */}
-        {error && (
-          <div className="p-3 bg-status-error/10 border border-status-error/30 rounded-md">
-            <p className="text-sm text-status-error">{error}</p>
-          </div>
-        )}
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">

@@ -5,6 +5,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '@/lib/i18n';
 import { ToastContainer } from '@/components/common/Toast';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const { theme, language } = useUIStore();
@@ -38,6 +39,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <I18nextProvider i18n={i18n}>
       {children}
       <ToastContainer />
+      <ConfirmDialog />
     </I18nextProvider>
   );
 }

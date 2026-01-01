@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
+import { toast } from '@/stores/toastStore';
 import type {
   ProjectAgent,
   CreateProjectAgentRequest,
@@ -21,7 +22,6 @@ import {
   normalizeCategory,
   parseMarkdownWithFrontmatter,
   ToggleSwitch,
-  useSuccessMessage,
   type EditorCategory,
 } from './shared';
 
@@ -45,8 +45,6 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, showSuccess] = useSuccessMessage();
   const [expandedCategories, setExpandedCategories] = useState<Set<EditorCategory>>(
     new Set(AGENT_CATEGORY_ORDER)
   );
@@ -73,13 +71,12 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const agentsList = await projectConfigApi.listAgents(projectId);
       setAgents(agentsList);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load agent configuration';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -100,14 +97,14 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
     try {
       setIsSaving(true);
       await projectConfigApi.updateAgent(projectId, agent.id, { enabled: newEnabled });
-      showSuccess(`${agent.name} ${newEnabled ? 'enabled' : 'disabled'}`);
+      toast.success(`${agent.name} ${newEnabled ? 'enabled' : 'disabled'}`);
     } catch (err: unknown) {
       // Revert on error
       setAgents((prev) =>
         prev.map((a) => (a.id === agent.id ? { ...a, enabled: !newEnabled } : a))
       );
       const errorMessage = err instanceof Error ? err.message : 'Failed to toggle agent';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -125,7 +122,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
 
   const handleCreateAgent = async () => {
     if (!newAgentForm.name) {
-      setError('Name is required');
+      toast.warning('Name is required');
       return;
     }
 
@@ -133,12 +130,12 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
       setIsCreating(true);
       const createdAgent = await projectConfigApi.createAgent(projectId, newAgentForm);
       setAgents((prev) => [...prev, createdAgent]);
-      showSuccess(`Agent "${createdAgent.name}" created successfully`);
+      toast.success(`Agent "${createdAgent.name}" created successfully`);
       setIsCreateModalOpen(false);
       setNewAgentForm(getDefaultAgentForm());
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create agent';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsCreating(false);
     }
@@ -171,13 +168,13 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
       setAgents((prev) =>
         prev.map((a) => (a.id === editingAgent.id ? updatedAgent : a))
       );
-      showSuccess(`Agent "${updatedAgent.name}" updated successfully`);
+      toast.success(`Agent "${updatedAgent.name}" updated successfully`);
       setIsEditModalOpen(false);
       setEditingAgent(null);
       setEditAgentForm({});
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update agent';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsUpdating(false);
     }
@@ -191,10 +188,10 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
       setDeletingAgentId(agentId);
       await projectConfigApi.deleteAgent(projectId, agentId);
       setAgents((prev) => prev.filter((a) => a.id !== agentId));
-      showSuccess(`Agent "${agent.name}" deleted successfully`);
+      toast.success(`Agent "${agent.name}" deleted successfully`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete agent';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setDeletingAgentId(null);
     }
@@ -254,7 +251,7 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
       // Create the agent
       const createdAgent = await projectConfigApi.createAgent(projectId, agentData);
       setAgents((prev) => [...prev, createdAgent]);
-      showSuccess(`Agent "${createdAgent.name}" imported successfully`);
+      toast.success(`Agent "${createdAgent.name}" imported successfully`);
 
       // Close modal
       setIsImportModalOpen(false);
@@ -318,24 +315,6 @@ export const AgentSettingsEditor: React.FC<AgentSettingsEditorProps> = ({ projec
           </div>
         </div>
       </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
-          <p className="text-sm text-red-400">{error}</p>
-          <button
-            onClick={() => setError(null)}
-            className="text-xs text-red-400 hover:text-red-300 mt-1 underline"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-      {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
-          <p className="text-sm text-green-400">{successMessage}</p>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">

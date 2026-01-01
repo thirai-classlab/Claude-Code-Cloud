@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/atoms';
 import { modelsApi, ModelInfo } from '@/lib/api';
+import { toast } from '@/stores/toastStore';
 
 // Fallback models when API is unavailable
 const FALLBACK_MODELS = [
@@ -33,7 +34,6 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
   const [model, setModel] = useState(FALLBACK_MODELS[0].id);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Fetch available models from API
   const loadModels = useCallback(async () => {
@@ -64,7 +64,6 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
     setIsSubmitting(true);
     try {
@@ -77,7 +76,7 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
       setModel(models[0]?.id || FALLBACK_MODELS[0].id);
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to create session');
+      toast.error(err.message || 'Failed to create session');
     } finally {
       setIsSubmitting(false);
     }
@@ -87,7 +86,6 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
     if (!isSubmitting) {
       setTitle('');
       setModel(models[0]?.id || FALLBACK_MODELS[0].id);
-      setError(null);
       onClose();
     }
   };
@@ -146,13 +144,6 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
             You can change the model during the session
           </p>
         </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="p-3 bg-status-error/10 border border-status-error/30 rounded-md">
-            <p className="text-sm text-status-error">{error}</p>
-          </div>
-        )}
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">

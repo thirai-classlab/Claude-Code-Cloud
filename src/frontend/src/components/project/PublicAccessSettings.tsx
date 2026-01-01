@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/stores/toastStore';
+import { confirm } from '@/stores/confirmStore';
 import {
   getPublicAccess,
   createPublicAccess,
@@ -130,7 +131,14 @@ export function PublicAccessSettings({ projectId }: Props) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(t('editor.publicAccess.confirmDelete'))) return;
+    const confirmed = await confirm({
+      title: t('editor.publicAccess.deleteTitle'),
+      message: t('editor.publicAccess.confirmDelete'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     setSaving(true);
 
@@ -152,7 +160,14 @@ export function PublicAccessSettings({ projectId }: Props) {
   };
 
   const handleRegenerateToken = async () => {
-    if (!confirm(t('editor.publicAccess.confirmRegenerate'))) return;
+    const confirmed = await confirm({
+      title: t('editor.publicAccess.regenerateTitle'),
+      message: t('editor.publicAccess.confirmRegenerate'),
+      confirmLabel: t('editor.publicAccess.regenerate'),
+      cancelLabel: t('common.cancel'),
+      variant: 'warning',
+    });
+    if (!confirmed) return;
 
     setSaving(true);
 

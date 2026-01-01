@@ -13,7 +13,6 @@ export type {
   EditorCategory,
   CategoryConfig,
   ParsedMarkdown,
-  ShowSuccessFunction,
 } from './types';
 
 // Category configuration
@@ -30,6 +29,3 @@ export { parseMarkdownWithFrontmatter } from './parseMarkdownFrontmatter';
 // Components
 export { ToggleSwitch } from './ToggleSwitch';
 export type { ToggleSwitchProps } from './ToggleSwitch';
-
-// Hooks
-export { useSuccessMessage } from './useSuccessMessage';

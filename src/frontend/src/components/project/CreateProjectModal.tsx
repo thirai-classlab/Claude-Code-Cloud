@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/atoms';
 import { templatesApi } from '@/lib/api/templates';
+import { toast } from '@/stores/toastStore';
 import type { TemplateListItem } from '@/types/template';
 import type { Project } from '@/types/project';
 
@@ -32,7 +33,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Template selection (radio button style: 'blank' or 'template')
   const [projectType, setProjectType] = useState<'blank' | 'template'>('blank');
@@ -69,10 +69,9 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
     if (!name.trim()) {
-      setError(t('modal.projectNameRequired'));
+      toast.warning(t('modal.projectNameRequired'));
       return;
     }
 
@@ -99,7 +98,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         resetForm();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create project');
+      toast.error(err instanceof Error ? err.message : 'Failed to create project');
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +111,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     setShowApiKey(false);
     setProjectType('blank');
     setSelectedTemplate(null);
-    setError(null);
   };
 
   const handleClose = () => {
@@ -373,13 +371,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             {t('modal.apiKeyHint')}
           </p>
         </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="p-3 bg-status-error/10 border border-status-error/30 rounded-md">
-            <p className="text-sm text-status-error">{error}</p>
-          </div>
-        )}
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">

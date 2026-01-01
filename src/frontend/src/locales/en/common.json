@@ -73,13 +73,16 @@
     "sessions": "sessions",
     "updated": "Updated",
     "searchProjects": "Search projects...",
-    "search": "Search..."
+    "search": "Search...",
+    "deleteTitle": "Delete Project",
+    "confirmDelete": "Delete this project and all its sessions?"
   },
   "session": {
     "session": "Session",
     "sessions": "Sessions",
     "newSession": "+ New Session",
     "noSessions": "No sessions yet",
+    "deleteTitle": "Delete Session",
     "confirmDelete": "Are you sure you want to delete this session?"
   },
   "sidebar": {
@@ -89,7 +92,10 @@
   "chat": {
     "placeholder": "Type a message... (/ for commands, Shift+Enter to send)",
     "send": "Send",
-    "thinking": "Thinking..."
+    "thinking": "Thinking...",
+    "clearHistoryTitle": "Clear Chat History",
+    "confirmClearHistory": "Are you sure you want to clear all messages?",
+    "clear": "Clear"
   },
   "common": {
     "loading": "Loading...",
@@ -148,7 +154,9 @@
       "noServers": "No MCP servers configured",
       "addFirstServer": "Add your first MCP server",
       "serversConfigured": "{{count}} server configured",
-      "serversConfigured_plural": "{{count}} servers configured"
+      "serversConfigured_plural": "{{count}} servers configured",
+      "deleteServerTitle": "Delete Server",
+      "confirmDeleteServer": "Are you sure you want to delete the server \"{{name}}\"?"
     },
     "agents": {
       "title": "Sub-agents Settings",
@@ -195,7 +203,8 @@
       "enabled": "Enabled",
       "editCommand": "Edit Command",
       "deleteCommand": "Delete Command",
-      "confirmDelete": "Are you sure you want to delete this command?"
+      "deleteTitle": "Delete Command",
+      "confirmDelete": "Are you sure you want to delete \"{{name}}\"?"
     },
     "cron": {
       "title": "Cron Schedules",
@@ -232,6 +241,7 @@
       "noExecutionLogsDescription": "Scheduled commands will appear here after execution.",
       "viewResult": "View Result",
       "error": "Error",
+      "deleteSchedule": "Delete Schedule",
       "confirmDelete": "Are you sure you want to delete the schedule \"{{name}}\"?",
       "scheduleDeleted": "Schedule \"{{name}}\" deleted successfully",
       "scheduleEnabled": "Schedule \"{{name}}\" enabled",
@@ -280,7 +290,9 @@
       "tokenRegenerated": "Token regenerated successfully",
       "regenerateError": "Failed to regenerate token",
       "commandUpdated": "Command visibility updated",
-      "commandUpdateError": "Failed to update command visibility"
+      "commandUpdateError": "Failed to update command visibility",
+      "deleteTitle": "Disable Public Access",
+      "regenerateTitle": "Regenerate Token"
     },
     "pricing": {
       "title": "Pricing & Usage",
@@ -367,5 +379,9 @@
     "cancel": "Cancel",
     "create": "Create Session",
     "creating": "Creating..."
+  },
+  "template": {
+    "deleteTitle": "Delete Template",
+    "confirmDelete": "Delete template \"{{name}}\"?"
   }
 }

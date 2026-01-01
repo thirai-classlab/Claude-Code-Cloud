@@ -73,13 +73,16 @@
     "sessions": "セッション",
     "updated": "更新日",
     "searchProjects": "プロジェクトを検索...",
-    "search": "検索..."
+    "search": "検索...",
+    "deleteTitle": "プロジェクトの削除",
+    "confirmDelete": "このプロジェクトとすべてのセッションを削除しますか？"
   },
   "session": {
     "session": "セッション",
     "sessions": "セッション",
     "newSession": "+ 新規セッション",
     "noSessions": "セッションがありません",
+    "deleteTitle": "セッションの削除",
     "confirmDelete": "このセッションを削除してもよろしいですか？"
   },
   "sidebar": {
@@ -89,7 +92,10 @@
   "chat": {
     "placeholder": "メッセージを入力... (/ でコマンド、Shift+Enter で送信)",
     "send": "送信",
-    "thinking": "考え中..."
+    "thinking": "考え中...",
+    "clearHistoryTitle": "チャット履歴をクリア",
+    "confirmClearHistory": "すべてのメッセージをクリアしてもよろしいですか？",
+    "clear": "クリア"
   },
   "common": {
     "loading": "読み込み中...",
@@ -147,7 +153,9 @@
       "enabled": "有効",
       "noServers": "MCPサーバーが設定されていません",
       "addFirstServer": "最初のMCPサーバーを追加してください",
-      "serversConfigured": "{{count}}個のサーバーが設定済み"
+      "serversConfigured": "{{count}}個のサーバーが設定済み",
+      "deleteServerTitle": "サーバーの削除",
+      "confirmDeleteServer": "サーバー「{{name}}」を削除してもよろしいですか？"
     },
     "agents": {
       "title": "サブエージェント設定",
@@ -194,7 +202,8 @@
       "enabled": "有効",
       "editCommand": "コマンド編集",
       "deleteCommand": "コマンド削除",
-      "confirmDelete": "このコマンドを削除してもよろしいですか？"
+      "deleteTitle": "コマンドの削除",
+      "confirmDelete": "「{{name}}」を削除してもよろしいですか？"
     },
     "cron": {
       "title": "スケジュール設定",
@@ -231,6 +240,7 @@
       "noExecutionLogsDescription": "スケジュールされたコマンドは実行後にここに表示されます。",
       "viewResult": "結果を表示",
       "error": "エラー",
+      "deleteSchedule": "スケジュールの削除",
       "confirmDelete": "スケジュール「{{name}}」を削除してもよろしいですか？",
       "scheduleDeleted": "スケジュール「{{name}}」を削除しました",
       "scheduleEnabled": "スケジュール「{{name}}」を有効にしました",
@@ -279,7 +289,9 @@
       "tokenRegenerated": "トークンを再生成しました",
       "regenerateError": "トークンの再生成に失敗しました",
       "commandUpdated": "コマンドの公開設定を更新しました",
-      "commandUpdateError": "コマンドの公開設定の更新に失敗しました"
+      "commandUpdateError": "コマンドの公開設定の更新に失敗しました",
+      "deleteTitle": "外部公開の無効化",
+      "regenerateTitle": "トークンの再生成"
     },
     "pricing": {
       "title": "料金・使用量",
@@ -366,5 +378,9 @@
     "cancel": "キャンセル",
     "create": "セッション作成",
     "creating": "作成中..."
+  },
+  "template": {
+    "deleteTitle": "テンプレートの削除",
+    "confirmDelete": "テンプレート「{{name}}」を削除しますか？"
   }
 }

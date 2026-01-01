@@ -31,8 +31,3 @@ export interface ParsedMarkdown {
   meta: Record<string, unknown>;
   content: string;
 }
-
-/**
- * Success message handler function type
- */
-export type ShowSuccessFunction = (message: string) => void;

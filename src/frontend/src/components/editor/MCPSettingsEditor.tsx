@@ -8,8 +8,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
+import { toast } from '@/stores/toastStore';
+import { confirm } from '@/stores/confirmStore';
 import type { ProjectMCPServer, CreateProjectMCPServerRequest, UpdateProjectMCPServerRequest, MCPTool } from '@/types';
-import { ToggleSwitch, useSuccessMessage } from './shared';
+import { ToggleSwitch } from './shared';
 
 interface MCPSettingsEditorProps {
   projectId: string;
@@ -50,8 +52,6 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
   const [servers, setServers] = useState<ProjectMCPServer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, showSuccess] = useSuccessMessage();
 
   const [isAddingServer, setIsAddingServer] = useState(false);
   const [editingServerId, setEditingServerId] = useState<string | null>(null);
@@ -70,13 +70,12 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
   const loadServers = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const serverList = await projectConfigApi.listMCPServers(projectId);
       setServers(serverList);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load MCP servers';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -125,18 +124,23 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
   };
 
   const handleDeleteServer = async (server: ProjectMCPServer) => {
-    if (!confirm(`Are you sure you want to delete the server "${server.name}"?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('editor.mcp.deleteServerTitle'),
+      message: t('editor.mcp.confirmDeleteServer', { name: server.name }),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       setIsSaving(true);
       await projectConfigApi.deleteMCPServer(projectId, server.id);
       setServers(prev => prev.filter(s => s.id !== server.id));
-      showSuccess(`Server "${server.name}" deleted successfully`);
+      toast.success(`Server "${server.name}" deleted successfully`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete server';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -149,10 +153,10 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
         enabled: !server.enabled,
       });
       setServers(prev => prev.map(s => s.id === server.id ? updated : s));
-      showSuccess(`Server "${server.name}" ${updated.enabled ? 'enabled' : 'disabled'}`);
+      toast.success(`Server "${server.name}" ${updated.enabled ? 'enabled' : 'disabled'}`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update server';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -160,7 +164,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
   const handleSaveServer = async () => {
     if (!serverForm.name.trim() || !serverForm.command.trim()) {
-      setError('Server name and command are required');
+      toast.warning('Server name and command are required');
       return;
     }
 
@@ -169,7 +173,6 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
     try {
       setIsSaving(true);
-      setError(null);
 
       if (editingServerId) {
         // Update existing server
@@ -181,7 +184,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
         };
         const updated = await projectConfigApi.updateMCPServer(projectId, editingServerId, updateData);
         setServers(prev => prev.map(s => s.id === editingServerId ? updated : s));
-        showSuccess('Server updated successfully');
+        toast.success('Server updated successfully');
       } else {
         // Create new server
         const createData: CreateProjectMCPServerRequest = {
@@ -193,7 +196,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
         };
         const created = await projectConfigApi.createMCPServer(projectId, createData);
         setServers(prev => [...prev, created]);
-        showSuccess('Server added successfully');
+        toast.success('Server added successfully');
       }
 
       setIsAddingServer(false);
@@ -201,7 +204,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       setServerForm(emptyServerForm);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save server configuration';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -211,7 +214,6 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
     setIsAddingServer(false);
     setEditingServerId(null);
     setServerForm(emptyServerForm);
-    setError(null);
   };
 
   // Parse JSON and extract MCP server configurations
@@ -319,7 +321,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
       if (createdServers.length > 0) {
         setServers(prev => [...prev, ...createdServers]);
-        showSuccess(`Successfully imported ${createdServers.length} server(s)`);
+        toast.success(`Successfully imported ${createdServers.length} server(s)`);
       }
 
       if (errors.length > 0) {
@@ -364,9 +366,9 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
 
       if (result.success) {
         setExpandedTools(prev => ({ ...prev, [server.id]: true }));
-        showSuccess(`Connection successful - ${result.tools.length} tool(s) available`);
+        toast.success(`Connection successful - ${result.tools.length} tool(s) available`);
       } else {
-        setError(result.error || 'Connection test failed');
+        toast.error(result.error || 'Connection test failed');
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to test connection';
@@ -378,7 +380,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
           error: errorMessage
         }
       }));
-      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -399,7 +401,7 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
       // If null, all tools are enabled. When disabling one, we need to get all tools first
       const testResult = testResults[server.id];
       if (!testResult?.tools) {
-        setError('Please test the connection first to load available tools');
+        toast.warning('Please test the connection first to load available tools');
         return;
       }
       // Start with all tools enabled, then remove the one being disabled
@@ -426,10 +428,10 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
         enabled_tools: newEnabledTools.length > 0 ? newEnabledTools : null
       });
       setServers(prev => prev.map(s => s.id === server.id ? updated : s));
-      showSuccess(`Tool "${toolName}" ${enabled ? 'enabled' : 'disabled'}`);
+      toast.success(`Tool "${toolName}" ${enabled ? 'enabled' : 'disabled'}`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update tool settings';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -488,18 +490,6 @@ export const MCPSettingsEditor: React.FC<MCPSettingsEditorProps> = ({ projectId 
           </div>
         </div>
       </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
-          <p className="text-sm text-red-400">{error}</p>
-        </div>
-      )}
-      {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
-          <p className="text-sm text-green-400">{successMessage}</p>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">

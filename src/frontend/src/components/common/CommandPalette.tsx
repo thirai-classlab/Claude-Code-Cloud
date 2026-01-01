@@ -5,8 +5,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useUIStore } from '@/stores/uiStore';
 import { useChatStore } from '@/stores/chatStore';
+import { confirm } from '@/stores/confirmStore';
 
 interface Command {
   id: string;
@@ -23,6 +25,7 @@ interface CommandPaletteProps {
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -161,8 +164,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
           />
         </svg>
       ),
-      action: () => {
-        if (confirm('Are you sure you want to clear all messages?')) {
+      action: async () => {
+        const confirmed = await confirm({
+          title: t('chat.clearHistoryTitle'),
+          message: t('chat.confirmClearHistory'),
+          confirmLabel: t('chat.clear'),
+          cancelLabel: t('common.cancel'),
+          variant: 'warning',
+        });
+        if (confirmed) {
           clearMessages();
           onClose();
         }

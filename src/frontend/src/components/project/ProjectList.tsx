@@ -4,10 +4,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ProjectCard } from './ProjectCard';
 import { SessionList } from '../session/SessionList';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
+import { confirm } from '@/stores/confirmStore';
 
 export interface ProjectListProps {
   /** Active search query (applied via API) */
@@ -15,6 +17,7 @@ export interface ProjectListProps {
 }
 
 export const ProjectList: React.FC<ProjectListProps> = ({ activeSearch = '' }) => {
+  const { t } = useTranslation();
   const {
     projects,
     currentProjectId,
@@ -80,12 +83,19 @@ export const ProjectList: React.FC<ProjectListProps> = ({ activeSearch = '' }) =
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    if (confirm('このプロジェクトとすべてのセッションを削除しますか？')) {
+    const confirmed = await confirm({
+      title: t('project.deleteTitle'),
+      message: t('project.confirmDelete'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      variant: 'danger',
+    });
+    if (confirmed) {
       try {
         await deleteProject(projectId);
         setContextMenu(null);
       } catch (err) {
-        console.error('プロジェクトの削除に失敗しました:', err);
+        console.error('Failed to delete project:', err);
       }
     }
   };

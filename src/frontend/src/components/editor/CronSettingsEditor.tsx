@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { cronApi } from '@/lib/api/cron';
 import { toast } from '@/stores/toastStore';
+import { confirm } from '@/stores/confirmStore';
 import {
   CronScheduleResponse,
   CronScheduleCreateRequest,
@@ -122,9 +123,14 @@ export const CronSettingsEditor: React.FC<CronSettingsEditorProps> = ({ projectI
   };
 
   const handleDeleteSchedule = async (name: string) => {
-    if (!confirm(t('editor.cron.confirmDelete', { name }))) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('editor.cron.deleteSchedule'),
+      message: t('editor.cron.confirmDelete', { name }),
+      confirmLabel: t('editor.cron.delete'),
+      cancelLabel: t('common.cancel'),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       setIsSaving(true);

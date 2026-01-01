@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { projectsApi } from '@/lib/api';
 import { UsageStats, CostLimitCheck, CostLimitUpdateRequest } from '@/types/project';
 import { toast } from '@/stores/toastStore';
+import { confirm } from '@/stores/confirmStore';
 
 interface PricingEditorProps {
   projectId: string;
@@ -95,7 +96,14 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
   };
 
   const handleClearLimits = async () => {
-    if (!confirm(t('editor.pricing.confirmClearAll'))) return;
+    const confirmed = await confirm({
+      title: t('editor.pricing.clearAll'),
+      message: t('editor.pricing.confirmClearAll'),
+      confirmLabel: t('editor.pricing.clearAll'),
+      cancelLabel: t('common.cancel'),
+      variant: 'warning',
+    });
+    if (!confirmed) return;
 
     setIsSaving(true);
 

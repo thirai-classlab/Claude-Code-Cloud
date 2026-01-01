@@ -8,6 +8,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
+import { toast } from '@/stores/toastStore';
+import { confirm } from '@/stores/confirmStore';
 import type {
   ProjectCommand,
   CreateProjectCommandRequest,
@@ -19,7 +21,6 @@ import {
   normalizeCategory,
   parseMarkdownWithFrontmatter,
   ToggleSwitch,
-  useSuccessMessage,
   type EditorCategory,
 } from './shared';
 
@@ -41,8 +42,6 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
   const [commands, setCommands] = useState<ProjectCommand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, showSuccess] = useSuccessMessage();
   const [expandedCategories, setExpandedCategories] = useState<Set<EditorCategory>>(
     new Set(CATEGORY_ORDER)
   );
@@ -69,13 +68,12 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const commandsList = await projectConfigApi.listCommands(projectId);
       setCommands(commandsList);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load command configuration';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -96,14 +94,14 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
     try {
       setIsSaving(true);
       await projectConfigApi.updateCommand(projectId, command.id, { enabled: newEnabled });
-      showSuccess(`${command.name} ${newEnabled ? 'enabled' : 'disabled'}`);
+      toast.success(`${command.name} ${newEnabled ? 'enabled' : 'disabled'}`);
     } catch (err: unknown) {
       // Revert on error
       setCommands((prev) =>
         prev.map((c) => (c.id === command.id ? { ...c, enabled: !newEnabled } : c))
       );
       const errorMessage = err instanceof Error ? err.message : 'Failed to toggle command';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -121,7 +119,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
 
   const handleCreateCommand = async () => {
     if (!newCommandForm.name) {
-      setError('Name is required');
+      toast.warning('Name is required');
       return;
     }
 
@@ -129,12 +127,12 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
       setIsCreating(true);
       const createdCommand = await projectConfigApi.createCommand(projectId, newCommandForm);
       setCommands((prev) => [...prev, createdCommand]);
-      showSuccess(`Command "${createdCommand.name}" created successfully`);
+      toast.success(`Command "${createdCommand.name}" created successfully`);
       setIsCreateModalOpen(false);
       setNewCommandForm(getDefaultCommandForm());
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create command';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsCreating(false);
     }
@@ -165,13 +163,13 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
       setCommands((prev) =>
         prev.map((c) => (c.id === editingCommand.id ? updatedCommand : c))
       );
-      showSuccess(`Command "${updatedCommand.name}" updated successfully`);
+      toast.success(`Command "${updatedCommand.name}" updated successfully`);
       setIsEditModalOpen(false);
       setEditingCommand(null);
       setEditCommandForm({});
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update command';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsUpdating(false);
     }
@@ -181,18 +179,23 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
     const command = commands.find((c) => c.id === commandId);
     if (!command) return;
 
-    if (!confirm(`Are you sure you want to delete "${command.name}"?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: t('editor.commands.deleteTitle'),
+      message: t('editor.commands.confirmDelete', { name: command.name }),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       setDeletingCommandId(commandId);
       await projectConfigApi.deleteCommand(projectId, commandId);
       setCommands((prev) => prev.filter((c) => c.id !== commandId));
-      showSuccess(`Command "${command.name}" deleted successfully`);
+      toast.success(`Command "${command.name}" deleted successfully`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete command';
-      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setDeletingCommandId(null);
     }
@@ -238,7 +241,7 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
       // Create the command
       const createdCommand = await projectConfigApi.createCommand(projectId, commandData);
       setCommands((prev) => [...prev, createdCommand]);
-      showSuccess(`Command "${createdCommand.name}" imported successfully`);
+      toast.success(`Command "${createdCommand.name}" imported successfully`);
 
       // Close modal
       setIsImportModalOpen(false);
@@ -302,24 +305,6 @@ export const CommandSettingsEditor: React.FC<CommandSettingsEditorProps> = ({ pr
           </div>
         </div>
       </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
-          <p className="text-sm text-red-400">{error}</p>
-          <button
-            onClick={() => setError(null)}
-            className="text-xs text-red-400 hover:text-red-300 mt-1 underline"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-      {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
-          <p className="text-sm text-green-400">{successMessage}</p>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">

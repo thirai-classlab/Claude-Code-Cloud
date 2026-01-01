@@ -8,13 +8,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms';
 import { projectConfigApi } from '@/lib/api';
+import { toast } from '@/stores/toastStore';
 import type { ProjectSkill, CreateProjectSkillRequest, UpdateProjectSkillRequest } from '@/types';
 import {
   CATEGORY_CONFIG,
   CATEGORY_ORDER,
   parseMarkdownWithFrontmatter,
   ToggleSwitch,
-  useSuccessMessage,
   type EditorCategory,
 } from './shared';
 
@@ -43,8 +43,6 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
   const [skills, setSkills] = useState<ProjectSkill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, showSuccess] = useSuccessMessage();
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,13 +60,12 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
 
   const loadSkills = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const skillList = await projectConfigApi.listSkills(projectId);
       setSkills(skillList);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load skills';
-      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +79,6 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
     setEditingSkillId(null);
     setSkillForm(emptySkillForm);
     setIsModalOpen(true);
-    setError(null);
   };
 
   const handleOpenEditModal = (skill: ProjectSkill) => {
@@ -95,25 +91,22 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
       enabled: skill.enabled,
     });
     setIsModalOpen(true);
-    setError(null);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingSkillId(null);
     setSkillForm(emptySkillForm);
-    setError(null);
   };
 
   const handleSaveSkill = async () => {
     if (!skillForm.name.trim()) {
-      setError('Skill name is required');
+      toast.warning('Skill name is required');
       return;
     }
 
     try {
       setIsSaving(true);
-      setError(null);
 
       if (editingSkillId) {
         // Update existing skill
@@ -126,7 +119,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
         };
         const updated = await projectConfigApi.updateSkill(projectId, editingSkillId, updateData);
         setSkills(prev => prev.map(s => s.id === editingSkillId ? updated : s));
-        showSuccess(`Skill "${skillForm.name}" updated successfully`);
+        toast.success(`Skill "${skillForm.name}" updated successfully`);
       } else {
         // Create new skill
         const createData: CreateProjectSkillRequest = {
@@ -138,13 +131,13 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
         };
         const created = await projectConfigApi.createSkill(projectId, createData);
         setSkills(prev => [...prev, created]);
-        showSuccess(`Skill "${skillForm.name}" created successfully`);
+        toast.success(`Skill "${skillForm.name}" created successfully`);
       }
 
       handleCloseModal();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save skill';
-      setError(message);
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -157,11 +150,11 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
       setIsSaving(true);
       await projectConfigApi.deleteSkill(projectId, deletingSkill.id);
       setSkills(prev => prev.filter(s => s.id !== deletingSkill.id));
-      showSuccess(`Skill "${deletingSkill.name}" deleted successfully`);
+      toast.success(`Skill "${deletingSkill.name}" deleted successfully`);
       setDeletingSkill(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to delete skill';
-      setError(message);
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -174,10 +167,10 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
         enabled: !skill.enabled,
       });
       setSkills(prev => prev.map(s => s.id === skill.id ? updated : s));
-      showSuccess(`Skill "${skill.name}" ${updated.enabled ? 'enabled' : 'disabled'}`);
+      toast.success(`Skill "${skill.name}" ${updated.enabled ? 'enabled' : 'disabled'}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to update skill';
-      setError(message);
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -223,7 +216,7 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
       // Create the skill
       const createdSkill = await projectConfigApi.createSkill(projectId, skillData);
       setSkills((prev) => [...prev, createdSkill]);
-      showSuccess(`Skill "${createdSkill.name}" imported successfully`);
+      toast.success(`Skill "${createdSkill.name}" imported successfully`);
 
       // Close modal
       setIsImportModalOpen(false);
@@ -287,18 +280,6 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
           </div>
         </div>
       </div>
-
-      {/* Messages */}
-      {error && !isModalOpen && (
-        <div className="mx-4 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
-          <p className="text-sm text-red-400">{error}</p>
-        </div>
-      )}
-      {successMessage && (
-        <div className="mx-4 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-md">
-          <p className="text-sm text-green-400">{successMessage}</p>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
@@ -506,12 +487,6 @@ export const SkillsSettingsEditor: React.FC<SkillsSettingsEditorProps> = ({ proj
             </div>
 
             <div className="p-4 space-y-4">
-              {error && (
-                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-md">
-                  <p className="text-sm text-red-400">{error}</p>
-                </div>
-              )}
-
               {/* Skill Name */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">

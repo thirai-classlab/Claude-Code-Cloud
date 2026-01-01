@@ -9,6 +9,7 @@ import { SessionItem } from './SessionItem';
 import { CreateSessionModal } from './CreateSessionModal';
 import { Button } from '@/components/atoms';
 import { useSessions } from '@/hooks/useSessions';
+import { confirm } from '@/stores/confirmStore';
 
 export interface SessionListProps {
   projectId: string;
@@ -51,7 +52,14 @@ export const SessionList: React.FC<SessionListProps> = ({ projectId }) => {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (confirm(t('session.confirmDelete'))) {
+    const confirmed = await confirm({
+      title: t('session.deleteTitle'),
+      message: t('session.confirmDelete'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      variant: 'danger',
+    });
+    if (confirmed) {
       try {
         await deleteSession(sessionId);
         setContextMenu(null);

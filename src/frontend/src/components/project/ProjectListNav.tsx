@@ -8,10 +8,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { ProjectCardNav } from './ProjectCardNav';
 import { SessionListNav } from '../session/SessionListNav';
 import { useProjects } from '@/hooks/useProjects';
 import { useSessions } from '@/hooks/useSessions';
+import { confirm } from '@/stores/confirmStore';
 
 export interface ProjectListNavProps {
   /** Active search query (applied via API) */
@@ -19,6 +21,7 @@ export interface ProjectListNavProps {
 }
 
 export const ProjectListNav: React.FC<ProjectListNavProps> = ({ activeSearch = '' }) => {
+  const { t } = useTranslation();
   const params = useParams();
   const currentProjectId = params?.id as string | undefined;
 
@@ -91,7 +94,14 @@ export const ProjectListNav: React.FC<ProjectListNavProps> = ({ activeSearch = '
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    if (confirm('Delete this project and all its sessions?')) {
+    const confirmed = await confirm({
+      title: t('project.deleteTitle'),
+      message: t('project.confirmDelete'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      variant: 'danger',
+    });
+    if (confirmed) {
       try {
         await deleteProject(projectId);
         setContextMenu(null);
