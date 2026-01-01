@@ -126,16 +126,13 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
         {/* Open panel button */}
         <button
           onClick={toggleEditorPanel}
-          className="p-2 rounded-lg mb-3 text-text-secondary hover:text-accent hover:bg-bg-tertiary transition-colors"
+          className="p-2 rounded-lg mb-2 text-text-secondary hover:text-accent hover:bg-bg-tertiary transition-colors"
           title={t('editor.openPanel')}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
           </svg>
         </button>
-
-        {/* Separator */}
-        <div className="w-6 h-px bg-border-subtle mb-3" />
 
         {/* Tab icons */}
         {EDITOR_TAB_CONFIG.map((tab) => (
@@ -163,7 +160,7 @@ export const EditorContainer: React.FC<EditorContainerProps> = ({
         {/* Collapse button */}
         <button
           onClick={toggleEditorPanel}
-          className="px-2 py-2 text-text-secondary hover:text-text-primary transition-colors"
+          className="px-3 py-2 text-text-secondary hover:text-accent hover:bg-bg-tertiary transition-colors"
           title={t('editor.collapsePanel')}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
