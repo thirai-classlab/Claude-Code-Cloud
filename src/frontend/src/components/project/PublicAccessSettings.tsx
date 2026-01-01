@@ -87,7 +87,7 @@ export function PublicAccessSettings({ projectId }: Props) {
   // 共有URLを取得（選択したコマンドも公開設定）
   const handleGetShareUrl = async () => {
     if (selectedCount === 0) {
-      toast.error('公開するコマンドを1つ以上選択してください');
+      toast.error(t('editor.publicAccess.selectCommandRequired'));
       return;
     }
 
@@ -115,7 +115,7 @@ export function PublicAccessSettings({ projectId }: Props) {
 
       await navigator.clipboard.writeText(newSettings.public_url);
       setCopied(true);
-      toast.success('共有URLをコピーしました');
+      toast.success(t('editor.publicAccess.urlCopied'));
       setTimeout(() => setCopied(false), 3000);
     } catch (err: any) {
       toast.error(err.message || t('editor.publicAccess.createError'));

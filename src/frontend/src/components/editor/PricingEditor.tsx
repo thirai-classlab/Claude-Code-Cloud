@@ -187,7 +187,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
               onClick={handleRefresh}
               disabled={isRefreshing}
               className="p-2 rounded-lg bg-bg-secondary border border-border hover:bg-bg-tertiary transition-colors disabled:opacity-50"
-              title="最新の情報を取得"
+              title={t('editor.pricing.refreshTooltip')}
             >
               <svg
                 className={`w-4 h-4 text-text-secondary ${isRefreshing ? 'animate-spin' : ''}`}
@@ -402,8 +402,8 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
           <div className="p-4 bg-bg-secondary rounded-lg border border-border">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-text-primary">API料金表</h3>
-                <p className="text-xs text-text-tertiary mt-1">最新の料金はClaudeの公式サイトをご確認ください</p>
+                <h3 className="text-sm font-medium text-text-primary">{t('editor.pricing.apiPricingTable')}</h3>
+                <p className="text-xs text-text-tertiary mt-1">{t('editor.pricing.apiPricingNote')}</p>
               </div>
               <a
                 href="https://claude.com/pricing#api"
@@ -411,7 +411,7 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-4 py-2 bg-accent text-white text-sm rounded-lg hover:bg-accent/90 transition-colors"
               >
-                <span>料金を確認</span>
+                <span>{t('editor.pricing.checkPricing')}</span>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
@@ -426,29 +426,29 @@ export const PricingEditor: React.FC<PricingEditorProps> = ({ projectId }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <h4 className="text-sm font-medium text-accent mb-1">APIキーと料金について</h4>
+                <h4 className="text-sm font-medium text-accent mb-1">{t('editor.pricing.aboutApiKey')}</h4>
                 <ul className="text-xs text-text-secondary space-y-1">
-                  <li>• 使用量はセッションごとに集計されます</li>
-                  <li>• 課金はプロジェクトに設定されたAPIキーに対して発生します</li>
-                  <li>• 正確な料金集計のため、プロジェクトごとにAPIキーを設定してください</li>
-                  <li>• 利用制限に達すると、新しいメッセージを送信できなくなります</li>
+                  <li>• {t('editor.pricing.aboutApiKeyNote1')}</li>
+                  <li>• {t('editor.pricing.aboutApiKeyNote2')}</li>
+                  <li>• {t('editor.pricing.aboutApiKeyNote3')}</li>
+                  <li>• {t('editor.pricing.aboutApiKeyNote4')}</li>
                 </ul>
               </div>
             </div>
           </div>
 
-          {/* API利用料金の更新タイミング説明 */}
+          {/* Usage update timing explanation */}
           <div className="p-4 bg-bg-secondary border border-border rounded-lg">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-text-tertiary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <h4 className="text-sm font-medium text-text-primary mb-1">利用料金の更新タイミング</h4>
+                <h4 className="text-sm font-medium text-text-primary mb-1">{t('editor.pricing.usageUpdateTiming')}</h4>
                 <ul className="text-xs text-text-secondary space-y-1">
-                  <li>• チャットメッセージの送信完了時に自動で記録されます</li>
-                  <li>• 中断されたメッセージの料金は含まれない場合があります</li>
-                  <li>• 最新の情報を確認するには、右上の同期ボタンをクリックしてください</li>
+                  <li>• {t('editor.pricing.usageUpdateNote1')}</li>
+                  <li>• {t('editor.pricing.usageUpdateNote2')}</li>
+                  <li>• {t('editor.pricing.usageUpdateNote3')}</li>
                 </ul>
               </div>
             </div>
